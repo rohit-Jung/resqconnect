@@ -1,0 +1,13 @@
+services:
+  resq_postgres:
+    image: postgres
+    container_name: resq_postgresdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+
