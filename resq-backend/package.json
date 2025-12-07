@@ -3,10 +3,38 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun run ./src/index.ts --watch"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/nodemailer": "^7.0.4",
+    "drizzle-kit": "^0.31.7"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^10.1.0",
+    "authenticator": "^1.1.5",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.44.7",
+    "drizzle-zod": "^0.8.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mailgen": "^2.0.32",
+    "morgan": "^1.10.1",
+    "nodemailer": "^7.0.10",
+    "pg": "^8.16.3",
+    "winston": "^3.18.3",
+    "zod": "^4.1.12"
   }
 }
