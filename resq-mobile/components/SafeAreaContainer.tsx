@@ -32,7 +32,7 @@ const SafeAreaContainer: React.FC<SafeAreaContainerProps> = ({
   return (
     <KeyboardAvoidingView
       behavior={behavior}
-      className={`flex-1 ${className}`}
+      className={`flex-1 ${className} mt-16`}
       style={style}>
       {scrollable ? (
         <ScrollView
