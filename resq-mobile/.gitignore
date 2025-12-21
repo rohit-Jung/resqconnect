@@ -12,6 +12,9 @@ web-build/
 
 
 
+.env
+.env.*
+.drizzle
 
 ios
 android
