@@ -6,9 +6,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: "#E13333",
-        foreground: "#ffffff"
-      }
+        primary: '#E13333',
+        foreground: '#ffffff',
+      },
+      fontFamily: {
+        chau: ['ChauPhilomeneOne'],
+        inter: ['Inter'],
+      },
     },
   },
   plugins: [],
