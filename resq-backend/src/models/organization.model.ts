@@ -1,33 +1,44 @@
-import { relations } from "drizzle-orm";
+import { relations } from 'drizzle-orm';
 import {
   bigint,
   pgEnum,
   pgTable,
+  boolean,
   timestamp,
   uuid,
   varchar,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import type { z } from "zod";
+} from 'drizzle-orm/pg-core';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { type z } from 'zod';
 
-import { serviceTypeEnum } from "@/constants";
-import { serviceProvider } from "./service-provider.model";
+import { serviceTypeEnum } from '../constants';
+import { serviceProvider } from './service-provider.model';
 
-export const orgStatusEnum = pgEnum("org_status", [
-  "not_active",
-  "active",
-  "not_verified",
+export const orgStatusEnum = pgEnum('org_status', [
+  'not_active',
+  'active',
+  'not_verified',
 ]);
 
-export const organization = pgTable("organization", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull().unique(),
-  serviceCategory: serviceTypeEnum("service_category").notNull(),
-  generalNumber: bigint("general_number", { mode: "number" }).notNull(),
-  status: orgStatusEnum("org_status").notNull().default("not_verified"),
+export const organization = pgTable('organization', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  email: varchar({ length: 255 }).notNull().unique(),
+  serviceCategory: serviceTypeEnum('service_category').notNull(),
+  generalNumber: bigint('general_number', { mode: 'number' }).notNull(),
+  password: varchar({ length: 255 }).notNull(),
+  isVerified: boolean('is_verified').default(false),
+  status: orgStatusEnum('org_status').notNull().default('not_verified'),
 
-  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow(),
+  verificationToken: varchar('verification_token', { length: 255 }),
+  tokenExpiry: timestamp('token_expiry', { mode: 'string' }),
+
+  resetPasswordToken: varchar('reset_password_token', { length: 255 }),
+  resetPasswordTokenExpiry: timestamp('reset_password_token_expiry', {
+    mode: 'string',
+  }),
+  createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
 });
 
 export const organizationRelations = relations(organization, ({ many }) => ({
