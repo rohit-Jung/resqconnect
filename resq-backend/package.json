@@ -4,9 +4,15 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run ./src/index.ts --watch"
+    "dev": "bun run ./src/index.ts --watch",
+    "format": "bun prettier --write 'src/**/*.{ts,js,json}'",
+    "lint": "bun eslint .",
+    "lint:fix": "bun eslint ./src/**/.ts --fix",
+    "db:migrate": "bun drizzle-kit migrate",
+    "db:generate": "bun drizzle-kit generate"
   },
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^6.0.0",
     "@types/bun": "latest",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
@@ -14,7 +20,8 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/nodemailer": "^7.0.4",
-    "drizzle-kit": "^0.31.7"
+    "drizzle-kit": "^0.31.7",
+    "prettier": "^3.7.4"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -22,6 +29,7 @@
   "dependencies": {
     "@faker-js/faker": "^10.1.0",
     "authenticator": "^1.1.5",
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -29,7 +37,10 @@
     "drizzle-orm": "^0.44.7",
     "drizzle-zod": "^0.8.3",
     "express": "^5.1.0",
+    "h3-js": "^4.4.0",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
     "mailgen": "^2.0.32",
     "morgan": "^1.10.1",
     "nodemailer": "^7.0.10",
