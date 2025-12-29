@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 
 import { corsOptions } from '@/config';
+import { notFoundMiddleware } from '@/middlewares/not-found.middleware';
 import { v1Router } from '@/routes';
 
 const app = express();
@@ -12,7 +13,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use();
 app.use('/api/v1', v1Router);
+app.use(notFoundMiddleware);
 
 export { app };
