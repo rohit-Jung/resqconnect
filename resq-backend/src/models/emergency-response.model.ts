@@ -23,10 +23,10 @@ export const statusUpdateEnum = pgEnum('status_update', [
 export const emergencyResponse = pgTable('emergency_response', {
   id: uuid('id').defaultRandom().primaryKey(),
   emergencyRequestId: uuid('emergency_request_id').references(
-    () => emergencyRequest.id,
+    () => emergencyRequest.id
   ),
   serviceProviderId: uuid('service_provider_id').references(
-    () => serviceProvider.id,
+    () => serviceProvider.id
   ),
 
   statusUpdate: statusUpdateEnum('status_update').default('accepted'),
@@ -64,7 +64,7 @@ export const emergencyResponseRelations = relations(
       references: [serviceProvider.id],
       relationName: 'emergency_requests',
     }),
-  }),
+  })
 );
 
 export const emergencyResponseSchema = createSelectSchema(emergencyResponse);

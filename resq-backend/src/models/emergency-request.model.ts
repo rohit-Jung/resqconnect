@@ -1,56 +1,107 @@
-import { relations } from "drizzle-orm";
-import { json, pgEnum, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import type { z } from "zod";
+import { relations } from 'drizzle-orm';
+import {
+  bigint,
+  boolean,
+  customType,
+  integer,
+  json,
+  pgEnum,
+  pgTable,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { type z } from 'zod';
 
-import { serviceTypeEnum } from "../constants";
+import { serviceTypeEnum } from '../constants';
+import { serviceProvider } from './service-provider.model';
+import { user } from './user.model';
 
-import { user } from "./user.model";
-
-export const requestStatusEnum = pgEnum("request_status", [
-	"pending",
-	"assigned",
-	"rejected",
-	"in_progress",
-	"completed",
+export const requestStatusEnum = pgEnum('request_status', [
+  'pending',
+  'accepted',
+  'assigned',
+  'rejected',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'no_providers_available',
 ]);
 
-export const emergencyRequest = pgTable("emergency_request", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	userId: uuid("user_id")
-		.references(() => user.id)
-		.notNull(),
-	serviceType: serviceTypeEnum("service_type").notNull(),
-	requestStatus: requestStatusEnum("request_status").notNull().default("pending"),
-	requestTime: timestamp("request_time").defaultNow(),
-	dispatchTime: timestamp("dispatch_time"),
-	arrivalTime: timestamp("arrival_time"),
-	description: varchar({ length: 255 }),
-	location: json("location")
-		.$type<{
-			latitude: string;
-			longitude: string;
-		}>()
-		.notNull(),
-
-	createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-	updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow(),
+// Custom PostGIS geometry type
+const geometry = customType<{ data: string }>({
+  dataType() {
+    return 'geometry(Point, 4326)';
+  },
 });
 
-export const emergencyRequestRelations = relations(emergencyRequest, ({ one }) => ({
-	userId: one(user, {
-		fields: [emergencyRequest.userId],
-		references: [user.id],
-	}),
-}));
+export const emergencyRequest = pgTable('emergency_request', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id')
+    .references(() => user.id)
+    .notNull(),
+  serviceType: serviceTypeEnum('service_type').notNull(),
+  requestStatus: requestStatusEnum('request_status')
+    .notNull()
+    .default('pending'),
+  requestTime: timestamp('request_time').defaultNow(),
+  dispatchTime: timestamp('dispatch_time'),
+  arrivalTime: timestamp('arrival_time'),
+  description: varchar({ length: 255 }),
+  requestTimeout: integer().default(120), // 2 minutes default
+
+  // Location fields
+  location: json('location')
+    .$type<{
+      latitude: number;
+      longitude: number;
+    }>()
+    .notNull(),
+
+  // PostGIS Point for spatial queries
+  geoLocation: geometry('geo_location'),
+
+  // H3 Index for fast spatial lookups
+  h3Index: bigint('h3_index', { mode: 'bigint' }),
+
+  // Search escalation fields
+  searchRadius: integer('search_radius').default(1), // k-ring radius
+  expiresAt: timestamp('expires_at', { mode: 'string' }),
+
+  // Provider assignment fields
+  providerId: uuid('provider_id').references(() => serviceProvider.id),
+  acceptedAt: timestamp('accepted_at', { mode: 'string' }),
+  mustConnectBy: timestamp('must_connect_by', { mode: 'string' }),
+  providerConnectedAt: timestamp('provider_connected_at', { mode: 'string' }),
+
+  createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
+});
+
+export const emergencyRequestRelations = relations(
+  emergencyRequest,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [emergencyRequest.userId],
+      references: [user.id],
+    }),
+    provider: one(serviceProvider, {
+      fields: [emergencyRequest.providerId],
+      references: [serviceProvider.id],
+    }),
+  })
+);
 
 export const emergencyRequestSchema = createSelectSchema(emergencyRequest);
 
-export const newEmergencyRequestSchema = createInsertSchema(emergencyRequest).pick({
-	userId: true,
-	serviceType: true,
-	description: true,
-	location: true,
+export const newEmergencyRequestSchema = createInsertSchema(
+  emergencyRequest
+).pick({
+  userId: true,
+  serviceType: true,
+  description: true,
+  location: true,
 });
 
 export type IEmergencyRequest = z.infer<typeof emergencyRequestSchema>;
