@@ -1,6 +1,6 @@
-import { generateToken, verifyToken } from "authenticator";
+import { generateToken, verifyToken } from 'authenticator';
 
-import { envConfig } from "@/config/env.config";
+import { envConfig } from '@/config/env.config';
 
 export const generateOtpToken = (phoneNumber: string) => {
   const formattedKey = phoneNumber + envConfig.otp_secret;
