@@ -29,6 +29,8 @@ export const userRegisterFormSchema = z
     primaryAddress: z.string().min(1, 'Primary address is required'),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Please confirm your password'),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -49,6 +51,8 @@ export const userRegisterSchema = z.object({
   termsAccepted: z.literal(true, {
     message: 'You must accept the terms and conditions',
   }),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export const verifyUserSchema = z.object({
