@@ -1,5 +1,5 @@
 {
-  "id": "6c9b0554-f6ae-4a00-ae65-c83e98abb06b",
+  "id": "f45560ac-392e-4e60-a4a6-8a017870d537",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -390,12 +390,22 @@
     }
   },
   "enums": {
+    "public.service_type": {
+      "name": "service_type",
+      "schema": "public",
+      "values": [
+        "ambulance",
+        "police",
+        "rescue_team",
+        "fire_truck"
+      ]
+    },
     "public.role": {
       "name": "role",
       "schema": "public",
       "values": [
-        "admin",
-        "user"
+        "user",
+        "admin"
       ]
     },
     "public.org_status": {
