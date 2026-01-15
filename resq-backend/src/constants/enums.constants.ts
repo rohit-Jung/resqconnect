@@ -1,21 +1,33 @@
-import { pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum } from 'drizzle-orm/pg-core';
 
-export const serviceTypeEnum = pgEnum("service_type", [
-  "ambulance",
-  "police",
-  "rescue_team",
-  "fire_truck",
-]);
+export enum UserRoles {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
+export enum ServiceTypeEnum {
+  AMBULANCE = 'ambulance',
+  POLICE = 'police',
+  RESCUE_TEAM = 'rescue_team',
+  FIRE_TRUCK = 'fire_truck',
+}
+
+export const serviceTypeEnum = pgEnum('service_type', [
+  ServiceTypeEnum.AMBULANCE,
+  ServiceTypeEnum.POLICE,
+  ServiceTypeEnum.RESCUE_TEAM,
+  ServiceTypeEnum.FIRE_TRUCK,
+] as const);
 
 export enum serviceStatusEnum {
-  AVAILABLE = "available",
-  ASSIGNED = "assigned",
-  OFF_DUTY = "off_duty",
+  AVAILABLE = 'available',
+  ASSIGNED = 'assigned',
+  OFF_DUTY = 'off_duty',
 }
 
 export enum serviceEnum {
-  AMBULANCE = "ambulance",
-  POLICE = "police",
-  RESCUE_TEAM = "rescue_team",
-  FIRE_TRUCK = "fire_truck",
+  AMBULANCE = 'ambulance',
+  POLICE = 'police',
+  RESCUE_TEAM = 'rescue_team',
+  FIRE_TRUCK = 'fire_truck',
 }
