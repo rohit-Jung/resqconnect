@@ -20,7 +20,7 @@ export const notifications = pgTable('notification', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => user.id),
   serviceProviderId: uuid('service_provider_id').references(
-    () => serviceProvider.id,
+    () => serviceProvider.id
   ),
   message: varchar({ length: 255 }).notNull(),
   type: varchar({ length: 50 }).notNull(),

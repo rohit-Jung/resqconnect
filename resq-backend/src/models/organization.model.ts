@@ -1,9 +1,9 @@
 import { relations } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   pgEnum,
   pgTable,
-  boolean,
   timestamp,
   uuid,
   varchar,
@@ -48,8 +48,10 @@ export const organizationRelations = relations(organization, ({ many }) => ({
 export const organizationSchema = createSelectSchema(organization);
 export const newOrganizationSchema = createInsertSchema(organization).pick({
   name: true,
+  email: true,
   serviceCategory: true,
   generalNumber: true,
+  password: true,
 });
 
 export type TOrganization = z.infer<typeof organizationSchema>;

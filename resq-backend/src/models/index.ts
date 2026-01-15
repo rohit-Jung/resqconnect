@@ -6,3 +6,5 @@ export * from './organization.model';
 export * from './emergency-contacts.model';
 export * from './feedback.model';
 export * from './notification.model';
+export * from './outbox.model';
+export * from './request-events.model';
