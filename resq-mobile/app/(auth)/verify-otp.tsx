@@ -1,10 +1,18 @@
 import SafeAreaContainer from '@/components/SafeAreaContainer';
-import Button from '@/components/ui/Button';
-import OTPInput from '@/components/ui/OTPInput';
 import { useVerifyUser } from '@/services/user/auth.api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View, Image, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+  Image,
+  TextInput,
+  Keyboard,
+} from 'react-native';
 
 const VerifyOTPScreen: React.FC = () => {
   const router = useRouter();
@@ -13,15 +21,12 @@ const VerifyOTPScreen: React.FC = () => {
     email: string;
   }>();
 
-  const [otpToken, setOtpToken] = useState('');
+  const [otp, setOtp] = useState('');
+  const inputRefs = useRef<(TextInput | null)[]>([]);
   const { mutate: verifyUser, isPending } = useVerifyUser();
 
-  const handleOTPComplete = (otp: string) => {
-    setOtpToken(otp);
-  };
-
   const handleVerify = () => {
-    if (!otpToken || otpToken.length !== 6) {
+    if (!otp || otp.length !== 6) {
       Alert.alert('Error', 'Please enter the complete OTP');
       return;
     }
@@ -33,7 +38,7 @@ const VerifyOTPScreen: React.FC = () => {
     }
 
     verifyUser(
-      { userId, otpToken },
+      { userId, otpToken: otp },
       {
         onSuccess: () => {
           router.push('/(auth)/completing-registration');
@@ -49,63 +54,168 @@ const VerifyOTPScreen: React.FC = () => {
   };
 
   const handleRequestAgain = () => {
-    // TODO: Implement resend OTP API
     Alert.alert('Info', 'A new OTP has been sent to your email.');
   };
 
   return (
-    <SafeAreaContainer>
-      <View className="flex-1 items-center justify-start bg-white px-8 pt-20">
+    <SafeAreaContainer style={styles.safeArea} scrollable={false}>
+      <View style={styles.container}>
         {/* Logo */}
-        <View className="mb-8 h-40 w-48">
-          <Image
-            source={require('../../assets/resq-connect-logo.png')}
-            resizeMode="contain"
-            className="h-full w-full"
-          />
-        </View>
+        <Image
+          source={require('../../assets/resq-connect-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
 
         {/* Title */}
-        <Text className="mb-3 text-3xl text-black" style={{ fontFamily: 'ChauPhilomeneOne' }}>
-          Enter OTP
-        </Text>
+        <Text style={styles.title}>Enter OTP</Text>
 
         {/* Subtitle */}
-        <Text className="mb-8 text-center text-base text-gray-600" style={{ fontFamily: 'Inter' }}>
-          Enter The OTP Received In Your Email
-          {email ? `\n${email}` : '.'}
+        <Text style={styles.subtitle}>
+          An OTP Has Been Sent To your linked email
+          {email ? `\n${email}` : ''}
         </Text>
 
         {/* OTP Input */}
-        <View className="mb-6 w-full">
-          <OTPInput length={6} onComplete={handleOTPComplete} />
+        <View style={styles.otpInputContainer}>
+          {Array(6)
+            .fill(0)
+            .map((_, index) => (
+              <TextInput
+                key={index}
+                style={styles.otpInput}
+                ref={(input) => {
+                  inputRefs.current[index] = input;
+                }}
+                maxLength={1}
+                keyboardType="number-pad"
+                onChangeText={(text) => {
+                  const newOtp = otp.split('');
+                  newOtp[index] = text;
+                  const updatedOtp = newOtp.join('');
+                  setOtp(updatedOtp);
+
+                  if (text && index < inputRefs.current.length - 1) {
+                    inputRefs.current[index + 1]?.focus();
+                  }
+
+                  if (updatedOtp.length === inputRefs.current.length && !updatedOtp.includes('')) {
+                    Keyboard.dismiss();
+                  }
+                }}
+                onKeyPress={({ nativeEvent }) => {
+                  if (nativeEvent.key === 'Backspace' && !otp[index]) {
+                    inputRefs.current[index - 1]?.focus();
+                  }
+                }}
+                editable={!isPending}
+              />
+            ))}
         </View>
 
-        {/* Request Again */}
-        <View className="mb-8 items-center">
-          <Text className="text-base text-gray-600" style={{ fontFamily: 'Inter' }}>
-            Didn&apos;t Get The Code?
+        {/* Resend */}
+        <Text style={styles.resendText}>
+          Didn&apos;t Get The Code?{' '}
+          <Text style={styles.resendLink} onPress={handleRequestAgain}>
+            Request Again
           </Text>
-          <TouchableOpacity onPress={handleRequestAgain}>
-            <Text
-              className="text-base font-semibold text-black underline"
-              style={{ fontFamily: 'Inter' }}>
-              Request Again
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </Text>
 
-        {/* Verify Button */}
-        <Button
-          label={isPending ? 'Verifying...' : 'Verify OTP'}
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[styles.button, isPending && styles.buttonDisabled]}
           onPress={handleVerify}
-          disabled={isPending}
-        />
-        {isPending && <ActivityIndicator className="mt-4" color="#E13333" />}
+          disabled={isPending}>
+          {isPending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Submit</Text>
+          )}
+        </TouchableOpacity>
       </View>
-      <View className="h-16 w-full bg-primary" />
     </SafeAreaContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#1F2937',
+    fontFamily: 'ChauPhilomeneOne_400Regular',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+  },
+  otpInputContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  otpInput: {
+    width: 50,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    textAlign: 'center',
+    fontSize: 18,
+    backgroundColor: '#F9FAFB',
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    fontFamily: 'Inter',
+  },
+  resendLink: {
+    fontWeight: 'bold',
+    color: '#E13333',
+  },
+  button: {
+    backgroundColor: '#E13333',
+    paddingVertical: 15,
+    paddingHorizontal: 60,
+    borderRadius: 30,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Inter',
+  },
+});
 
 export default VerifyOTPScreen;
