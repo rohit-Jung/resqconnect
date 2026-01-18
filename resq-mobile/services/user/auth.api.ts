@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../axiosInstance';
-import { userEndpoints } from '../endPoints';
+import { userEndpoints, serviceProviderEndpoints } from '../endPoints';
 import { AxiosError, AxiosResponse } from 'axios';
 
 // Import request types from schemas
@@ -22,6 +22,7 @@ import {
   IResetPasswordResponse,
   IChangePasswordResponse,
   IOtpResponse,
+  IProfileResponse,
 } from '@/types/auth.types';
 
 interface ApiResponse<T> {
@@ -37,6 +38,14 @@ const useLoginUser = () => {
   >({
     mutationFn: (loginData) => {
       return api.post(userEndpoints.login, loginData);
+    },
+  });
+};
+
+const useLoginServiceProvider = () => {
+  return useMutation<AxiosResponse<ApiResponse<ILoginResponse>>, AxiosError, TLoginUser>({
+    mutationFn: (loginData) => {
+      return api.post(serviceProviderEndpoints.login, loginData);
     },
   });
 };
@@ -93,11 +102,22 @@ const useChangePassword = () => {
   });
 };
 
+const useGetProfile = (enabled: boolean = true) => {
+  return useQuery<AxiosResponse<ApiResponse<IProfileResponse>>, AxiosError>({
+    queryKey: ['profile'],
+    queryFn: () => api.get(userEndpoints.profile),
+    enabled,
+    retry: false,
+  });
+};
+
 export {
   useLoginUser,
+  useLoginServiceProvider,
   useRegisterUser,
   useVerifyUser,
   useForgotPassword,
   useResetPassword,
   useChangePassword,
+  useGetProfile,
 };
