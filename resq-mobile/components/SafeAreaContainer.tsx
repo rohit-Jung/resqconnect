@@ -1,11 +1,6 @@
 import React, { ReactNode } from 'react';
-import {
-  SafeAreaView,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
-  ViewStyle,
-} from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Platform, ViewStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface SafeAreaContainerProps {
   children: ReactNode;
@@ -15,6 +10,7 @@ interface SafeAreaContainerProps {
   keyboardBehavior?: 'padding' | 'height' | 'position';
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
+  edges?: ('top' | 'bottom' | 'left' | 'right')[];
 }
 
 const SafeAreaContainer: React.FC<SafeAreaContainerProps> = ({
@@ -25,27 +21,26 @@ const SafeAreaContainer: React.FC<SafeAreaContainerProps> = ({
   keyboardBehavior,
   style,
   contentContainerStyle,
+  edges = ['top', 'bottom'],
 }) => {
-  const behavior =
-    keyboardBehavior || (Platform.OS === 'ios' ? 'padding' : 'height');
+  const behavior = keyboardBehavior || (Platform.OS === 'ios' ? 'padding' : 'height');
 
   return (
-    <KeyboardAvoidingView
-      behavior={behavior}
-      className={`flex-1 ${className} mt-16`}
-      style={style}>
-      {scrollable ? (
-        <ScrollView
-          contentContainerStyle={[{ flexGrow: 1 }, contentContainerStyle]}
-          className={contentContainerClassName}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          {children}
-        </ScrollView>
-      ) : (
-        <>{children}</>
-      )}
-    </KeyboardAvoidingView>
+    <SafeAreaView style={[{ flex: 1, backgroundColor: '#fff' }, style]} edges={edges}>
+      <KeyboardAvoidingView behavior={behavior} style={{ flex: 1 }} className={className}>
+        {scrollable ? (
+          <ScrollView
+            contentContainerStyle={[{ flexGrow: 1 }, contentContainerStyle]}
+            className={contentContainerClassName}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
+        ) : (
+          <>{children}</>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
