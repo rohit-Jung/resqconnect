@@ -1,3 +1,5 @@
+import type { ZodError } from 'zod';
+
 class ApiError extends Error {
   private statusCode: number;
   private data: any;
@@ -5,10 +7,10 @@ class ApiError extends Error {
 
   constructor(
     statusCode: number,
-    message: string = "Internal Server Error",
+    message: string = 'Internal Server Error',
     errors: any[] = [],
     data: any = null,
-    stack: string = "",
+    stack: string = '',
   ) {
     super(message);
     this.statusCode = statusCode;
@@ -30,6 +32,14 @@ class ApiError extends Error {
       data: this.data,
       statusCode: this.statusCode,
     };
+  }
+
+  static validationError(errors: ZodError) {
+    return new ApiError(
+      400,
+      'Error validating data',
+      errors.issues.map(issue => `${issue.path.join('.')} : ${issue.message}`),
+    );
   }
 }
 
