@@ -76,9 +76,10 @@ export default function NewServiceProviderPage() {
 
 	const onSubmit = async (data: TServiceProviderRegisterForm) => {
 		try {
-			// Convert form data to API format
+			// Convert form data to API format, excluding confirmPassword
+			const { confirmPassword, ...formData } = data;
 			const apiData = {
-				...data,
+				...formData,
 				age: parseInt(data.age, 10),
 				phoneNumber: parseInt(data.phoneNumber, 10),
 			};
