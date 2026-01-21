@@ -1,0 +1,22 @@
+meta {
+  name: login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{server}}/service-provider/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "phoneNumber": 9807345678,
+      "password": "mypassword321"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

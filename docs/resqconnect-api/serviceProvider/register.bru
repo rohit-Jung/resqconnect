@@ -1,0 +1,29 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/service-providers
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "name": "Mr. John Doe",
+      "age": 35,
+      "email": "john.doe@another.com",
+      "password": "mypassword321",
+      "primaryAddress": "Pokhara, Nepal",
+      "phoneNumber": 9807345678,
+      "serviceType": "ambulance",
+      "organizationId": "0387c863-04cd-41a4-ae52-6734e3108d81"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
