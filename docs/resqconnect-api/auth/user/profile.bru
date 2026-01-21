@@ -1,0 +1,16 @@
+meta {
+  name: profile
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{server}}/user/profile
+  body: json
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

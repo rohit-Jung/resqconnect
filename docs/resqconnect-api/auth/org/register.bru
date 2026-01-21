@@ -1,0 +1,26 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/organization/register
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Ambulance",
+    "serviceCategory": "ambulance",
+    "email": "amb@resqconnect.com",
+    "generalNumber": 102,
+    "password": "amublance@123"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
