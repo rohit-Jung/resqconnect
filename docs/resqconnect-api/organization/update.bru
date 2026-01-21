@@ -1,0 +1,22 @@
+meta {
+  name: update
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{server}}/organization/4dc96aa8-837a-49b1-854b-07c4012fb93d
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "serviceCategory": "police"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
