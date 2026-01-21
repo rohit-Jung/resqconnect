@@ -1,0 +1,31 @@
+meta {
+  name: user-register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/user/register
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "rokshh",
+    "name": "Rohit Jung Kathet",
+    "fullName": "Rokshh",
+    "phoneNumber": 9807333458,
+    "age": 18,
+    "email": "rokshh28@gmail.com",
+    "password": "Hellotest@123",      
+    "primaryAddress": "Gokarna",
+    "role": "user",
+    "termsAccepted": true
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

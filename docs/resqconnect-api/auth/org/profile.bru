@@ -1,0 +1,20 @@
+meta {
+  name: profile
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{server}}/organization/profile
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImEwODg2YzJlLWRjYWYtNGZiNy04ZTg1LWQzNDA3N2RlYWNiZCIsIm5hbWUiOiJBbWJ1bGFuY2UiLCJlbWFpbCI6ImFtYkByZXNxY29ubmVjdC5jb20iLCJyb2xlIjoic2VydmljZV9wcm92aWRlciIsImlhdCI6MTc2NjkwNTk3MCwiZXhwIjoxNzY2OTA5NTcwfQ.JTD_xQmOUhuV5QGQIuKAR8MAun6xkG9nbxh0FB5CjOI
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

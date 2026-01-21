@@ -1,0 +1,23 @@
+meta {
+  name: login
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{server}}/organization/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "amb@resqconnect.com",
+    "password": "amublance@123"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
