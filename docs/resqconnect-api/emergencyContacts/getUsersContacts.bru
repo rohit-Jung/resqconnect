@@ -1,0 +1,15 @@
+meta {
+  name: getUsersContacts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{server}}/emergency-contacts
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
