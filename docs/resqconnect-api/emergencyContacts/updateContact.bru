@@ -1,0 +1,23 @@
+meta {
+  name: updateContact
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{server}}/emergency-contacts/0af06b9f-366d-4130-99e1-bb3e20527f62
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Alice Johnson",
+    "relationship": "Ancal"
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+}
