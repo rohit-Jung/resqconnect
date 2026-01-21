@@ -1,0 +1,22 @@
+meta {
+  name: verify
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{server}}/service-provider/verify
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+          "serviceProviderId": "b8c75590-8d5b-4673-a8c4-1e3fa98ed63d",
+          "otpToken": "662481"
+      }
+}
+
+settings {
+  encodeUrl: true
+}

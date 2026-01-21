@@ -1,0 +1,22 @@
+meta {
+  name: updateStatus
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{server}}/service-provider/status
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "status": "off_duty",
+      "emergencyResponseId": ""
+  }
+}
+
+settings {
+  encodeUrl: true
+}
