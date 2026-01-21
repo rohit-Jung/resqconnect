@@ -1,4 +1,5 @@
-CREATE TYPE "public"."role" AS ENUM('admin', 'user');--> statement-breakpoint
+CREATE TYPE "public"."service_type" AS ENUM('ambulance', 'police', 'rescue_team', 'fire_truck');--> statement-breakpoint
+CREATE TYPE "public"."role" AS ENUM('user', 'admin');--> statement-breakpoint
 CREATE TYPE "public"."org_status" AS ENUM('not_active', 'active', 'not_verified');--> statement-breakpoint
 CREATE TYPE "public"."service_status" AS ENUM('available', 'assigned', 'off_duty');--> statement-breakpoint
 CREATE TABLE "user" (
