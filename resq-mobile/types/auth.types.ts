@@ -37,3 +37,16 @@ export interface IResetPasswordResponse {
 export interface IChangePasswordResponse {
   message?: string;
 }
+
+export interface IProfileResponse {
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    name: string;
+    phoneNumber?: number;
+    age?: number;
+    primaryAddress?: string;
+    role?: string;
+  };
+}
