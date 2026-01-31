@@ -1,0 +1,15 @@
+meta {
+  name: getUserRequest Copy
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{server}}/emergency-request/
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

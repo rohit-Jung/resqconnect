@@ -1,0 +1,15 @@
+meta {
+  name: getResponse
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{server}}/emergency-response
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

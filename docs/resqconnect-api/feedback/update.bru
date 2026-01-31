@@ -1,0 +1,22 @@
+meta {
+  name: update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{server}}/feedback/e27f7431-048a-4869-a6a7-5642b30aa879
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "message": "The service was on time",
+      "serviceRatings": 5
+  }
+}
+
+settings {
+  encodeUrl: true
+}

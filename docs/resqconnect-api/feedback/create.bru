@@ -1,0 +1,23 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/feedback
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "serviceProviderId": "09dfa6ad-6841-457a-acdb-64d0e4bace3a",
+      "message": "The service was on time",
+      "serviceRatings": 5
+  }
+}
+
+settings {
+  encodeUrl: true
+}

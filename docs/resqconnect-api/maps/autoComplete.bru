@@ -1,0 +1,19 @@
+meta {
+  name: autoComplete
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{server}}/maps/autocomplete?q=herald
+  body: none
+  auth: inherit
+}
+
+params:query {
+  q: herald
+}
+
+settings {
+  encodeUrl: true
+}
