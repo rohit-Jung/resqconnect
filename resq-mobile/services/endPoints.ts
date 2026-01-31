@@ -9,6 +9,7 @@ export const userEndpoints = {
   updateProfile: `/user/update`,
   emergencySettings: `/user/settings/emergency`,
   updatePushToken: `/user/update-push-token`,
+  updateLocation: `/user/update-location`,
 };
 
 export const serviceProviderEndpoints = {
@@ -19,6 +20,8 @@ export const serviceProviderEndpoints = {
   profile: `/service-provider/profile`,
   updateProfile: `/service-provider/update`,
   updateStatus: `/service-provider/status`,
+  updateLocation: `/service-provider/update-location`,
+  nearby: `/service-provider/nearby`,
 };
 
 export const emergencyRequestEndpoints = {
@@ -26,6 +29,7 @@ export const emergencyRequestEndpoints = {
   getAll: `/emergency-request`,
   getById: (id: string) => `/emergency-request/${id}`,
   cancel: (id: string) => `/emergency-request/${id}/cancel`,
+  status: (id: string) => `/emergency-request/${id}/status`,
 };
 
 export const emergencyContactEndpoints = {

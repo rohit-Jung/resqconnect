@@ -73,7 +73,7 @@ export const serviceProviderApi = {
     status: 'available' | 'assigned' | 'off_duty'
   ): Promise<ServiceProviderProfile> => {
     const response = await api.patch(serviceProviderEndpoints.updateStatus, {
-      serviceStatus: status,
+      status,
     });
     return response.data.data.serviceProvider;
   },
@@ -101,7 +101,7 @@ export const serviceProviderApi = {
 
   // Update provider location
   updateLocation: async (latitude: number, longitude: number): Promise<void> => {
-    await api.patch(`${serviceProviderEndpoints.profile}/location`, {
+    await api.patch(serviceProviderEndpoints.updateLocation, {
       currentLocation: { latitude, longitude },
     });
   },
