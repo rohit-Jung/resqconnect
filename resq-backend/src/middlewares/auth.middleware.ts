@@ -9,18 +9,23 @@ const validateServiceProvider = asyncHandler(
   async function validateServiceProvider(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ) {
     const token =
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
-    const decoded = await verifyAndDecodeToken(token);
-    if (decoded && decoded != null) {
-      req.user = decoded;
+    if (!token) {
+      throw new ApiError(401, 'Authentication token required');
     }
 
+    const decoded = await verifyAndDecodeToken(token);
+    if (!decoded || decoded == null) {
+      throw new ApiError(401, 'Invalid or expired token');
+    }
+
+    req.user = decoded;
     next();
-  },
+  }
 );
 
 const validateRoleAuth = (allowedRoles: TUserRole[]) => {
@@ -48,15 +53,19 @@ const validateOrg = asyncHandler(
     const token =
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
+    if (!token) {
+      throw new ApiError(401, 'Authentication token required');
+    }
+
     const decoded = await verifyAndDecodeToken(token);
+    console.log('Decoded', decoded);
     if (!decoded || decoded == null) {
-      next();
-      return;
+      throw new ApiError(401, 'Invalid or expired token');
     }
 
     req.user = decoded;
     next();
-  },
+  }
 );
 
 export { validateServiceProvider, validateRoleAuth, validateOrg };
