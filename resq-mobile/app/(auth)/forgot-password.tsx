@@ -1,11 +1,21 @@
 import InputBox from '@/components/ui/InputBox';
 import SafeAreaContainer from '@/components/SafeAreaContainer';
 import { useForgotPassword } from '@/services/user/auth.api';
-import { forgotPasswordSchema, TForgotPassword } from '@/validations/auth.schema';
+import {
+  forgotPasswordSchema,
+  TForgotPassword,
+} from '@/validations/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { View, Text, Alert, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 
 const ForgotPasswordScreen: React.FC = () => {
@@ -31,7 +41,7 @@ const ForgotPasswordScreen: React.FC = () => {
         Alert.alert(
           'Success',
           'Password reset instructions have been sent to your email address.',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
         router.push({
           pathname: '/(auth)/reset-password',
@@ -41,7 +51,8 @@ const ForgotPasswordScreen: React.FC = () => {
       onError: (error: any) => {
         Alert.alert(
           'Error',
-          error.response?.data?.message || 'Failed to send OTP. Please try again.'
+          error.response?.data?.message ||
+            'Failed to send OTP. Please try again.',
         );
       },
     });
@@ -53,7 +64,9 @@ const ForgotPasswordScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Forgot Password</Text>
-          <Text style={styles.subtitle}>Enter your linked email to reset your password</Text>
+          <Text style={styles.subtitle}>
+            Enter your linked email to reset your password
+          </Text>
         </View>
 
         {/* Form */}
@@ -78,7 +91,11 @@ const ForgotPasswordScreen: React.FC = () => {
 
           {errors.email && (
             <View style={styles.errorContainer}>
-              <FontAwesome name="exclamation-circle" size={16} color="#EF4444" />
+              <FontAwesome
+                name="exclamation-circle"
+                size={16}
+                color="#EF4444"
+              />
               <Text style={styles.errorText}>{errors.email.message}</Text>
             </View>
           )}
@@ -94,7 +111,9 @@ const ForgotPasswordScreen: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}>
             <Text style={styles.backButtonText}>Back to Login</Text>
           </TouchableOpacity>
         </View>

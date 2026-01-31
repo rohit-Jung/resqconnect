@@ -59,9 +59,10 @@ const SigninScreen: React.FC = () => {
         onSuccess: (response) => {
           const { token, user } = response.data.data;
           console.log('Service Provider Login successful:', { user, token });
-          setAuth(user, token);
+          setAuth(user, token, 'service_provider');
           save(TOKEN_KEY, token);
-          router.replace('/(tabs)');
+          // Redirect service providers to provider dashboard
+          router.replace('/(provider)/dashboard');
         },
         onError: (error: any) => {
           Alert.alert(
@@ -78,8 +79,9 @@ const SigninScreen: React.FC = () => {
           if (isLoginResponse(responseData)) {
             const { token, user } = responseData;
             console.log('Login successful:', { user, token });
-            setAuth(user, token);
+            setAuth(user, token, 'user');
             save(TOKEN_KEY, token);
+            // Redirect regular users to user tabs
             router.replace('/(tabs)');
           } else {
             const { otpToken, userId } = responseData;
