@@ -23,6 +23,61 @@ import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
+// Cancel an emergency request (user action)
+const cancelEmergencyRequest = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const loggedInUser = req.user;
+
+    if (!loggedInUser || !loggedInUser.id) {
+      throw new ApiError(400, 'User ID is required');
+    }
+
+    if (!id) {
+      throw new ApiError(400, 'Emergency request ID is required');
+    }
+
+    // Only allow the user who created the request to cancel it
+    const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
+      where: and(
+        eq(emergencyRequest.id, id),
+        eq(emergencyRequest.userId, loggedInUser.id)
+      ),
+    });
+
+    if (!existingEmergencyRequest) {
+      throw new ApiError(404, 'Emergency request not found or not authorized');
+    }
+
+    if (existingEmergencyRequest.requestStatus === 'cancelled') {
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            'Request already cancelled',
+            existingEmergencyRequest
+          )
+        );
+    }
+
+    // Update status to cancelled
+    const [updatedRequest] = await db
+      .update(emergencyRequest)
+      .set({ requestStatus: 'cancelled' })
+      .where(eq(emergencyRequest.id, id))
+      .returning();
+
+    // Optionally: emit socket event to notify providers
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, 'Emergency request cancelled', updatedRequest)
+      );
+  }
+);
+
 // Constants for emergency request handling
 const H3_RESOLUTION = 8; // ~0.46 km² per cell
 const REQUEST_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
@@ -419,4 +474,5 @@ export {
   updateEmergencyRequest,
   deleteEmergencyRequest,
   getRecentEmergencyRequests,
+  cancelEmergencyRequest,
 };
