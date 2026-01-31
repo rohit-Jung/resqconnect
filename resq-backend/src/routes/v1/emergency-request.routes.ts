@@ -1,6 +1,8 @@
 import { Router } from 'express';
 
+import { UserRoles } from '@/constants/enums.constants';
 import {
+  cancelEmergencyRequest,
   createEmergencyRequest,
   deleteEmergencyRequest,
   getEmergencyRequest,
@@ -9,7 +11,6 @@ import {
   updateEmergencyRequest,
 } from '@/controllers/emergency-request.controller';
 import { validateRoleAuth } from '@/middlewares/auth.middleware';
-import { UserRoles } from "@/constants/enums.constants"
 
 const emergencyRequestRouter = Router();
 
@@ -23,10 +24,18 @@ emergencyRequestRouter.get(
   validateRoleAuth([UserRoles.USER]),
   getRecentEmergencyRequests
 );
+
 emergencyRequestRouter
   .route('/:id')
   .get(getEmergencyRequest)
   .put(updateEmergencyRequest)
-  .delete(validateRoleAuth(['admin']), deleteEmergencyRequest);
+  .delete(validateRoleAuth([UserRoles.ADMIN]), deleteEmergencyRequest);
+
+// Cancel emergency request (user only)
+emergencyRequestRouter.patch(
+  '/:id/cancel',
+  validateRoleAuth([UserRoles.USER]),
+  cancelEmergencyRequest
+);
 
 export default emergencyRequestRouter;
