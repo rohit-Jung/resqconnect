@@ -133,7 +133,7 @@ export const newServiceProviderSchema = serviceProviderSchema.pick({
 export const loginServiceProviderSchema = createInsertSchema(
   serviceProvider,
 ).pick({
-  phoneNumber: true,
+  email: true,
   password: true,
 });
 
