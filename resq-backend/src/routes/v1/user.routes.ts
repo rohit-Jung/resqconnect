@@ -23,13 +23,9 @@ const validateUser = validateRoleAuth([UserRoles.USER]);
 
 userRouter.route('/register').post(registerUser);
 userRouter.route('/login').post(loginUser);
-userRouter
-  .route('/logout')
-  .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), logoutUser);
+userRouter.route('/logout').get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), logoutUser);
 
-userRouter
-  .route('/update')
-  .put(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), updateUser);
+userRouter.route('/update').put(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), updateUser);
 
 userRouter.route('/verify').post(verifyUser);
 userRouter.route('/forgot-password').post(forgotPassword);

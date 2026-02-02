@@ -11,11 +11,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { type z } from 'zod';
 
-export const outboxStatusEnum = pgEnum('outbox_status', [
-  'pending',
-  'published',
-  'failed',
-]);
+export const outboxStatusEnum = pgEnum('outbox_status', ['pending', 'published', 'failed']);
 
 export const outbox = pgTable('outbox', {
   id: uuid('id').defaultRandom().primaryKey(),

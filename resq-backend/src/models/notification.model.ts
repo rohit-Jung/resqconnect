@@ -1,13 +1,5 @@
 import { relations } from 'drizzle-orm';
-import {
-  boolean,
-  json,
-  pgEnum,
-  pgTable,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { boolean, json, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
@@ -19,9 +11,7 @@ export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
 export const notifications = pgTable('notification', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => user.id),
-  serviceProviderId: uuid('service_provider_id').references(
-    () => serviceProvider.id
-  ),
+  serviceProviderId: uuid('service_provider_id').references(() => serviceProvider.id),
   message: varchar({ length: 255 }).notNull(),
   type: varchar({ length: 50 }).notNull(),
   priority: priorityEnum('priority').default('low'),

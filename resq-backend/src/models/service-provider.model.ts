@@ -24,11 +24,7 @@ const geometry = customType<{ data: string }>({
   },
 });
 
-export const statusTypeEnum = pgEnum('service_status', [
-  'available',
-  'assigned',
-  'off_duty',
-]);
+export const statusTypeEnum = pgEnum('service_status', ['available', 'assigned', 'off_duty']);
 
 const serviceTypeEnum = pgEnum('service_type', [
   ServiceTypeEnum.AMBULANCE,
@@ -86,9 +82,7 @@ export const serviceProvider = pgTable(
     organizationId: uuid('organization_id')
       .references(() => organization.id, { onDelete: 'cascade' })
       .notNull(),
-    serviceStatus: statusTypeEnum('service_status')
-      .notNull()
-      .default('available'),
+    serviceStatus: statusTypeEnum('service_status').notNull().default('available'),
     verificationToken: varchar('verification_token', { length: 255 }),
     tokenExpiry: timestamp('token_expiry', { mode: 'string' }),
 
@@ -97,25 +91,18 @@ export const serviceProvider = pgTable(
       mode: 'string',
     }),
 
-    createdAt: timestamp('created_at', { mode: 'string' })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'string' })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
   },
-  t => [index('spatial_idx').on(t.lastLocation), index('h3_idx').on(t.h3Index)],
+  t => [index('spatial_idx').on(t.lastLocation), index('h3_idx').on(t.h3Index)]
 );
 
-export const serviceProviderRelations = relations(
-  serviceProvider,
-  ({ one }) => ({
-    organization: one(organization, {
-      fields: [serviceProvider.organizationId],
-      references: [organization.id],
-    }),
+export const serviceProviderRelations = relations(serviceProvider, ({ one }) => ({
+  organization: one(organization, {
+    fields: [serviceProvider.organizationId],
+    references: [organization.id],
   }),
-);
+}));
 
 // Define the serviceProvider schema
 export const serviceProviderSchema = createSelectSchema(serviceProvider);
@@ -130,9 +117,7 @@ export const newServiceProviderSchema = serviceProviderSchema.pick({
   organizationId: true,
 });
 
-export const loginServiceProviderSchema = createInsertSchema(
-  serviceProvider,
-).pick({
+export const loginServiceProviderSchema = createInsertSchema(serviceProvider).pick({
   email: true,
   password: true,
 });

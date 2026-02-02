@@ -9,8 +9,7 @@ export const corsOptions = {
     if (origin.includes(':')) origin = origin.split(':')[0];
 
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg =
-        'The CORS policy for this site does not allow access from the specified Origin.';
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     } else {
       return callback(null, true);

@@ -1,10 +1,4 @@
-import {
-  customType,
-  pgTable,
-  serial,
-  text,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { customType, pgTable, serial, text, varchar } from 'drizzle-orm/pg-core';
 
 // Define a custom geometry type for PostGIS
 const geometry = customType<{

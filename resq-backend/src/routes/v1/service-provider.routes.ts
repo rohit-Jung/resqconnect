@@ -12,6 +12,7 @@ import {
   registerServiceProvider,
   resetServiceProviderPassword,
   updateServiceProvider,
+  updateServiceProviderLocation,
   updateServiceProviderStatus,
   verifyServiceProvider,
 } from '@/controllers/service-provider.controller';
@@ -32,6 +33,7 @@ serviceProviderRouter.use(validateServiceProvider);
 serviceProviderRouter.post('/logout', logoutServiceProvider);
 serviceProviderRouter.get('/profile', getServiceProviderProfile);
 serviceProviderRouter.patch('/update', updateServiceProvider);
+serviceProviderRouter.patch('/update-location', updateServiceProviderLocation);
 serviceProviderRouter.delete('/delete', deleteServiceProvider);
 serviceProviderRouter.post('/change-password', changeProviderPassword);
 serviceProviderRouter.get('/:id', getServiceProvider);

@@ -1,12 +1,9 @@
 import { redis } from './kafka.service';
 
 // Emergency request cache keys
-export const EMERGENCY_PROVIDERS_KEY = (requestId: string) =>
-  `emergency:${requestId}:providers`;
-export const EMERGENCY_LOCK_KEY = (requestId: string) =>
-  `emergency:${requestId}:lock`;
-export const PROVIDER_LOCATION_KEY = (providerId: string) =>
-  `provider:${providerId}:location`;
+export const EMERGENCY_PROVIDERS_KEY = (requestId: string) => `emergency:${requestId}:providers`;
+export const EMERGENCY_LOCK_KEY = (requestId: string) => `emergency:${requestId}:lock`;
+export const PROVIDER_LOCATION_KEY = (providerId: string) => `provider:${providerId}:location`;
 
 // Cache expiry times (in seconds)
 export const CACHE_EXPIRY = {
@@ -45,20 +42,13 @@ export async function cacheEmergencyProviders(
   providerIds: string[]
 ): Promise<void> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
-  await redis.set(
-    key,
-    JSON.stringify(providerIds),
-    'EX',
-    CACHE_EXPIRY.PROVIDERS_LIST
-  );
+  await redis.set(key, JSON.stringify(providerIds), 'EX', CACHE_EXPIRY.PROVIDERS_LIST);
 }
 
 /**
  * Get the list of providers for an emergency request
  */
-export async function getEmergencyProviders(
-  requestId: string
-): Promise<string[]> {
+export async function getEmergencyProviders(requestId: string): Promise<string[]> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
   const data = await redis.get(key);
   return data ? JSON.parse(data) : [];
@@ -84,9 +74,7 @@ export async function cacheProviderLocation(
 /**
  * Get provider's cached location
  */
-export async function getProviderLocation(
-  providerId: string
-): Promise<{
+export async function getProviderLocation(providerId: string): Promise<{
   lat: number;
   lng: number;
   timestamp: number;

@@ -1,24 +1,12 @@
 import { relations } from 'drizzle-orm';
-import {
-  bigint,
-  boolean,
-  pgEnum,
-  pgTable,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { bigint, boolean, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { type z } from 'zod';
 
 import { serviceTypeEnum } from '../constants';
 import { serviceProvider } from './service-provider.model';
 
-export const orgStatusEnum = pgEnum('org_status', [
-  'not_active',
-  'active',
-  'not_verified',
-]);
+export const orgStatusEnum = pgEnum('org_status', ['not_active', 'active', 'not_verified']);
 
 export const organization = pgTable('organization', {
   id: uuid('id').defaultRandom().primaryKey(),

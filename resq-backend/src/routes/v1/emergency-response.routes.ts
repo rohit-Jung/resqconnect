@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { UserRoles } from '@/constants';
 import {
   createEmergencyResponse,
   deleteEmergencyResponse,
@@ -7,11 +8,7 @@ import {
   getProviderResponses,
   updateEmergencyResponse,
 } from '@/controllers/emergency-response.controller';
-import {
-  validateRoleAuth,
-  validateServiceProvider,
-} from '@/middlewares/auth.middleware';
-import { UserRoles } from '@/constants';
+import { validateRoleAuth, validateServiceProvider } from '@/middlewares/auth.middleware';
 
 const emergencyResponseRouter = Router();
 

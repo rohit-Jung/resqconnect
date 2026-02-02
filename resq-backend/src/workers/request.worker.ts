@@ -16,7 +16,7 @@ async function startEmergencyRequestService() {
   await consumer.run({
     eachMessage: async ({ message }) => {
       const { id, userId, emergencyType, emergencyLocation } = JSON.parse(
-        message.value!.toString(),
+        message.value!.toString()
       );
 
       // update the request status in progress
@@ -73,15 +73,12 @@ async function startEmergencyRequestService() {
           io.in(userId).socketsJoin(socketEvents.EMERGENCY_ROOM(id));
 
           // emit joined room to both
-          io.to(socketEvents.EMERGENCY_ROOM(id)).emit(
-            socketEvents.JOINED_EMERGENCY_ROOM,
-            {
-              requestId: id,
-              emergencyLocation: emergencyLocation,
-              emergencyType: emergencyType,
-              providerId: provider.id,
-            },
-          );
+          io.to(socketEvents.EMERGENCY_ROOM(id)).emit(socketEvents.JOINED_EMERGENCY_ROOM, {
+            requestId: id,
+            emergencyLocation: emergencyLocation,
+            emergencyType: emergencyType,
+            providerId: provider.id,
+          });
         }
       }
     },
