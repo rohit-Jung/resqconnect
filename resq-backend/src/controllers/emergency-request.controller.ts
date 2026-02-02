@@ -15,39 +15,18 @@ import {
 } from '@/constants/kafka.constants';
 import db from '@/db';
 import { emergencyRequest, outbox, user } from '@/models';
-import { safeSend } from '@/services/kafka.service';
 import { notifyEmergencyContacts } from '@/services/notification.service';
 import { emitSocketEvent } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { CreateNewRequestSchema } from '@/validations/emergency-request';
+import { publishWithRetry } from '@/services/kafka/kafka.utils';
 
-async function publishWithRetry(
-  topic: string,
-  message: { key: string; value: string },
-  retries = 3,
-): Promise<boolean> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      await safeSend({ topic, messages: [message] });
-      return true;
-    } catch (error) {
-      console.error(`Kafka publish failed (attempt ${i + 1}):`, error);
-      if (i < retries - 1) {
-        await new Promise(resolve =>
-          setTimeout(resolve, 1000 * Math.pow(2, i)),
-        );
-      }
-    }
-  }
-  return false;
-}
 
 const createEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const parsedValues = CreateNewRequestSchema.safeParse(req.body);
-    console.log('BODY::', req.body);
 
     if (!parsedValues.success) {
       return res
