@@ -1,7 +1,6 @@
 import { relations } from 'drizzle-orm';
 import {
   bigint,
-  boolean,
   customType,
   integer,
   json,
@@ -42,12 +41,8 @@ export const emergencyRequest = pgTable('emergency_request', {
     .references(() => user.id)
     .notNull(),
   serviceType: serviceTypeEnum('service_type').notNull(),
-  requestStatus: requestStatusEnum('request_status')
-    .notNull()
-    .default('pending'),
-  requestTime: timestamp('request_time').defaultNow(),
-  dispatchTime: timestamp('dispatch_time'),
-  arrivalTime: timestamp('arrival_time'),
+  requestStatus: requestStatusEnum('request_status').notNull().default('pending'),
+
   description: varchar({ length: 255 }),
   requestTimeout: integer().default(120), // 2 minutes default
 
@@ -67,42 +62,31 @@ export const emergencyRequest = pgTable('emergency_request', {
 
   // Search escalation fields
   searchRadius: integer('search_radius').default(1), // k-ring radius
-  expiresAt: timestamp('expires_at', { mode: 'string' }),
-
-  // Provider assignment fields
-  providerId: uuid('provider_id').references(() => serviceProvider.id),
-  acceptedAt: timestamp('accepted_at', { mode: 'string' }),
   mustConnectBy: timestamp('must_connect_by', { mode: 'string' }),
   providerConnectedAt: timestamp('provider_connected_at', { mode: 'string' }),
+
+  expiresAt: timestamp('expires_at', { mode: 'string' }),
 
   createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
 });
 
-export const emergencyRequestRelations = relations(
-  emergencyRequest,
-  ({ one }) => ({
-    user: one(user, {
-      fields: [emergencyRequest.userId],
-      references: [user.id],
-    }),
-    provider: one(serviceProvider, {
-      fields: [emergencyRequest.providerId],
-      references: [serviceProvider.id],
-    }),
-  })
-);
+export const emergencyRequestRelations = relations(emergencyRequest, ({ one }) => ({
+  user: one(user, {
+    fields: [emergencyRequest.userId],
+    references: [user.id],
+  }),
+}));
 
+// Schemas
 export const emergencyRequestSchema = createSelectSchema(emergencyRequest);
-
-export const newEmergencyRequestSchema = createInsertSchema(
-  emergencyRequest
-).pick({
+export const newEmergencyRequestSchema = createInsertSchema(emergencyRequest).pick({
   userId: true,
   serviceType: true,
   description: true,
   location: true,
 });
+
 
 export type IEmergencyRequest = z.infer<typeof emergencyRequestSchema>;
 export type ICreateEmergencyRequest = z.infer<typeof newEmergencyRequestSchema>;

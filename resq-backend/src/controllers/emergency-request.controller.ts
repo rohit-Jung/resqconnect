@@ -2,103 +2,31 @@ import { HttpStatusCode } from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { latLngToCell } from 'h3-js';
-import z from 'zod';
 
-import { serviceEnum } from '@/constants';
+import {
+  H3_RESOLUTION,
+  INITIAL_SEARCH_RADIUS,
+  REQUEST_TIMEOUT_MS,
+} from '@/constants';
 import {
   AGGREGATE_TYPES,
   KAFKA_TOPICS,
   OUTBOX_EVENT_TYPES,
 } from '@/constants/kafka.constants';
 import db from '@/db';
-import {
-  emergencyRequest,
-  newEmergencyRequestSchema,
-  outbox,
-  user,
-} from '@/models';
+import { emergencyRequest, outbox, user } from '@/models';
 import { safeSend } from '@/services/kafka.service';
 import { notifyEmergencyContacts } from '@/services/notification.service';
+import { emitSocketEvent } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
+import { CreateNewRequestSchema } from '@/validations/emergency-request';
 
-// Cancel an emergency request (user action)
-const cancelEmergencyRequest = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'User ID is required');
-    }
-
-    if (!id) {
-      throw new ApiError(400, 'Emergency request ID is required');
-    }
-
-    // Only allow the user who created the request to cancel it
-    const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
-      where: and(
-        eq(emergencyRequest.id, id),
-        eq(emergencyRequest.userId, loggedInUser.id)
-      ),
-    });
-
-    if (!existingEmergencyRequest) {
-      throw new ApiError(404, 'Emergency request not found or not authorized');
-    }
-
-    if (existingEmergencyRequest.requestStatus === 'cancelled') {
-      return res
-        .status(200)
-        .json(
-          new ApiResponse(
-            200,
-            'Request already cancelled',
-            existingEmergencyRequest
-          )
-        );
-    }
-
-    // Update status to cancelled
-    const [updatedRequest] = await db
-      .update(emergencyRequest)
-      .set({ requestStatus: 'cancelled' })
-      .where(eq(emergencyRequest.id, id))
-      .returning();
-
-    // Optionally: emit socket event to notify providers
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Emergency request cancelled', updatedRequest)
-      );
-  }
-);
-
-// Constants for emergency request handling
-const H3_RESOLUTION = 8; // ~0.46 km² per cell
-const REQUEST_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
-const INITIAL_SEARCH_RADIUS = 1; // k-ring radius
-
-const CreateNewRequestSchema = z.object({
-  emergencyType: z.enum(serviceEnum),
-  emergencyDescription: z.string().optional(),
-  userLocation: z.object({
-    latitude: z.number(),
-    longitude: z.number(),
-  }),
-});
-
-/**
- * Publish message to Kafka with retry logic
- */
 async function publishWithRetry(
   topic: string,
   message: { key: string; value: string },
-  retries = 3
+  retries = 3,
 ): Promise<boolean> {
   for (let i = 0; i < retries; i++) {
     try {
@@ -108,7 +36,7 @@ async function publishWithRetry(
       console.error(`Kafka publish failed (attempt ${i + 1}):`, error);
       if (i < retries - 1) {
         await new Promise(resolve =>
-          setTimeout(resolve, 1000 * Math.pow(2, i))
+          setTimeout(resolve, 1000 * Math.pow(2, i)),
         );
       }
     }
@@ -122,7 +50,6 @@ const createEmergencyRequest = asyncHandler(
     console.log('BODY::', req.body);
 
     if (!parsedValues.success) {
-      console.log(ApiError.validationError(parsedValues.error));
       return res
         .status(HttpStatusCode.BadRequest)
         .json(ApiError.validationError(parsedValues.error));
@@ -133,15 +60,19 @@ const createEmergencyRequest = asyncHandler(
 
     const loggedInUser = req.user;
     if (!loggedInUser?.id) {
-      throw new ApiError(400, 'User ID is required');
+      throw new ApiError(
+        HttpStatusCode.Unauthorized,
+        'Unauthorized access to request creation.',
+      );
     }
 
     // Convert location to H3 index
     const h3Index = latLngToCell(
       userLocation.latitude,
       userLocation.longitude,
-      H3_RESOLUTION
+      H3_RESOLUTION,
     );
+
     const h3IndexBigInt = BigInt(`0x${h3Index}`);
 
     // Create PostGIS POINT geometry string
@@ -245,11 +176,12 @@ const createEmergencyRequest = asyncHandler(
           .where(eq(outbox.aggregateId, result.id));
       } else {
         console.warn(
-          `Kafka unavailable, event queued in outbox for request ${result.id}`
+          `Kafka unavailable, event queued in outbox for request ${result.id}`,
         );
       }
 
       // Notify emergency contacts asynchronously (don't block response)
+      // TODO: do this in the topic
       notifyEmergencyContacts({
         requestId: result.id,
         userId: result.userId,
@@ -267,13 +199,13 @@ const createEmergencyRequest = asyncHandler(
       res.status(201).json(
         new ApiResponse(201, 'Emergency request created', {
           emergencyRequest: result,
-        })
+        }),
       );
     } catch (error) {
       console.error('Error creating emergency request:', error);
       throw new ApiError(500, 'Failed to create emergency request');
     }
-  }
+  },
 );
 
 const getEmergencyRequest = asyncHandler(
@@ -291,9 +223,9 @@ const getEmergencyRequest = asyncHandler(
     return res
       .status(200)
       .json(
-        new ApiResponse(200, 'Emergency request found', emergencyRequestData)
+        new ApiResponse(200, 'Emergency request found', emergencyRequestData),
       );
-  }
+  },
 );
 
 const getUsersEmergencyRequests = asyncHandler(
@@ -301,7 +233,6 @@ const getUsersEmergencyRequests = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      console.log('User ID is required');
       throw new ApiError(400, 'User ID is required');
     }
 
@@ -312,9 +243,9 @@ const getUsersEmergencyRequests = asyncHandler(
     return res
       .status(200)
       .json(
-        new ApiResponse(200, 'Emergency requests found', emergencyRequests)
+        new ApiResponse(200, 'Emergency requests found', emergencyRequests),
       );
-  }
+  },
 );
 
 const updateEmergencyRequest = asyncHandler(
@@ -323,26 +254,23 @@ const updateEmergencyRequest = asyncHandler(
     const { status } = req.body;
 
     if (!id) {
-      console.log('Emergency request ID is required');
       throw new ApiError(400, 'Emergency request ID is required');
     }
 
     const updateData = req.body;
 
     if (Object.keys(updateData).length === 0) {
-      console.log('No data to update');
       throw new ApiError(400, 'No data to update');
     }
 
     const invalidKeys = Object.keys(updateData).filter(
-      key => !Object.keys(emergencyRequest).includes(key)
+      key => !Object.keys(emergencyRequest).includes(key),
     );
 
     if (invalidKeys.length > 0) {
-      console.log(`Invalid data to update. Invalid keys: ${invalidKeys}`);
       throw new ApiError(
         400,
-        `Invalid data to update. Invalid keys: ${invalidKeys}`
+        `Invalid data to update. Invalid keys: ${invalidKeys}`,
       );
     }
 
@@ -351,7 +279,6 @@ const updateEmergencyRequest = asyncHandler(
     });
 
     if (!existingEmergencyRequest) {
-      console.log('Emergency request not found');
       throw new ApiError(404, 'Emergency request not found');
     }
 
@@ -369,7 +296,6 @@ const updateEmergencyRequest = asyncHandler(
       });
 
     if (!updatedEmergencyRequest) {
-      console.log('Error updating emergency request');
       throw new ApiError(500, 'Error updating emergency request');
     }
 
@@ -379,10 +305,10 @@ const updateEmergencyRequest = asyncHandler(
         new ApiResponse(
           200,
           'Emergency request updated',
-          updatedEmergencyRequest
-        )
+          updatedEmergencyRequest,
+        ),
       );
-  }
+  },
 );
 
 const deleteEmergencyRequest = asyncHandler(
@@ -391,17 +317,14 @@ const deleteEmergencyRequest = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      console.log('User ID is required');
       throw new ApiError(400, 'User ID is required');
     }
 
     if (!loggedInUser.role) {
-      console.log('User role is required');
       throw new ApiError(400, 'User role is required');
     }
 
     if (!id) {
-      console.log('Emergency request ID is required');
       throw new ApiError(400, 'Emergency request ID is required');
     }
 
@@ -410,7 +333,6 @@ const deleteEmergencyRequest = asyncHandler(
     });
 
     if (!existingEmergencyRequest) {
-      console.log('Emergency request not found');
       throw new ApiError(404, 'Emergency request not found');
     }
 
@@ -427,7 +349,6 @@ const deleteEmergencyRequest = asyncHandler(
       });
 
     if (!deletedEmergencyRequest) {
-      console.log('Error deleting emergency request');
       throw new ApiError(500, 'Error deleting emergency request');
     }
 
@@ -437,16 +358,15 @@ const deleteEmergencyRequest = asyncHandler(
         new ApiResponse(
           200,
           'Emergency request deleted',
-          deletedEmergencyRequest
-        )
+          deletedEmergencyRequest,
+        ),
       );
-  }
+  },
 );
 
 const getRecentEmergencyRequests = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    console.log('userId', userId);
 
     if (!userId) {
       return res.status(401).json({
@@ -457,14 +377,67 @@ const getRecentEmergencyRequests = asyncHandler(
 
     const recentRequests = await db.query.emergencyRequest.findMany({
       where: eq(emergencyRequest.userId, userId),
-      orderBy: [desc(emergencyRequest.requestTime)],
+      orderBy: [desc(emergencyRequest.createdAt)],
       limit: 10,
     });
 
     return res
       .status(200)
       .json(new ApiResponse(200, 'Recent emergency requests', recentRequests));
-  }
+  },
+);
+
+const cancelEmergencyRequest = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const loggedInUser = req.user;
+
+    if (!loggedInUser || !loggedInUser.id) {
+      throw new ApiError(400, 'User ID is required');
+    }
+
+    if (!id) {
+      throw new ApiError(400, 'Emergency request ID is required');
+    }
+
+    const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
+      where: and(
+        eq(emergencyRequest.id, id),
+        eq(emergencyRequest.userId, loggedInUser.id),
+      ),
+    });
+
+    if (!existingEmergencyRequest) {
+      throw new ApiError(404, 'Emergency request not found or not authorized');
+    }
+
+    if (existingEmergencyRequest.requestStatus === 'cancelled') {
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            'Request already cancelled',
+            existingEmergencyRequest,
+          ),
+        );
+    }
+
+    const [updatedRequest] = await db
+      .update(emergencyRequest)
+      .set({ requestStatus: 'cancelled' })
+      .where(eq(emergencyRequest.id, id))
+      .returning();
+
+    // Optionally: emit socket event to notify providers
+    // emitSocketEvent()
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, 'Emergency request cancelled', updatedRequest),
+      );
+  },
 );
 
 export {
