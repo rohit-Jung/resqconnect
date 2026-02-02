@@ -1,10 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import {
-  cellToLatLng,
-  greatCircleDistance,
-  gridDisk,
-  latLngToCell,
-} from 'h3-js';
+import { cellToLatLng, greatCircleDistance, gridDisk, latLngToCell } from 'h3-js';
 import type { Server } from 'socket.io';
 
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
@@ -78,9 +73,7 @@ async function findNearbyProvidersH3(
   // Get all cells in k-ring
   const searchCells = gridDisk(centerH3, kRingRadius);
 
-  console.log(
-    `🔍 Searching ${searchCells.length} H3 cells at radius ${kRingRadius}`
-  );
+  console.log(`🔍 Searching ${searchCells.length} H3 cells at radius ${kRingRadius}`);
 
   // Convert H3 hex strings to BigInt for comparison
   const cellBigInts = searchCells.map(cell => BigInt(`0x${cell}`));
@@ -132,9 +125,7 @@ function calculateDistancesAndSort(
   return providers
     .map(provider => {
       // Convert BigInt h3Index back to hex string
-      const h3Hex = provider.h3Index
-        ? provider.h3Index.toString(16).padStart(15, '0')
-        : null;
+      const h3Hex = provider.h3Index ? provider.h3Index.toString(16).padStart(15, '0') : null;
 
       let distance = 0;
       let eta = 0;
@@ -191,29 +182,17 @@ async function startEmergencyRequestService() {
         // Convert emergency location to H3 index if not provided
         const userH3 =
           h3Index ||
-          latLngToCell(
-            emergencyLocation.latitude,
-            emergencyLocation.longitude,
-            H3_RESOLUTION
-          );
+          latLngToCell(emergencyLocation.latitude, emergencyLocation.longitude, H3_RESOLUTION);
 
         // Search for available providers
-        let providers = await findNearbyProvidersH3(
-          userH3,
-          emergencyType,
-          INITIAL_K_RING_RADIUS
-        );
+        let providers = await findNearbyProvidersH3(userH3, emergencyType, INITIAL_K_RING_RADIUS);
 
         // If < 3 providers found, expand to k-ring radius 2
         if (providers.length < 3) {
           console.log(
             `📍 Only ${providers.length} providers in radius ${INITIAL_K_RING_RADIUS}, expanding to radius ${EXPANDED_K_RING_RADIUS}`
           );
-          providers = await findNearbyProvidersH3(
-            userH3,
-            emergencyType,
-            EXPANDED_K_RING_RADIUS
-          );
+          providers = await findNearbyProvidersH3(userH3, emergencyType, EXPANDED_K_RING_RADIUS);
         }
 
         const io = getIo();
@@ -234,16 +213,10 @@ async function startEmergencyRequestService() {
         }
 
         // Calculate distances and sort
-        const providersWithDistance = calculateDistancesAndSort(
-          providers,
-          emergencyLocation
-        );
+        const providersWithDistance = calculateDistancesAndSort(providers, emergencyLocation);
 
         // Take top 10 providers
-        const top10Providers = providersWithDistance.slice(
-          0,
-          MAX_PROVIDERS_TO_BROADCAST
-        );
+        const top10Providers = providersWithDistance.slice(0, MAX_PROVIDERS_TO_BROADCAST);
 
         // Store providers in Redis cache
         await cacheEmergencyProviders(
@@ -278,26 +251,25 @@ async function startEmergencyRequestService() {
           })),
         });
 
-        console.log(
-          `👤 Showing ${top10Providers.length} providers to user ${userId}`
-        );
+        console.log(`👤 Showing ${top10Providers.length} providers to user ${userId}`);
 
-        // Broadcast to all providers
+        // Broadcast to all providers (emit to both provider.id and provider:${provider.id} rooms)
         for (const provider of top10Providers) {
-          io.to(provider.id).emit(socketEvents.NEW_EMERGENCY, {
-            requestId,
-            emergencyType,
-            emergencyDescription,
-            emergencyLocation,
-            distance: provider.distance,
-            eta: provider.eta,
-            expiresAt: Date.now() + REQUEST_TIMEOUT_MS,
-          });
+          io.to(provider.id)
+            .to(`provider:${provider.id}`)
+            .emit(socketEvents.NEW_EMERGENCY, {
+              requestId,
+              userId,
+              emergencyType,
+              emergencyDescription,
+              emergencyLocation,
+              distance: provider.distance,
+              eta: provider.eta,
+              expiresAt: Date.now() + REQUEST_TIMEOUT_MS,
+            });
         }
 
-        console.log(
-          `📢 Broadcasted emergency ${requestId} to ${top10Providers.length} providers`
-        );
+        console.log(`📢 Broadcasted emergency ${requestId} to ${top10Providers.length} providers`);
       } catch (error) {
         console.error('❌ Error processing emergency request:', error);
       }

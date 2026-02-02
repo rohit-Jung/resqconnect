@@ -69,10 +69,7 @@ export async function safeSend(params: {
     await producer.send(params);
   } catch (error: any) {
     // If disconnected, try to reconnect and send again
-    if (
-      error.message?.includes('disconnected') ||
-      error.name === 'KafkaJSError'
-    ) {
+    if (error.message?.includes('disconnected') || error.name === 'KafkaJSError') {
       console.log('🔄 Producer disconnected, attempting reconnect...');
       isProducerConnected = false;
       await producer.connect();

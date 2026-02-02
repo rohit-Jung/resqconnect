@@ -1,14 +1,9 @@
 import { eq } from 'drizzle-orm';
-import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
+import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk';
 
 import { socketEvents } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyContact,
-  notifications,
-  serviceProvider,
-  user,
-} from '@/models';
+import { emergencyContact, notifications, serviceProvider, user } from '@/models';
 import { getIo } from '@/socket';
 
 // Initialize Expo SDK for push notifications
@@ -121,10 +116,7 @@ export async function sendSMS(payload: SMSPayload): Promise<boolean> {
 /**
  * Send notification to a user
  */
-export async function notifyUser(
-  userId: string,
-  notification: NotificationPayload
-): Promise<void> {
+export async function notifyUser(userId: string, notification: NotificationPayload): Promise<void> {
   try {
     // Get user's push token
     const userRecord = await db.query.user.findFirst({
@@ -223,9 +215,7 @@ export async function notifyServiceProvider(
 /**
  * Notify emergency contacts when an emergency request is created
  */
-export async function notifyEmergencyContacts(
-  data: EmergencyNotificationData
-): Promise<void> {
+export async function notifyEmergencyContacts(data: EmergencyNotificationData): Promise<void> {
   try {
     // Get user's settings
     const userRecord = await db.query.user.findFirst({
@@ -239,10 +229,7 @@ export async function notifyEmergencyContacts(
     });
 
     if (!userRecord || !userRecord.notifyEmergencyContacts) {
-      console.log(
-        'Emergency contact notification disabled for user:',
-        data.userId
-      );
+      console.log('Emergency contact notification disabled for user:', data.userId);
       return;
     }
 
@@ -290,17 +277,12 @@ export async function notifyEmergencyContacts(
       }
 
       // Send push notification if contact has the app and push token
-      if (
-        (contactMethod === 'push' || contactMethod === 'both') &&
-        contact.pushToken
-      ) {
+      if ((contactMethod === 'push' || contactMethod === 'both') && contact.pushToken) {
         await sendPushNotification([contact.pushToken], pushNotification);
       }
     }
 
-    console.log(
-      `✅ Notified ${contacts.length} emergency contacts for user ${data.userId}`
-    );
+    console.log(`✅ Notified ${contacts.length} emergency contacts for user ${data.userId}`);
   } catch (error) {
     console.error('Error notifying emergency contacts:', error);
   }
@@ -393,9 +375,7 @@ export async function notifyNearbyProviders(
   providerIds: string[],
   notification: NotificationPayload
 ): Promise<void> {
-  const promises = providerIds.map(id =>
-    notifyServiceProvider(id, notification)
-  );
+  const promises = providerIds.map(id => notifyServiceProvider(id, notification));
   await Promise.allSettled(promises);
 }
 

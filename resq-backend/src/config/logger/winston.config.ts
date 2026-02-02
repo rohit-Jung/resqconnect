@@ -36,8 +36,7 @@ const format = winston.format.combine(
   winston.format.timestamp(),
   winston.format.colorize({ all: true }),
   winston.format.printf(
-    ({ timestamp, level, message }) =>
-      `${timestamp} [${level.toUpperCase()}]: ${message}`
+    ({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}]: ${message}`
   )
 );
 

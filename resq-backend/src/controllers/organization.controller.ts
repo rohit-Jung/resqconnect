@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import db from '@/db';
@@ -17,108 +17,90 @@ import { asyncHandler } from '@/utils/api/asyncHandler';
 import { sendOTP } from '@/utils/services/email';
 import { generateJWT } from '@/utils/tokens/jwtTokens';
 
-const registerOrganization = asyncHandler(
-  async (req: Request, res: Response) => {
-    const parsedValues = newOrganizationSchema.safeParse(req.body);
+const registerOrganization = asyncHandler(async (req: Request, res: Response) => {
+  const parsedValues = newOrganizationSchema.safeParse(req.body);
 
-    if (!parsedValues.success) {
-      const validationError = new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${issue.path.join('.')} : ${issue.message}`
-        )
-      );
-
-      return res.status(400).json(validationError);
-    }
-
-    const existingOrganization = await db.query.organization.findFirst({
-      where: and(
-        eq(organization.name, parsedValues.data.name),
-        eq(organization.serviceCategory, parsedValues.data.serviceCategory)
-      ),
-    });
-
-    if (existingOrganization) {
-      throw new ApiError(400, 'Organization already exists');
-    }
-
-    console.log('RAW PASSWORD:', parsedValues.data.password);
-    const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
-    const newOrganization = await db
-      .insert(organization)
-      .values({ ...parsedValues.data, password: hashedPassword })
-      .returning({
-        id: organization.id,
-        name: organization.name,
-        serviceCategory: organization.serviceCategory,
-        generalNumber: organization.generalNumber,
-      });
-
-    if (!newOrganization) {
-      throw new ApiError(500, 'Error creating organization');
-    }
-
-    console.log('HASHED PASSWORD:', hashedPassword);
-
-    res.status(201).json(
-      new ApiResponse(201, 'Organization created', {
-        organization: newOrganization[0],
-      })
+  if (!parsedValues.success) {
+    const validationError = new ApiError(
+      400,
+      'Error validating data',
+      parsedValues.error.issues.map(issue => `${issue.path.join('.')} : ${issue.message}`)
     );
+
+    return res.status(400).json(validationError);
   }
-);
 
-const getAllOrganizations = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInUser = req.user;
+  const existingOrganization = await db.query.organization.findFirst({
+    where: and(
+      eq(organization.name, parsedValues.data.name),
+      eq(organization.serviceCategory, parsedValues.data.serviceCategory)
+    ),
+  });
 
-    if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
-      throw new ApiError(401, 'Unauthorized to perform this action');
-    }
-
-    const organizations = await db.query.organization.findMany();
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Organizations retrieved', organizations));
+  if (existingOrganization) {
+    throw new ApiError(400, 'Organization already exists');
   }
-);
 
-const getOrganizationById = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(401, 'Unauthorized to perform this action');
-    }
-
-    const organizationId = req.params.id;
-
-    if (!organizationId) {
-      throw new ApiError(401, 'Organiztion Id required in params');
-    }
-
-    const organizationDetails = await db.query.organization.findFirst({
-      where: eq(organization.id, organizationId),
+  console.log('RAW PASSWORD:', parsedValues.data.password);
+  const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
+  const newOrganization = await db
+    .insert(organization)
+    .values({ ...parsedValues.data, password: hashedPassword })
+    .returning({
+      id: organization.id,
+      name: organization.name,
+      serviceCategory: organization.serviceCategory,
+      generalNumber: organization.generalNumber,
     });
 
-    if (!organizationDetails) {
-      throw new ApiError(404, 'Organization not found');
-    }
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          'Organization details retrieved',
-          organizationDetails
-        )
-      );
+  if (!newOrganization) {
+    throw new ApiError(500, 'Error creating organization');
   }
-);
+
+  console.log('HASHED PASSWORD:', hashedPassword);
+
+  res.status(201).json(
+    new ApiResponse(201, 'Organization created', {
+      organization: newOrganization[0],
+    })
+  );
+});
+
+const getAllOrganizations = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInUser = req.user;
+
+  if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
+    throw new ApiError(401, 'Unauthorized to perform this action');
+  }
+
+  const organizations = await db.query.organization.findMany();
+
+  res.status(200).json(new ApiResponse(200, 'Organizations retrieved', organizations));
+});
+
+const getOrganizationById = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInUser = req.user;
+
+  if (!loggedInUser || !loggedInUser.id) {
+    throw new ApiError(401, 'Unauthorized to perform this action');
+  }
+
+  const organizationId = req.params.id;
+
+  if (!organizationId) {
+    throw new ApiError(401, 'Organiztion Id required in params');
+  }
+
+  const organizationDetails = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+  });
+
+  if (!organizationDetails) {
+    throw new ApiError(404, 'Organization not found');
+  }
+
+  res.status(200).json(new ApiResponse(200, 'Organization details retrieved', organizationDetails));
+});
 
 const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
@@ -194,10 +176,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (invalidKeys.length > 0) {
-    throw new ApiError(
-      400,
-      `Invalid data to update. Invalid keys: ${invalidKeys}`
-    );
+    throw new ApiError(400, `Invalid data to update. Invalid keys: ${invalidKeys}`);
   }
 
   const updatedOrganization = await db
@@ -229,9 +208,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
     const validationError = new ApiError(
       400,
       'Error validating data',
-      parsedValues.error.issues.map(
-        issue => `${issue.path.join('.')} : ${issue.message}`
-      )
+      parsedValues.error.issues.map(issue => `${issue.path.join('.')} : ${issue.message}`)
     );
 
     return res.status(400).json(validationError);
@@ -298,9 +275,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const token = generateJWT(existingOrg);
-  const loggedInOrg: Partial<TOrganization> = JSON.parse(
-    JSON.stringify(existingOrg)
-  );
+  const loggedInOrg: Partial<TOrganization> = JSON.parse(JSON.stringify(existingOrg));
   delete loggedInOrg.password;
 
   res
@@ -345,13 +320,8 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (!existingUser.tokenExpiry) {
-    console.log(
-      'Verification token expiry not registered. Please verify again.'
-    );
-    throw new ApiError(
-      400,
-      'Verification token expiry not registered. Please verify again.'
-    );
+    console.log('Verification token expiry not registered. Please verify again.');
+    throw new ApiError(400, 'Verification token expiry not registered. Please verify again.');
   }
 
   const tokenExpiry = new Date(existingUser.tokenExpiry);
@@ -381,10 +351,7 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
       isVerified: organization.isVerified,
     });
 
-  if (
-    !Array.isArray(updatedUser) ||
-    (updatedUser[0] && !updatedUser[0].isVerified)
-  ) {
+  if (!Array.isArray(updatedUser) || (updatedUser[0] && !updatedUser[0].isVerified)) {
     console.log('Failed to verify user');
     throw new ApiError(500, 'Failed to verify user');
   }
@@ -418,298 +385,251 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'User not found');
   }
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, 'User found', { user: existingOrg }));
+  res.status(200).json(new ApiResponse(200, 'User found', { user: existingOrg }));
 });
 
 // Public endpoint to list organizations for service provider registration
-const listOrganizationsPublic = asyncHandler(
-  async (req: Request, res: Response) => {
-    const organizations = await db.query.organization.findMany({
-      columns: {
-        id: true,
-        name: true,
-        email: true,
-        serviceCategory: true,
-      },
-      where: eq(organization.isVerified, true),
-    });
+const listOrganizationsPublic = asyncHandler(async (req: Request, res: Response) => {
+  const organizations = await db.query.organization.findMany({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      serviceCategory: true,
+    },
+    where: eq(organization.isVerified, true),
+  });
 
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Organizations retrieved', organizations));
-  }
-);
+  res.status(200).json(new ApiResponse(200, 'Organizations retrieved', organizations));
+});
 
 // ============== Organization Service Provider Management ==============
 
 // Get all service providers for the organization
-const getOrgServiceProviders = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
+const getOrgServiceProviders = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    const providers = await db.query.serviceProvider.findMany({
-      where: eq(serviceProvider.organizationId, loggedInOrg.id),
-      columns: {
-        password: false,
-        verificationToken: false,
-        tokenExpiry: false,
-      },
-    });
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Service providers retrieved', providers));
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  const providers = await db.query.serviceProvider.findMany({
+    where: eq(serviceProvider.organizationId, loggedInOrg.id),
+    columns: {
+      password: false,
+      verificationToken: false,
+      tokenExpiry: false,
+    },
+  });
+
+  res.status(200).json(new ApiResponse(200, 'Service providers retrieved', providers));
+});
 
 // Get single service provider by ID
-const getOrgServiceProviderById = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
-    const { id } = req.params;
+const getOrgServiceProviderById = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
+  const { id } = req.params;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!id) {
-      throw new ApiError(400, 'Provider ID is required');
-    }
-
-    const provider = await db.query.serviceProvider.findFirst({
-      where: and(
-        eq(serviceProvider.id, id),
-        eq(serviceProvider.organizationId, loggedInOrg.id)
-      ),
-      columns: {
-        password: false,
-        verificationToken: false,
-        tokenExpiry: false,
-      },
-    });
-
-    if (!provider) {
-      throw new ApiError(404, 'Service provider not found');
-    }
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Service provider retrieved', provider));
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  if (!id) {
+    throw new ApiError(400, 'Provider ID is required');
+  }
+
+  const provider = await db.query.serviceProvider.findFirst({
+    where: and(eq(serviceProvider.id, id), eq(serviceProvider.organizationId, loggedInOrg.id)),
+    columns: {
+      password: false,
+      verificationToken: false,
+      tokenExpiry: false,
+    },
+  });
+
+  if (!provider) {
+    throw new ApiError(404, 'Service provider not found');
+  }
+
+  res.status(200).json(new ApiResponse(200, 'Service provider retrieved', provider));
+});
 
 // Register a new service provider for the organization
-const registerOrgServiceProvider = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
+const registerOrgServiceProvider = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
 
-    const parsedValues = newServiceProviderSchema.safeParse({
-      ...req.body,
-      organizationId: loggedInOrg.id,
-    });
+  const parsedValues = newServiceProviderSchema.safeParse({
+    ...req.body,
+    organizationId: loggedInOrg.id,
+  });
 
-    if (!parsedValues.success) {
-      throw new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${issue.path.join('.')} : ${issue.message}`
-        )
-      );
-    }
-
-    // Validate service type matches organization category
-    const org = await db.query.organization.findFirst({
-      where: eq(organization.id, loggedInOrg.id),
-    });
-
-    if (!org) {
-      throw new ApiError(404, 'Organization not found');
-    }
-
-    if (org.serviceCategory !== parsedValues.data.serviceType) {
-      throw new ApiError(
-        400,
-        `Service type must match organization category: ${org.serviceCategory}`
-      );
-    }
-
-    // Check for existing provider
-    const existingProvider = await db.query.serviceProvider.findFirst({
-      where: or(
-        eq(serviceProvider.phoneNumber, parsedValues.data.phoneNumber),
-        eq(serviceProvider.email, parsedValues.data.email)
-      ),
-    });
-
-    if (existingProvider) {
-      throw new ApiError(
-        400,
-        'Service provider with this email or phone number already exists'
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
-
-    const newProvider = await db
-      .insert(serviceProvider)
-      .values({
-        ...parsedValues.data,
-        password: hashedPassword,
-        organizationId: loggedInOrg.id,
-        // Default location values - will be updated when provider logs in from mobile
-        lastLocation: `POINT(0 0)`,
-        h3Index: BigInt(0),
-      })
-      .returning({
-        id: serviceProvider.id,
-        name: serviceProvider.name,
-        email: serviceProvider.email,
-        phoneNumber: serviceProvider.phoneNumber,
-        serviceType: serviceProvider.serviceType,
-      });
-
-    res.status(201).json(
-      new ApiResponse(201, 'Service provider registered successfully', {
-        provider: newProvider[0],
-      })
+  if (!parsedValues.success) {
+    throw new ApiError(
+      400,
+      'Error validating data',
+      parsedValues.error.issues.map(issue => `${issue.path.join('.')} : ${issue.message}`)
     );
   }
-);
+
+  // Validate service type matches organization category
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, loggedInOrg.id),
+  });
+
+  if (!org) {
+    throw new ApiError(404, 'Organization not found');
+  }
+
+  if (org.serviceCategory !== parsedValues.data.serviceType) {
+    throw new ApiError(
+      400,
+      `Service type must match organization category: ${org.serviceCategory}`
+    );
+  }
+
+  // Check for existing provider
+  const existingProvider = await db.query.serviceProvider.findFirst({
+    where: or(
+      eq(serviceProvider.phoneNumber, parsedValues.data.phoneNumber),
+      eq(serviceProvider.email, parsedValues.data.email)
+    ),
+  });
+
+  if (existingProvider) {
+    throw new ApiError(400, 'Service provider with this email or phone number already exists');
+  }
+
+  const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
+
+  const newProvider = await db
+    .insert(serviceProvider)
+    .values({
+      ...parsedValues.data,
+      password: hashedPassword,
+      organizationId: loggedInOrg.id,
+      // Default location values - will be updated when provider logs in from mobile
+      lastLocation: sql`ST_SetSRID(ST_MakePoint(85.3240, 27.7172), 4326)`,
+      h3Index: BigInt(0),
+    })
+    .returning({
+      id: serviceProvider.id,
+      name: serviceProvider.name,
+      email: serviceProvider.email,
+      phoneNumber: serviceProvider.phoneNumber,
+      serviceType: serviceProvider.serviceType,
+    });
+
+  res.status(201).json(
+    new ApiResponse(201, 'Service provider registered successfully', {
+      provider: newProvider[0],
+    })
+  );
+});
 
 // Update a service provider
-const updateOrgServiceProvider = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
-    const { id } = req.params;
+const updateOrgServiceProvider = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
+  const { id } = req.params;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
 
-    if (!id) {
-      throw new ApiError(400, 'Provider ID is required');
-    }
+  if (!id) {
+    throw new ApiError(400, 'Provider ID is required');
+  }
 
-    const existingProvider = await db.query.serviceProvider.findFirst({
-      where: and(
-        eq(serviceProvider.id, id),
-        eq(serviceProvider.organizationId, loggedInOrg.id)
-      ),
+  const existingProvider = await db.query.serviceProvider.findFirst({
+    where: and(eq(serviceProvider.id, id), eq(serviceProvider.organizationId, loggedInOrg.id)),
+  });
+
+  if (!existingProvider) {
+    throw new ApiError(404, 'Service provider not found');
+  }
+
+  const { name, age, primaryAddress, serviceArea, vehicleInformation } = req.body;
+
+  const updateData: Record<string, unknown> = {};
+  if (name) updateData.name = name;
+  if (age) updateData.age = age;
+  if (primaryAddress) updateData.primaryAddress = primaryAddress;
+  if (serviceArea) updateData.serviceArea = serviceArea;
+  if (vehicleInformation) updateData.vehicleInformation = vehicleInformation;
+
+  const updatedProvider = await db
+    .update(serviceProvider)
+    .set(updateData)
+    .where(eq(serviceProvider.id, id))
+    .returning({
+      id: serviceProvider.id,
+      name: serviceProvider.name,
+      email: serviceProvider.email,
+      phoneNumber: serviceProvider.phoneNumber,
+      serviceType: serviceProvider.serviceType,
     });
 
-    if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
-    }
-
-    const { name, age, primaryAddress, serviceArea, vehicleInformation } =
-      req.body;
-
-    const updateData: Record<string, unknown> = {};
-    if (name) updateData.name = name;
-    if (age) updateData.age = age;
-    if (primaryAddress) updateData.primaryAddress = primaryAddress;
-    if (serviceArea) updateData.serviceArea = serviceArea;
-    if (vehicleInformation) updateData.vehicleInformation = vehicleInformation;
-
-    const updatedProvider = await db
-      .update(serviceProvider)
-      .set(updateData)
-      .where(eq(serviceProvider.id, id))
-      .returning({
-        id: serviceProvider.id,
-        name: serviceProvider.name,
-        email: serviceProvider.email,
-        phoneNumber: serviceProvider.phoneNumber,
-        serviceType: serviceProvider.serviceType,
-      });
-
-    res.status(200).json(
-      new ApiResponse(200, 'Service provider updated successfully', {
-        provider: updatedProvider[0],
-      })
-    );
-  }
-);
+  res.status(200).json(
+    new ApiResponse(200, 'Service provider updated successfully', {
+      provider: updatedProvider[0],
+    })
+  );
+});
 
 // Delete a service provider
-const deleteOrgServiceProvider = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
-    const { id } = req.params;
+const deleteOrgServiceProvider = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
+  const { id } = req.params;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!id) {
-      throw new ApiError(400, 'Provider ID is required');
-    }
-
-    const existingProvider = await db.query.serviceProvider.findFirst({
-      where: and(
-        eq(serviceProvider.id, id),
-        eq(serviceProvider.organizationId, loggedInOrg.id)
-      ),
-    });
-
-    if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
-    }
-
-    await db.delete(serviceProvider).where(eq(serviceProvider.id, id));
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Service provider deleted successfully', {}));
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  if (!id) {
+    throw new ApiError(400, 'Provider ID is required');
+  }
+
+  const existingProvider = await db.query.serviceProvider.findFirst({
+    where: and(eq(serviceProvider.id, id), eq(serviceProvider.organizationId, loggedInOrg.id)),
+  });
+
+  if (!existingProvider) {
+    throw new ApiError(404, 'Service provider not found');
+  }
+
+  await db.delete(serviceProvider).where(eq(serviceProvider.id, id));
+
+  res.status(200).json(new ApiResponse(200, 'Service provider deleted successfully', {}));
+});
 
 // Verify a service provider manually
-const verifyOrgServiceProvider = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInOrg = req.user;
-    const { id } = req.params;
+const verifyOrgServiceProvider = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
+  const { id } = req.params;
 
-    if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!id) {
-      throw new ApiError(400, 'Provider ID is required');
-    }
-
-    const existingProvider = await db.query.serviceProvider.findFirst({
-      where: and(
-        eq(serviceProvider.id, id),
-        eq(serviceProvider.organizationId, loggedInOrg.id)
-      ),
-    });
-
-    if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
-    }
-
-    await db
-      .update(serviceProvider)
-      .set({ isVerified: true })
-      .where(eq(serviceProvider.id, id));
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Service provider verified successfully', {}));
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  if (!id) {
+    throw new ApiError(400, 'Provider ID is required');
+  }
+
+  const existingProvider = await db.query.serviceProvider.findFirst({
+    where: and(eq(serviceProvider.id, id), eq(serviceProvider.organizationId, loggedInOrg.id)),
+  });
+
+  if (!existingProvider) {
+    throw new ApiError(404, 'Service provider not found');
+  }
+
+  await db.update(serviceProvider).set({ isVerified: true }).where(eq(serviceProvider.id, id));
+
+  res.status(200).json(new ApiResponse(200, 'Service provider verified successfully', {}));
+});
 
 export {
   registerOrganization,

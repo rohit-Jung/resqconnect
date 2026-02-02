@@ -16,18 +16,14 @@ const mailGenerator = new Mailgen({
   },
 });
 
-export const sendOTPEmail = async (
-  email: string,
-  otpToken: string
-): Promise<boolean> => {
+export const sendOTPEmail = async (email: string, otpToken: string): Promise<boolean> => {
   try {
     const emailContent = {
       body: {
         name: 'User',
         intro: 'Welcome to Resqconnect',
         action: {
-          instructions:
-            'To complete your verification, please use the following OTP code:',
+          instructions: 'To complete your verification, please use the following OTP code:',
           button: {
             color: '#E13333',
             text: otpToken,

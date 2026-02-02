@@ -1,5 +1,7 @@
 import type { ZodError } from 'zod';
 
+import { logger } from '@/config';
+
 class ApiError extends Error {
   private statusCode: number;
   private data: any;
@@ -18,6 +20,8 @@ class ApiError extends Error {
     this.data = data;
     this.errors = errors;
 
+    logger.error('Occured API Error:: ', this.message);
+
     if (this.stack) {
       this.stack = stack;
     } else {
@@ -35,6 +39,7 @@ class ApiError extends Error {
   }
 
   static validationError(errors: ZodError) {
+    logger.error('validationError', JSON.stringify(errors));
     return new ApiError(
       400,
       'Error validating data',

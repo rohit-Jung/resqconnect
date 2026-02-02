@@ -75,15 +75,10 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'No data to update');
   }
 
-  const invalidKeys = Object.keys(updateData).filter(
-    key => !Object.keys(feedback).includes(key)
-  );
+  const invalidKeys = Object.keys(updateData).filter(key => !Object.keys(feedback).includes(key));
 
   if (invalidKeys.length > 0) {
-    throw new ApiError(
-      400,
-      `Invalid data to update. Invalid keys: ${invalidKeys}`
-    );
+    throw new ApiError(400, `Invalid data to update. Invalid keys: ${invalidKeys}`);
   }
 
   const updatedFeedback = await db
@@ -123,10 +118,7 @@ const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized to perform this action');
   }
 
-  const deletedFeedback = await db
-    .delete(feedback)
-    .where(eq(feedback.id, id))
-    .returning();
+  const deletedFeedback = await db.delete(feedback).where(eq(feedback.id, id)).returning();
 
   if (!deletedFeedback) {
     throw new ApiError(500, 'Failed to delete feedback');
@@ -150,9 +142,7 @@ const getFeedback = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Feedback not found');
   }
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, 'Feedback found', existingFeedback));
+  res.status(200).json(new ApiResponse(200, 'Feedback found', existingFeedback));
 });
 
 const getUsersFeedback = asyncHandler(async (req: Request, res: Response) => {
@@ -169,10 +159,4 @@ const getUsersFeedback = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(200, 'Feedbacks found', feedbacks));
 });
 
-export {
-  createFeedback,
-  updateFeedback,
-  deleteFeedback,
-  getFeedback,
-  getUsersFeedback,
-};
+export { createFeedback, updateFeedback, deleteFeedback, getFeedback, getUsersFeedback };

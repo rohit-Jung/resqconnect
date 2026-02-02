@@ -5,6 +5,11 @@ export enum UserRoles {
   ADMIN = 'admin',
 }
 
+export enum OtherRoles {
+  SERVICE_PROVIDER = 'service_provider',
+  ORGANIZATION = 'organization',
+}
+
 export enum ServiceTypeEnum {
   AMBULANCE = 'ambulance',
   POLICE = 'police',

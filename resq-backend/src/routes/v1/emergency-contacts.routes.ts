@@ -26,10 +26,7 @@ emergencyContactsRouter
   .route('/:id')
   .get(getEmergencyContact)
   .put(validateRoleAuth([UserRoles.USER]), updateEmergencyContact)
-  .delete(
-    validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    deleteEmergencyContact
-  );
+  .delete(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), deleteEmergencyContact);
 
 // Toggle notification for a specific contact
 emergencyContactsRouter

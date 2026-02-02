@@ -11,11 +11,7 @@ interface IProviderInfo {
   type: ServiceTypeEnum;
 }
 
-export async function findNearbyProviders({
-  lat,
-  lng,
-  type,
-}: IProviderInfo): Promise<
+export async function findNearbyProviders({ lat, lng, type }: IProviderInfo): Promise<
   Array<{
     id: string;
     distance: unknown;
@@ -38,11 +34,11 @@ export async function findNearbyProviders({
     .from(serviceProvider)
     // FAST FILTER: Only look in these specific H3 cells
     .where(
-      sql`${serviceProvider.h3Index} IN ${nearbyCells} AND ${serviceProvider.serviceStatus} = 'available' AND ${serviceProvider.serviceType} = ${type}`,
+      sql`${serviceProvider.h3Index} IN ${nearbyCells} AND ${serviceProvider.serviceStatus} = 'available' AND ${serviceProvider.serviceType} = ${type}`
     )
     // ACCURATE SORT: Use PostGIS for real distance
     .orderBy(
-      sql`${serviceProvider.lastLocation} <-> ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)`,
+      sql`${serviceProvider.lastLocation} <-> ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)`
     )
     .limit(1);
 

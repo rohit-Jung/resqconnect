@@ -3,11 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import ApiError from './ApiError';
 
 export function asyncHandler(
-  fnc: (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => Promise<unknown> | void
+  fnc: (req: Request, res: Response, next: NextFunction) => Promise<unknown> | void
 ) {
   return async function (req: Request, res: Response, next: NextFunction) {
     try {
@@ -18,9 +14,7 @@ export function asyncHandler(
 
       res
         .status(error.statusCode || 500)
-        .json(
-          new ApiError(error.statusCode || 500, error.message, [], null, stack)
-        );
+        .json(new ApiError(error.statusCode || 500, error.message, [], null, stack));
     }
   };
 }

@@ -1,12 +1,5 @@
 import { relations } from 'drizzle-orm';
-import {
-  boolean,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
@@ -24,29 +17,22 @@ export const emergencyContact = pgTable('emergency_contact', {
 
   // Notification preferences for this contact
   notifyOnEmergency: boolean('notify_on_emergency').default(true),
-  notificationMethod: varchar('notification_method', { length: 20 }).default(
-    'sms'
-  ), // 'sms', 'push', 'both'
+  notificationMethod: varchar('notification_method', { length: 20 }).default('sms'), // 'sms', 'push', 'both'
   pushToken: text('push_token'), // If contact has the app installed
 
   createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
 });
 
-export const emergencyContactRelations = relations(
-  emergencyContact,
-  ({ one }) => ({
-    userId: one(user, {
-      fields: [emergencyContact.userId],
-      references: [user.id],
-    }),
-  })
-);
+export const emergencyContactRelations = relations(emergencyContact, ({ one }) => ({
+  userId: one(user, {
+    fields: [emergencyContact.userId],
+    references: [user.id],
+  }),
+}));
 
 export const emergencyContactSchema = createSelectSchema(emergencyContact);
-export const newEmergencyContactSchema = createInsertSchema(
-  emergencyContact
-).pick({
+export const newEmergencyContactSchema = createInsertSchema(emergencyContact).pick({
   name: true,
   relationship: true,
   phoneNumber: true,

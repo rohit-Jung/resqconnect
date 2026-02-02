@@ -2,19 +2,19 @@ import { eq, sql } from 'drizzle-orm';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 
 import { envConfig } from '@/config/env.config';
-import { UserRoles } from '@/constants';
+import { OtherRoles, UserRoles } from '@/constants';
 import db from '@/db';
 import { organization, serviceProvider, user } from '@/models';
 import type { TOrganization, TServiceProvider, TUser } from '@/models';
 
 import ApiError from '../api/ApiError';
 
-type EntityRole = UserRoles | 'service_provider' | 'organization';
+export type TEntityRole = UserRoles | OtherRoles;
 export interface IJWTToken extends JwtPayload {
   id: string;
   name: string;
   email: string;
-  role: EntityRole;
+  role: TEntityRole;
   iat?: number;
   exp?: number;
 }
@@ -24,14 +24,14 @@ type Entity =
   | Partial<TServiceProvider & { kind: 'service_provider' }>
   | Partial<TOrganization & { kind: 'organization' }>;
 
-const getRole = (e: Entity): EntityRole => {
+const getRole = (e: Entity): TEntityRole => {
   switch (e.kind) {
     case 'user':
       return e.role as UserRoles;
     case 'service_provider':
-      return 'service_provider';
+      return OtherRoles.SERVICE_PROVIDER;
     case 'organization':
-      return 'organization';
+      return OtherRoles.ORGANIZATION;
     default:
       return UserRoles.USER;
   }
@@ -52,7 +52,7 @@ const generateJWT = (user: Entity) => {
     envConfig.jwt_secret!,
     {
       expiresIn: envConfig.jwt_expiry,
-    },
+    }
   );
 
   return token;
@@ -72,9 +72,7 @@ const verifyJWT = (token: string): IJWTToken => {
   return decoded;
 };
 
-const verifyAndDecodeToken = async (
-  token: string,
-): Promise<IJWTToken | null> => {
+const verifyAndDecodeToken = async (token: string): Promise<IJWTToken | null> => {
   if (!token) {
     throw new ApiError(401, 'Unauthorized');
   }
@@ -87,7 +85,7 @@ const verifyAndDecodeToken = async (
   const [row] = await db
     .select({
       id: user.id,
-      role: sql<EntityRole>`${user.role}::text`,
+      role: sql<TEntityRole>`${user.role}::text`,
       name: user.name,
       email: user.email,
     })
@@ -97,23 +95,23 @@ const verifyAndDecodeToken = async (
       db
         .select({
           id: serviceProvider.id,
-          role: sql<EntityRole>`'serviceProvider'`,
+          role: sql<TEntityRole>`'serviceProvider'`,
           name: serviceProvider.name,
           email: serviceProvider.email,
         })
         .from(serviceProvider)
-        .where(eq(serviceProvider.id, decoded.id)),
+        .where(eq(serviceProvider.id, decoded.id))
     )
     .union(
       db
         .select({
           id: organization.id,
-          role: sql<EntityRole>`'organization'`,
+          role: sql<TEntityRole>`'organization'`,
           name: organization.name,
           email: organization.email,
         })
         .from(organization)
-        .where(eq(organization.id, decoded.id)),
+        .where(eq(organization.id, decoded.id))
     )
     .limit(1);
 

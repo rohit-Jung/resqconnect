@@ -22,18 +22,12 @@ const H3_RESOLUTION = 8; // Resolution 7-8 is best for city-wide emergency dispa
 const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const parsedValues = newUserSchema.safeParse(req.body);
   if (!parsedValues.success) {
-    return res
-      .status(HttpStatusCode.BadRequest)
-      .json(ApiError.validationError(parsedValues.error));
+    return res.status(HttpStatusCode.BadRequest).json(ApiError.validationError(parsedValues.error));
   }
 
-  const { phoneNumber, email, password, role, latitude, longitude } =
-    parsedValues.data;
+  const { phoneNumber, email, password, role, latitude, longitude } = parsedValues.data;
   if (role && role == UserRoles.ADMIN && !adminEmails.includes(email)) {
-    throw new ApiError(
-      HttpStatusCode.Unauthorized,
-      'Admin email not authorized'
-    );
+    throw new ApiError(HttpStatusCode.Unauthorized, 'Admin email not authorized');
   }
 
   if (phoneNumber && phoneRegex.exec(phoneNumber.toString()) === null) {
@@ -46,10 +40,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (existingUser) {
     console.log('User with this email or phone number already exists');
-    throw new ApiError(
-      400,
-      'User with this email or phone number already exists'
-    );
+    throw new ApiError(400, 'User with this email or phone number already exists');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -68,11 +59,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const locationPoint = `POINT(${userLongitude} ${userLatitude})`;
 
   // Remove latitude/longitude from data before insert (they're not in the table schema)
-  const {
-    latitude: _lat,
-    longitude: _lng,
-    ...userDataWithoutCoords
-  } = parsedValues.data;
+  const { latitude: _lat, longitude: _lng, ...userDataWithoutCoords } = parsedValues.data;
 
   const newUser = await db
     .insert(user)
@@ -113,9 +100,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     const validationError = new ApiError(
       400,
       'Error validating data',
-      parsedValues.error.issues.map(
-        issue => `${issue.path.join('.')} : ${issue.message}`
-      )
+      parsedValues.error.issues.map(issue => `${issue.path.join('.')} : ${issue.message}`)
     );
 
     return res.status(400).json(validationError);
@@ -195,9 +180,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     .json(
       new ApiResponse(
         200,
-        `${capitalizeFirstLetter(
-          loggedInUser.role?.toString() ?? 'user'
-        )} logged in successfully`,
+        `${capitalizeFirstLetter(loggedInUser.role?.toString() ?? 'user')} logged in successfully`,
         {
           user: loggedInUser,
           token,
@@ -266,16 +249,11 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'No data to update');
   }
 
-  const invalidKeys = Object.keys(updateData).filter(
-    key => !Object.keys(user).includes(key)
-  );
+  const invalidKeys = Object.keys(updateData).filter(key => !Object.keys(user).includes(key));
 
   if (invalidKeys.length > 0) {
     console.log(`Invalid data to update. Invalid keys: ${invalidKeys}`);
-    throw new ApiError(
-      400,
-      `Invalid data to update. Invalid keys: ${invalidKeys}`
-    );
+    throw new ApiError(400, `Invalid data to update. Invalid keys: ${invalidKeys}`);
   }
 
   const updatedUser = await db
@@ -325,9 +303,7 @@ const getProfile = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'User not found');
   }
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, 'User found', { user: existingUser }));
+  res.status(200).json(new ApiResponse(200, 'User found', { user: existingUser }));
 });
 
 const getUser = asyncHandler(async (req: Request, res: Response) => {
@@ -357,11 +333,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'User not found');
   }
 
-  res
-    .status(200)
-    .json(
-      new ApiResponse(200, 'User fetched successfully', { user: existingUser })
-    );
+  res.status(200).json(new ApiResponse(200, 'User fetched successfully', { user: existingUser }));
 });
 
 const verifyUser = asyncHandler(async (req: Request, res: Response) => {
@@ -395,13 +367,8 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (!existingUser.tokenExpiry) {
-    console.log(
-      'Verification token expiry not registered. Please verify again.'
-    );
-    throw new ApiError(
-      400,
-      'Verification token expiry not registered. Please verify again.'
-    );
+    console.log('Verification token expiry not registered. Please verify again.');
+    throw new ApiError(400, 'Verification token expiry not registered. Please verify again.');
   }
 
   const tokenExpiry = new Date(existingUser.tokenExpiry);
@@ -431,10 +398,7 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
       isVerified: user.isVerified,
     });
 
-  if (
-    !Array.isArray(updatedUser) ||
-    (updatedUser[0] && !updatedUser[0].isVerified)
-  ) {
+  if (!Array.isArray(updatedUser) || (updatedUser[0] && !updatedUser[0].isVerified)) {
     console.log('Failed to verify user');
     throw new ApiError(500, 'Failed to verify user');
   }
@@ -521,22 +485,14 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'User not found');
   }
 
-  if (
-    !existingUser.resetPasswordToken ||
-    !existingUser.resetPasswordTokenExpiry
-  ) {
+  if (!existingUser.resetPasswordToken || !existingUser.resetPasswordTokenExpiry) {
     console.log('Reset Password token not found');
     throw new ApiError(400, 'Reset Password token not found');
   }
 
   if (!existingUser.resetPasswordTokenExpiry) {
-    console.log(
-      'Verification token expiry not registered. Please verify again.'
-    );
-    throw new ApiError(
-      400,
-      'Verification token expiry not registered. Please verify again.'
-    );
+    console.log('Verification token expiry not registered. Please verify again.');
+    throw new ApiError(400, 'Verification token expiry not registered. Please verify again.');
   }
 
   const tokenExpiry = new Date(existingUser.resetPasswordTokenExpiry);
@@ -619,10 +575,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const isPasswordValid = await bcrypt.compare(
-    oldPassword,
-    existingUser.password
-  );
+  const isPasswordValid = await bcrypt.compare(oldPassword, existingUser.password);
 
   if (!isPasswordValid) {
     console.log('Invalid credentials');
@@ -658,129 +611,102 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
   );
 });
 
-export const updatePushToken = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { pushToken } = req.body;
-    const userId = req.user?.id;
+export const updatePushToken = asyncHandler(async (req: Request, res: Response) => {
+  const { pushToken } = req.body;
+  const userId = req.user?.id;
 
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    const updatedUser = await db
-      .update(user)
-      .set({ pushToken })
-      .where(eq(user.id, userId))
-      .returning();
-
-    if (!updatedUser) {
-      throw new ApiError(404, 'User not found');
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Push token updated successfully', updatedUser[0])
-      );
+  if (!userId) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  const updatedUser = await db
+    .update(user)
+    .set({ pushToken })
+    .where(eq(user.id, userId))
+    .returning();
+
+  if (!updatedUser) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Push token updated successfully', updatedUser[0]));
+});
 
 /**
  * Update emergency contact notification settings
  */
-export const updateEmergencySettings = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { notifyEmergencyContacts, emergencyNotificationMethod } = req.body;
-    const userId = req.user?.id;
+export const updateEmergencySettings = asyncHandler(async (req: Request, res: Response) => {
+  const { notifyEmergencyContacts, emergencyNotificationMethod } = req.body;
+  const userId = req.user?.id;
 
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    // Validate notification method
-    const validMethods = ['sms', 'push', 'both'];
-    if (
-      emergencyNotificationMethod &&
-      !validMethods.includes(emergencyNotificationMethod)
-    ) {
-      throw new ApiError(
-        400,
-        `Invalid notification method. Must be one of: ${validMethods.join(', ')}`
-      );
-    }
-
-    const updateData: Record<string, unknown> = {};
-    if (typeof notifyEmergencyContacts === 'boolean') {
-      updateData.notifyEmergencyContacts = notifyEmergencyContacts;
-    }
-    if (emergencyNotificationMethod) {
-      updateData.emergencyNotificationMethod = emergencyNotificationMethod;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No valid settings to update');
-    }
-
-    const updatedUser = await db
-      .update(user)
-      .set(updateData)
-      .where(eq(user.id, userId))
-      .returning({
-        id: user.id,
-        notifyEmergencyContacts: user.notifyEmergencyContacts,
-        emergencyNotificationMethod: user.emergencyNotificationMethod,
-      });
-
-    if (!updatedUser.length) {
-      throw new ApiError(500, 'Failed to update settings');
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          'Emergency notification settings updated',
-          updatedUser[0]
-        )
-      );
+  if (!userId) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  // Validate notification method
+  const validMethods = ['sms', 'push', 'both'];
+  if (emergencyNotificationMethod && !validMethods.includes(emergencyNotificationMethod)) {
+    throw new ApiError(
+      400,
+      `Invalid notification method. Must be one of: ${validMethods.join(', ')}`
+    );
+  }
+
+  const updateData: Record<string, unknown> = {};
+  if (typeof notifyEmergencyContacts === 'boolean') {
+    updateData.notifyEmergencyContacts = notifyEmergencyContacts;
+  }
+  if (emergencyNotificationMethod) {
+    updateData.emergencyNotificationMethod = emergencyNotificationMethod;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new ApiError(400, 'No valid settings to update');
+  }
+
+  const updatedUser = await db.update(user).set(updateData).where(eq(user.id, userId)).returning({
+    id: user.id,
+    notifyEmergencyContacts: user.notifyEmergencyContacts,
+    emergencyNotificationMethod: user.emergencyNotificationMethod,
+  });
+
+  if (!updatedUser.length) {
+    throw new ApiError(500, 'Failed to update settings');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Emergency notification settings updated', updatedUser[0]));
+});
 
 /**
  * Get emergency contact notification settings
  */
-export const getEmergencySettings = asyncHandler(
-  async (req: Request, res: Response) => {
-    const userId = req.user?.id;
+export const getEmergencySettings = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
 
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    const userSettings = await db.query.user.findFirst({
-      where: eq(user.id, userId),
-      columns: {
-        notifyEmergencyContacts: true,
-        emergencyNotificationMethod: true,
-      },
-    });
-
-    if (!userSettings) {
-      throw new ApiError(404, 'User not found');
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          'Emergency notification settings retrieved',
-          userSettings
-        )
-      );
+  if (!userId) {
+    throw new ApiError(401, 'Unauthorized');
   }
-);
+
+  const userSettings = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+    columns: {
+      notifyEmergencyContacts: true,
+      emergencyNotificationMethod: true,
+    },
+  });
+
+  if (!userSettings) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Emergency notification settings retrieved', userSettings));
+});
 
 export {
   registerUser,

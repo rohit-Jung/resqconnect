@@ -4,17 +4,9 @@ import { gridDisk, latLngToCell } from 'h3-js';
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { socketEvents } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyRequest,
-  outbox,
-  requestEvents,
-  serviceProvider,
-} from '@/models';
+import { emergencyRequest, outbox, requestEvents, serviceProvider } from '@/models';
 import { isKafkaProducerConnected, safeSend } from '@/services/kafka.service';
-import {
-  cacheEmergencyProviders,
-  getEmergencyProviders,
-} from '@/services/redis.service';
+import { cacheEmergencyProviders, getEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
 
 // Constants
@@ -59,9 +51,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
 
       // Check if producer is connected before processing
       if (!isKafkaProducerConnected()) {
-        console.log(
-          '⚠️ Kafka producer not connected, skipping outbox processing...'
-        );
+        console.log('⚠️ Kafka producer not connected, skipping outbox processing...');
         return;
       }
 
@@ -92,10 +82,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
 
           console.log(`✅ Published outbox event ${event.id} to ${topic}`);
         } catch (error) {
-          console.error(
-            `❌ Failed to publish outbox event ${event.id}:`,
-            error
-          );
+          console.error(`❌ Failed to publish outbox event ${event.id}:`, error);
 
           // Update retry count
           await db
@@ -146,9 +133,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
 
         // If max radius exceeded, mark as failed
         if (currentRadius > MAX_SEARCH_RADIUS) {
-          console.log(
-            `❌ Request ${req.id} failed after ${currentRadius} escalations`
-          );
+          console.log(`❌ Request ${req.id} failed after ${currentRadius} escalations`);
 
           await db
             .update(emergencyRequest)
@@ -273,16 +258,12 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
 
       if (staleRequests.length === 0) return;
 
-      console.log(
-        `🔌 Found ${staleRequests.length} providers who accepted but never connected`
-      );
+      console.log(`🔌 Found ${staleRequests.length} providers who accepted but never connected`);
 
       const io = getIo();
 
       for (const req of staleRequests) {
-        console.log(
-          `🔌 Provider ${req.providerId} accepted request ${req.id} but never connected`
-        );
+        console.log(`🔌 Provider ${req.providerId} accepted request ${req.id} but never connected`);
 
         // Reset request to pending
         const newExpiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
@@ -318,8 +299,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
               emergencyLocation: req.location,
               rebroadcast: true,
               previousProvider: req.providerId,
-              message:
-                'Previous provider disconnected. Request available again.',
+              message: 'Previous provider disconnected. Request available again.',
               expiresAt: newExpiresAt.getTime(),
             });
           }

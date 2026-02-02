@@ -16,10 +16,7 @@ import { z } from 'zod';
 
 import { UserRoles } from '../constants';
 
-export const userRolesEnum = pgEnum('role', [
-  UserRoles.USER,
-  UserRoles.ADMIN,
-] as const);
+export const userRolesEnum = pgEnum('role', [UserRoles.USER, UserRoles.ADMIN] as const);
 
 const geometry = customType<{ data: string }>({
   dataType() {
@@ -93,10 +90,7 @@ export const newUserSchema = createInsertSchema(user)
       .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
       .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
       .regex(/[0-9]/, 'Password must contain at least one number')
-      .regex(
-        /[^A-Za-z0-9]/,
-        'Password must contain at least one special character'
-      ),
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
     termsAccepted: z.boolean(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
