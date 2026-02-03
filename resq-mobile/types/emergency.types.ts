@@ -10,7 +10,11 @@ export interface IEmergencyRequest {
   emergencyDescription: string;
   emergencyLocation: ILocation;
   status: EmergencyStatus;
-  currentLocation: ILocation;
+  searchRadius?: number;
+  expiresAt?: string;
+  assignedProviderId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export enum EmergencyStatus {
@@ -38,6 +42,23 @@ export interface IProvider {
   vehicleNumber?: string;
   distance?: number;
   eta?: number;
+}
+
+export interface INearbyProvider {
+  id: string;
+  name: string;
+  serviceType: string;
+  currentLocation: {
+    latitude: string;
+    longitude: string;
+  };
+  distance: number;
+}
+
+export interface IAssignedProvider extends INearbyProvider {
+  phoneNumber?: string;
+  vehicleNumber?: string;
+  estimatedArrival?: number;
 }
 
 export interface ICreateEmergencyResponse {
