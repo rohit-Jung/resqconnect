@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { TOKEN_KEY } from '@/constants';
 
+export type UserType = 'user' | 'service_provider';
+
 export interface User {
   id: string;
   email: string;
@@ -18,13 +20,15 @@ export interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
+  userType: UserType | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
-  login: (user: User, token: string) => void;
+  setUserType: (userType: UserType | null) => void;
+  login: (user: User, token: string, userType: UserType) => void;
   logout: () => Promise<void>;
   setLoading: (loading: boolean) => void;
 }
@@ -34,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      userType: null,
       isAuthenticated: false,
       isLoading: true,
 
@@ -45,10 +50,13 @@ export const useAuthStore = create<AuthState>()(
 
       setToken: (token) => set({ token }),
 
-      login: (user, token) =>
+      setUserType: (userType) => set({ userType }),
+
+      login: (user, token, userType) =>
         set({
           user,
           token,
+          userType,
           isAuthenticated: true,
           isLoading: false,
         }),
@@ -59,6 +67,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           token: null,
+          userType: null,
           isAuthenticated: false,
         });
       },
