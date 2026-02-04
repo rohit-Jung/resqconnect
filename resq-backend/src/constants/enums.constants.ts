@@ -30,9 +30,3 @@ export enum serviceStatusEnum {
   OFF_DUTY = 'off_duty',
 }
 
-export enum serviceEnum {
-  AMBULANCE = 'ambulance',
-  POLICE = 'police',
-  RESCUE_TEAM = 'rescue_team',
-  FIRE_TRUCK = 'fire_truck',
-}
