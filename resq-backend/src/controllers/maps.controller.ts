@@ -1,12 +1,15 @@
+import { HttpStatusCode } from 'axios';
 import { eq } from 'drizzle-orm';
 import { type Request, type Response } from 'express';
 
 import db from '@/db';
 import { user } from '@/models';
+import { getRouteFromMapbox } from '@/services/mapbox.service';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { compeletAutoSearch, getOptimalRoute } from '@/utils/maps/galli-maps';
+import { getRouteDataSchema } from '@/validations/maps.validations';
 
 const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
   const { q: searchQuery, lat: currentLat, lg: currentLong } = req.query;
@@ -70,51 +73,93 @@ const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'No results found');
   }
 
-  res.status(200).json(new ApiResponse(200, 'Search results found', searchAutoCompleteResult));
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, 'Search results found', searchAutoCompleteResult),
+    );
 });
 
-const getOptimalRouteForUser = asyncHandler(async (req: Request, res: Response) => {
-  const { srcLat, srcLng, dstLat, dstLng, mode } = req.query;
+const getOptimalRouteForUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { srcLat, srcLng, dstLat, dstLng, mode } = req.query;
 
-  if (!srcLat || !srcLng || !dstLat || !dstLng) {
-    throw new ApiError(400, 'Source and destination coordinates are required');
-  }
-
-  if (
-    typeof srcLat !== 'string' ||
-    typeof srcLng !== 'string' ||
-    typeof dstLat !== 'string' ||
-    typeof dstLng !== 'string' ||
-    typeof mode !== 'string'
-  ) {
-    throw new ApiError(400, 'Source and destination coordinates must be strings');
-  }
-
-  const loggedInUser = req.user;
-
-  if (!loggedInUser || !loggedInUser.id) {
-    throw new ApiError(400, 'Unauthorized to perform this action');
-  }
-
-  if (mode) {
-    if (mode !== 'DRIVING' && mode !== 'WALKING' && mode !== 'BICYCLING') {
-      throw new ApiError(400, 'Invalid mode parameter');
+    if (!srcLat || !srcLng || !dstLat || !dstLng) {
+      throw new ApiError(
+        400,
+        'Source and destination coordinates are required',
+      );
     }
+
+    if (
+      typeof srcLat !== 'string' ||
+      typeof srcLng !== 'string' ||
+      typeof dstLat !== 'string' ||
+      typeof dstLng !== 'string' ||
+      typeof mode !== 'string'
+    ) {
+      throw new ApiError(
+        400,
+        'Source and destination coordinates must be strings',
+      );
+    }
+
+    const loggedInUser = req.user;
+
+    if (!loggedInUser || !loggedInUser.id) {
+      throw new ApiError(400, 'Unauthorized to perform this action');
+    }
+
+    if (mode) {
+      if (mode !== 'DRIVING' && mode !== 'WALKING' && mode !== 'BICYCLING') {
+        throw new ApiError(400, 'Invalid mode parameter');
+      }
+    }
+
+    const optimalRoute = await getOptimalRoute({
+      srcLat,
+      srcLng,
+      dstLat,
+      dstLng,
+      mode: (mode || 'DRIVING') as 'DRIVING' | 'WALKING' | 'CYCLING',
+    });
+
+    if (!optimalRoute) {
+      throw new ApiError(404, 'No route found');
+    }
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, 'Optimal route found', optimalRoute));
+  },
+);
+
+const getRoute = asyncHandler(async (req: Request, res: Response) => {
+  const parsedData = getRouteDataSchema.safeParse(req.body);
+  if (!parsedData.success) {
+    return res
+      .status(HttpStatusCode.BadRequest)
+      .json(ApiError.validationError(parsedData.error));
   }
 
-  const optimalRoute = await getOptimalRoute({
-    srcLat,
-    srcLng,
-    dstLat,
-    dstLng,
-    mode: (mode || 'DRIVING') as 'DRIVING' | 'WALKING' | 'CYCLING',
-  });
+  const { origin, dest, profile } = parsedData.data;
+  const routeResult = await getRouteFromMapbox(origin, dest, profile);
 
-  if (!optimalRoute) {
-    throw new ApiError(404, 'No route found');
+  if (!routeResult.success) {
+    return res.status(HttpStatusCode.InternalServerError).json({
+      error: routeResult.error,
+    });
   }
 
-  res.status(200).json(new ApiResponse(200, 'Optimal route found', optimalRoute));
+  return res
+    .status(HttpStatusCode.Ok)
+    .json(
+      new ApiResponse(
+        HttpStatusCode.Ok,
+        'Route Found Successfully',
+        routeResult.route,
+      ),
+    );
 });
 
-export { getAutoComplete, getOptimalRouteForUser };
+export { getAutoComplete, getOptimalRouteForUser , getRoute };

@@ -1,94 +1,27 @@
-/**
- * Mapbox Directions API Service
- * Used to calculate routes between provider and user locations
- */
+import { envConfig, logger } from '@/config';
+import { RoutingProfiles } from '@/constants/mapbox.constants';
+import type { RouteResponse, RouteResult } from '@/types/maps.types';
+import { constructDirectionUrl } from '@/utils/maps/mapbox';
+import type { Coordinates } from '@/validations/maps.validations';
 
-interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
-
-interface RouteResponse {
-  routes: Array<{
-    geometry: {
-      coordinates: [number, number][];
-      type: string;
-    };
-    legs: Array<{
-      distance: number; // in meters
-      duration: number; // in seconds
-      steps: Array<{
-        distance: number;
-        duration: number;
-        geometry: {
-          coordinates: [number, number][];
-        };
-        maneuver: {
-          instruction: string;
-          type: string;
-          modifier?: string;
-          location: [number, number];
-        };
-        name: string;
-      }>;
-    }>;
-    distance: number;
-    duration: number;
-  }>;
-  waypoints: Array<{
-    location: [number, number];
-    name: string;
-  }>;
-}
-
-interface RouteResult {
-  success: boolean;
-  route?: {
-    coordinates: [number, number][];
-    distance: number; // in km
-    duration: number; // in minutes
-    steps?: Array<{
-      instruction: string;
-      distance: number;
-      duration: number;
-    }>;
-  };
-  error?: string;
-}
-
-/**
- * Get route from Mapbox Directions API
- * @param origin - Provider's current location
- * @param destination - User's emergency location
- * @param profile - Routing profile (driving, walking, cycling)
- */
-export async function getRoute(
+export async function getRouteFromMapbox(
   origin: Coordinates,
   destination: Coordinates,
-  profile: 'driving' | 'walking' | 'cycling' | 'driving-traffic' = 'driving-traffic'
+  profile: RoutingProfiles = RoutingProfiles.DrivingTraffic,
 ): Promise<RouteResult> {
-  const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
-
-  if (!MAPBOX_ACCESS_TOKEN) {
-    console.error('MAPBOX_ACCESS_TOKEN is not set in environment variables');
-    return {
-      success: false,
-      error: 'Mapbox API key not configured',
-    };
-  }
-
   try {
-    // Mapbox expects coordinates as longitude,latitude
-    const originStr = `${origin.longitude},${origin.latitude}`;
-    const destinationStr = `${destination.longitude},${destination.latitude}`;
-
-    const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${originStr};${destinationStr}?geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_ACCESS_TOKEN}`;
+    const url = constructDirectionUrl({
+      profile,
+      token: envConfig.mapbox_token,
+      origin,
+      dest: destination,
+    });
 
     const response = await fetch(url);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Mapbox API error:', response.status, errorText);
+      logger.error(`Mapbox API error: ${response.status} ${errorText}`);
+      // console.error('Mapbox API error:', response.status, errorText);
       return {
         success: false,
         error: `Mapbox API error: ${response.status}`,
@@ -96,7 +29,6 @@ export async function getRoute(
     }
 
     const data = (await response.json()) as RouteResponse;
-
     if (!data.routes || data.routes.length === 0) {
       return {
         success: false,
@@ -117,8 +49,8 @@ export async function getRoute(
       success: true,
       route: {
         coordinates: route.geometry.coordinates,
-        distance: Math.round((route.distance / 1000) * 100) / 100, // Convert to km, round to 2 decimals
-        duration: Math.round(route.duration / 60), // Convert to minutes
+        distance: Math.round((route.distance / 1000) * 100) / 100, // to km
+        duration: Math.round(route.duration / 60), //  to minutes
         steps: route.legs[0]?.steps.map(step => ({
           instruction: step.maneuver.instruction,
           distance: Math.round(step.distance),
@@ -135,15 +67,12 @@ export async function getRoute(
   }
 }
 
-/**
- * Get estimated time of arrival (ETA) in minutes
- */
 export async function getETA(
   origin: Coordinates,
-  destination: Coordinates
+  destination: Coordinates,
 ): Promise<number | null> {
-  const result = await getRoute(origin, destination);
+  const result = await getRouteFromMapbox(origin, destination);
   return result.success && result.route ? result.route.duration : null;
 }
 
-export default { getRoute, getETA };
+export default { getRouteFromMapbox, getETA };
