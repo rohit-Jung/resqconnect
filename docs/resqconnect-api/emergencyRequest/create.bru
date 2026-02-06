@@ -1,0 +1,26 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/emergency-request
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "emergencyType": "police",
+      "emergencyDescription": "police needed at here",
+      "emergencyLocation": {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}

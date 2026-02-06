@@ -1,0 +1,22 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/emergency-response
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "emergencyRequestId": "81987e40-0612-47a2-a721-7a2e224a874e",
+      "serviceProviderId": "7fe9ddf0-c540-4695-9a64-f3fc85037f0d"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

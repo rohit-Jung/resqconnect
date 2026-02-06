@@ -1,0 +1,15 @@
+meta {
+  name: updateRequest
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{server}}/emergency-request/70a4f575-6ec7-46ca-ad22-9f84da2e156d
+  body: json
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
