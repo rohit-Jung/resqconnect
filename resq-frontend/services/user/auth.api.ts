@@ -1,28 +1,29 @@
 import { useMutation } from '@tanstack/react-query';
-import api from '../axiosInstance';
-import { userEndpoints } from '../endPoints';
-import { AxiosError, AxiosResponse } from 'axios';
 
-// Import request types from schemas
-import {
-  TLoginUser,
-  TRegisterUser,
-  TVerifyUser,
-  TForgotPassword,
-  TResetPassword,
-  TChangePassword,
-} from '@/validations/auth.schema';
+import { AxiosError, AxiosResponse } from 'axios';
 
 // Import response types
 import {
-  ILoginResponse,
-  IRegisterResponse,
-  IVerifyResponse,
-  IForgotPasswordResponse,
-  IResetPasswordResponse,
   IChangePasswordResponse,
+  IForgotPasswordResponse,
+  ILoginResponse,
   IOtpResponse,
+  IRegisterResponse,
+  IResetPasswordResponse,
+  IVerifyResponse,
 } from '@/types/auth.types';
+// Import request types from schemas
+import {
+  TChangePassword,
+  TForgotPassword,
+  TLoginUser,
+  TRegisterUser,
+  TResetPassword,
+  TVerifyUser,
+} from '@/validations/auth.schema';
+
+import api from '../axiosInstance';
+import { userEndpoints } from '../endPoints';
 
 interface ApiResponse<T> {
   data: T;
@@ -35,7 +36,7 @@ const useLoginUser = () => {
     AxiosError,
     TLoginUser
   >({
-    mutationFn: (loginData) => {
+    mutationFn: loginData => {
       return api.post(userEndpoints.login, loginData);
     },
   });
@@ -43,7 +44,7 @@ const useLoginUser = () => {
 
 const useRegisterUser = () => {
   return useMutation<AxiosResponse<ApiResponse<IRegisterResponse>>, AxiosError, TRegisterUser>({
-    mutationFn: (userRegisterData) => {
+    mutationFn: userRegisterData => {
       return api.post(userEndpoints.register, userRegisterData);
     },
   });
@@ -51,7 +52,7 @@ const useRegisterUser = () => {
 
 const useVerifyUser = () => {
   return useMutation<AxiosResponse<ApiResponse<IVerifyResponse>>, AxiosError, TVerifyUser>({
-    mutationFn: (verifyData) => {
+    mutationFn: verifyData => {
       return api.post(userEndpoints.verify, verifyData);
     },
   });
@@ -63,7 +64,7 @@ const useForgotPassword = () => {
     AxiosError,
     TForgotPassword
   >({
-    mutationFn: (forgotPasswordData) => {
+    mutationFn: forgotPasswordData => {
       return api.post(userEndpoints.forgotPassword, forgotPasswordData);
     },
   });
@@ -75,7 +76,7 @@ const useResetPassword = () => {
     AxiosError,
     TResetPassword
   >({
-    mutationFn: (resetPasswordData) => {
+    mutationFn: resetPasswordData => {
       return api.post(userEndpoints.resetPassword, resetPasswordData);
     },
   });
@@ -87,7 +88,7 @@ const useChangePassword = () => {
     AxiosError,
     TChangePassword
   >({
-    mutationFn: (changePasswordData) => {
+    mutationFn: changePasswordData => {
       return api.post(userEndpoints.changePassword, changePasswordData);
     },
   });

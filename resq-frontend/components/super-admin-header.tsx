@@ -7,21 +7,21 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 
-export function DashboardHeader() {
+export function SuperAdminHeader() {
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
+    localStorage.removeItem('superAdminToken');
+    router.push('/super-admin/login');
   };
 
   return (
     <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 border-b backdrop-blur">
       <div className="flex h-24 items-center justify-between px-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Organization Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Monitor and control ResqConnect applications across your network
+            Manage all organizations, users, and system settings
           </p>
         </div>
 
@@ -34,10 +34,10 @@ export function DashboardHeader() {
 
           <div className="flex items-center gap-3">
             <Avatar>
-              <AvatarImage src="https://avatar.vercel.sh/admin" alt="Admin User" />
-              <AvatarFallback>AU</AvatarFallback>
+              <AvatarImage src="https://avatar.vercel.sh/superadmin" alt="Super Admin" />
+              <AvatarFallback>SA</AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">Admin User</span>
+            <span className="text-sm font-medium">Super Admin</span>
           </div>
 
           <Button
