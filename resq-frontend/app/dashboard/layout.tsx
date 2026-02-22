@@ -1,19 +1,20 @@
-import type React from "react"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
-import { DashboardHeader } from "@/components/dashboard-header"
+import type React from 'react';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+import { DashboardContent } from '@/components/dashboard-content';
+import { DashboardHeader } from '@/components/dashboard-header';
+import { DashboardSidebar } from '@/components/dashboard-sidebar';
+import { SidebarProvider } from '@/providers/sidebar-provider';
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      <DashboardSidebar />
-      <div className="pl-64">
-        <DashboardHeader />
-        <main className="p-8 max-w-[1600px] mx-auto">{children}</main>
+    <SidebarProvider>
+      <div className="bg-background min-h-screen">
+        <DashboardSidebar />
+        <DashboardContent>
+          <DashboardHeader />
+          <main className="p-8">{children}</main>
+        </DashboardContent>
       </div>
-    </div>
-  )
+    </SidebarProvider>
+  );
 }

@@ -1,7 +1,7 @@
-import { DashboardStats } from "@/components/dashboard-stats"
-import { DashboardCharts } from "@/components/dashboard-charts"
-import { DashboardAlerts } from "@/components/dashboard-alerts"
-import { DashboardTeams } from "@/components/dashboard-teams"
+import { DashboardAlerts } from '@/components/dashboard-alerts';
+import { DashboardCharts } from '@/components/dashboard-charts';
+import { DashboardStats } from '@/components/dashboard-stats';
+import { DashboardTeams } from '@/components/dashboard-teams';
 
 export default function DashboardPage() {
   return (
@@ -13,5 +13,5 @@ export default function DashboardPage() {
         <DashboardTeams />
       </div>
     </div>
-  )
+  );
 }
