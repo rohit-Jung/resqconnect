@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
-  Navigation,
   Settings,
   Smartphone,
   Users,
@@ -21,21 +20,15 @@ import { cn } from '@/lib/utils';
 import { useSidebar } from '@/providers/sidebar-provider';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Service Providers', href: '/dashboard/service-providers', icon: Users },
-  { name: 'Mobile Apps', href: '/dashboard/mobile-apps', icon: Smartphone },
-  { name: 'Organizations', href: '/dashboard/organizations', icon: Building2 },
-  {
-    name: 'Emergency Reports',
-    href: '/dashboard/emergency-reports',
-    icon: AlertTriangle,
-  },
-  { name: 'Live Tracking', href: '/dashboard/live-tracking', icon: Navigation },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Dashboard', href: '/super-admin/dashboard', icon: LayoutDashboard },
+  { name: 'Organizations', href: '/super-admin/dashboard/organizations', icon: Building2 },
+  { name: 'Users', href: '/super-admin/dashboard/users', icon: Users },
+  { name: 'Service Providers', href: '/super-admin/dashboard/service-providers', icon: Smartphone },
+  { name: 'Analytics', href: '/super-admin/dashboard/analytics', icon: BarChart3 },
+  { name: 'Settings', href: '/super-admin/dashboard/settings', icon: Settings },
 ];
 
-export function DashboardSidebar() {
+export function SuperAdminSidebar() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
@@ -63,7 +56,7 @@ export function DashboardSidebar() {
           />
           {!isCollapsed && (
             <span className="text-lg font-bold tracking-tight">
-              ResQ <span className="text-primary">Connect</span>
+              Super <span className="text-slate-600 dark:text-slate-400">Admin</span>
             </span>
           )}
         </div>
@@ -81,7 +74,7 @@ export function DashboardSidebar() {
                   'flex items-center rounded-lg text-sm font-medium transition-colors',
                   isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-slate-900 text-white dark:bg-slate-700'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
               >

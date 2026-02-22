@@ -1,25 +1,52 @@
-"use client"
+'use client';
 
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const emergencyData = [
-  { month: "Jan", reports: 65 },
-  { month: "Feb", reports: 72 },
-  { month: "Mar", reports: 78 },
-  { month: "Apr", reports: 88 },
-  { month: "May", reports: 85 },
-  { month: "Jun", reports: 92 },
-]
+  { month: 'Jan', reports: 65 },
+  { month: 'Feb', reports: 72 },
+  { month: 'Mar', reports: 78 },
+  { month: 'Apr', reports: 88 },
+  { month: 'May', reports: 85 },
+  { month: 'Jun', reports: 92 },
+];
 
 const responseTimeData = [
-  { range: "<2m", count: 25 },
-  { range: "2-4m", count: 45 },
-  { range: "4-6m", count: 20 },
-  { range: "6-8m", count: 8 },
-  { range: ">8m", count: 2 },
-]
+  { range: '<2m', count: 25 },
+  { range: '2-4m', count: 45 },
+  { range: '4-6m', count: 20 },
+  { range: '6-8m', count: 8 },
+  { range: '>8m', count: 2 },
+];
+
+const CustomTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+}) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background rounded-lg border p-2 shadow-md">
+        <p className="text-sm font-medium">{payload[0].value}</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function DashboardCharts() {
   return (
@@ -30,38 +57,30 @@ export function DashboardCharts() {
           <CardTitle>Emergency Reports Trend</CardTitle>
         </CardHeader>
         <CardContent>
-          <ChartContainer
-            config={{
-              reports: {
-                label: "Reports",
-                color: "hsl(var(--primary))",
-              },
-            }}
-            className="h-[300px]"
-          >
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={emergencyData}>
                 <defs>
                   <linearGradient id="colorReports" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="month" stroke="#6B7280" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#6B7280" style={{ fontSize: '12px' }} />
+                <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
                   dataKey="reports"
-                  stroke="hsl(var(--primary))"
+                  stroke="#DC2626"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorReports)"
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </ChartContainer>
+          </div>
         </CardContent>
       </Card>
 
@@ -71,27 +90,19 @@ export function DashboardCharts() {
           <CardTitle>Response Time Distribution</CardTitle>
         </CardHeader>
         <CardContent>
-          <ChartContainer
-            config={{
-              count: {
-                label: "Count",
-                color: "hsl(160 84% 39%)",
-              },
-            }}
-            className="h-[300px]"
-          >
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={responseTimeData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="range" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" fill="hsl(160 84% 39%)" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="range" stroke="#6B7280" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#6B7280" style={{ fontSize: '12px' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="count" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartContainer>
+          </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

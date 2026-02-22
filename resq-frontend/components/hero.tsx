@@ -6,18 +6,18 @@ import Image from "next/image";
 
 export function Hero() {
 	return (
-		<section className="relative overflow-hidden bg-slate-50 py-12 md:py-24">
-			<div className="container mx-auto px-6 sm:px-8 lg:px-12">
+		<section className="relative overflow-hidden bg-secondary py-12 md:py-24">
+			<div className="container mx-auto px-8 sm:px-12 md:px-16 lg:px-24 xl:px-32">
 				<div className="grid gap-12 lg:grid-cols-2 lg:items-center">
 					<div className="flex flex-col gap-6">
-						<div className="inline-flex w-fit items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-primary">
+						<div className="inline-flex w-fit items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
 							Emergency Response in Seconds
 						</div>
-						<h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl text-slate-900">
+						<h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl text-foreground">
 							Connect to Help When Every <span className="text-primary">Second</span>{" "}
 							Counts
 						</h1>
-						<p className="max-w-[600px] text-lg text-slate-600 md:text-xl">
+						<p className="max-w-[600px] text-lg text-muted-foreground md:text-xl">
 							ResQConnect instantly connects you to emergency responders, medical
 							professionals, and loved ones with a single tap. Your safety network, always
 							ready.
@@ -31,8 +31,8 @@ export function Hero() {
 							</Button>
 							<Button
 								size="lg"
-								variant="outline"
-								className="h-14 px-8 text-base bg-[#0F172A] text-white hover:bg-[#1E293B] hover:text-white border-none"
+								variant="secondary"
+								className="h-14 px-8 text-base bg-card border border-border text-foreground hover:bg-accent"
 							>
 								<Play className="mr-2 h-5 w-5 fill-current" /> Download for Android
 							</Button>
@@ -42,7 +42,7 @@ export function Hero() {
 								{[1, 2, 3].map((i) => (
 									<Avatar
 										key={i}
-										className="border-2 border-white"
+										className="border-2 border-background"
 									>
 										<AvatarImage src="/assets/images/user.png" />
 										<AvatarFallback>U{i}</AvatarFallback>
@@ -57,9 +57,9 @@ export function Hero() {
 											className="h-4 w-4 fill-yellow-400 text-yellow-400"
 										/>
 									))}
-									<span className="ml-1 text-sm font-bold">4.9/5 Rating</span>
+									<span className="ml-1 text-sm font-bold text-foreground">4.9/5 Rating</span>
 								</div>
-								<p className="text-xs font-medium text-slate-500">
+								<p className="text-xs font-medium text-muted-foreground">
 									50,000+ Lives Protected
 								</p>
 							</div>
@@ -74,12 +74,12 @@ export function Hero() {
 							/>
 						</div>
 						{/* Notification Card Overlay */}
-						<div className="absolute -bottom-6 -left-12 z-20 hidden md:block w-64 rounded-xl bg-white p-4 shadow-xl border border-slate-100 animate-in fade-in slide-in-from-left-4 duration-1000">
+						<div className="absolute -bottom-6 -left-12 z-20 hidden md:block w-64 rounded-xl bg-card p-4 shadow-xl border border-border animate-in fade-in slide-in-from-left-4 duration-1000">
 							<div className="flex items-center gap-3">
 								<div className="h-3 w-3 rounded-full bg-green-500" />
-								<p className="text-sm font-bold">Emergency Alert Sent</p>
+								<p className="text-sm font-bold text-foreground">Emergency Alert Sent</p>
 							</div>
-							<p className="mt-1 text-xs text-slate-500">
+							<p className="mt-1 text-xs text-muted-foreground">
 								Responders notified in 2.3 seconds
 							</p>
 						</div>

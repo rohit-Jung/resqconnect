@@ -8,16 +8,16 @@ export function CTA() {
 	return (
 		<section
 			id="download"
-			className="py-20 md:py-32"
+			className="py-20 md:py-32 bg-secondary"
 		>
-			<div className="container mx-auto px-6 sm:px-8 lg:px-12">
-				<div className="relative overflow-hidden rounded-[2.5rem] bg-primary px-8 py-16 md:px-16 md:py-24 text-white shadow-2xl">
+			<div className="container mx-auto px-8 sm:px-12 md:px-16 lg:px-24 xl:px-32">
+				<div className="relative overflow-hidden rounded-[2.5rem] bg-primary px-8 py-16 md:px-16 md:py-24 text-primary-foreground shadow-2xl">
 					<div className="grid gap-12 lg:grid-cols-2 lg:items-center">
 						<div className="space-y-8">
 							<h2 className="text-4xl md:text-6xl font-extrabold tracking-tight">
 								Ready to Feel Safer?
 							</h2>
-							<p className="text-xl text-white/90 leading-relaxed max-w-lg">
+							<p className="text-xl text-primary-foreground/90 leading-relaxed max-w-lg">
 								Join thousands who trust ResQConnect to keep them and their loved ones
 								safe. Download now and get peace of mind in your pocket.
 							</p>
@@ -25,7 +25,7 @@ export function CTA() {
 								<Button
 									size="lg"
 									variant="secondary"
-									className="h-14 px-8 text-base bg-white text-primary hover:bg-white/90"
+									className="h-14 px-8 text-base bg-background text-foreground hover:bg-background/90"
 									asChild
 								>
 									<Link href="/signup">
@@ -35,7 +35,7 @@ export function CTA() {
 								<Button
 									size="lg"
 									variant="outline"
-									className="h-14 px-8 text-base border-white text-white bg-[#0F172A] hover:bg-slate-900 hover:text-white"
+									className="h-14 px-8 text-base border-primary-foreground/30 text-primary-foreground bg-primary-foreground/10 hover:bg-primary-foreground/20 hover:text-primary-foreground"
 									asChild
 								>
 									<Link href="/signup">
