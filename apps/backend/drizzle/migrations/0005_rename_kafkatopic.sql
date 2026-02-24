@@ -1,0 +1,2 @@
+CREATE TYPE "public"."kafka_topic_enum" AS ENUM('fire_events', 'medical_events', 'rescue_events', 'police_events');--> statement-breakpoint
+ALTER TABLE "outbox" ALTER COLUMN "kafka_topic" SET DATA TYPE "public"."kafka_topic_enum" USING "kafka_topic"::text::"public"."kafka_topic_enum";

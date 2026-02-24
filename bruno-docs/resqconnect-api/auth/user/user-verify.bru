@@ -1,0 +1,23 @@
+meta {
+  name: user-verify
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{server}}/user/verify
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "userId": "d3476e23-f30c-4a97-8a19-3bf45def9eff",
+    "otpToken": "061744"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

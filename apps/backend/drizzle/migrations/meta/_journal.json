@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1765078491218,
+      "tag": "0000_stormy_molecule_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766902169107,
+      "tag": "0001_plain_whistler",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767278169677,
+      "tag": "0002_dear_leopardon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768060056797,
+      "tag": "0003_sloppy_shape",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770063123158,
+      "tag": "0004_daffy_moondragon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770065293616,
+      "tag": "0005_rename_kafkatopic",
+      "breakpoints": true
+    }
+  ]
+}
