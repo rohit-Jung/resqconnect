@@ -65,4 +65,21 @@ const useOrgProfile = (enabled: boolean = true) => {
   });
 };
 
-export { useOrgLogin, useOrgRegister, useOrgVerify, useOrgProfile };
+// Organization list item from public list endpoint
+export interface IOrgListItem {
+  id: string;
+  name: string;
+  email: string;
+  serviceCategory: 'ambulance' | 'police' | 'rescue_team' | 'fire_truck';
+}
+
+// Get list of all verified organizations (public)
+const useOrgList = (enabled: boolean = true) => {
+  return useQuery<AxiosResponse<ApiResponse<IOrgListItem[]>>, AxiosError>({
+    queryKey: ['orgList'],
+    queryFn: () => api.get(orgEndpoints.list),
+    enabled,
+  });
+};
+
+export { useOrgLogin, useOrgRegister, useOrgVerify, useOrgProfile, useOrgList };

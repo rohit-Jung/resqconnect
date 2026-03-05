@@ -2,11 +2,9 @@ import { z } from 'zod';
 
 export const serviceCategoryEnum = z.enum([
   'ambulance',
-  'fire',
   'police',
-  'disaster_response',
-  'medical',
-  'rescue',
+  'rescue_team',
+  'fire_truck',
 ]);
 
 export type ServiceCategory = z.infer<typeof serviceCategoryEnum>;

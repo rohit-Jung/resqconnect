@@ -13,6 +13,8 @@ export const orgEndpoints = {
   verify: `/organization/verify`,
   profile: `/organization/profile`,
   list: `/organization/list`,
+  // Dashboard analytics
+  dashboardAnalytics: `/organization/dashboard-analytics`,
   // Service Provider management by organization
   serviceProviders: `/organization/service-providers`,
   getProvider: (id: string) => `/organization/service-providers/${id}`,

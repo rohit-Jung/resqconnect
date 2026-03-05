@@ -44,7 +44,7 @@ const serviceCategories: {
     icon: <Ambulance className="h-4 w-4" />,
   },
   {
-    value: 'fire',
+    value: 'fire_truck',
     label: 'Fire Department',
     icon: <Flame className="h-4 w-4" />,
   },
@@ -54,17 +54,7 @@ const serviceCategories: {
     icon: <Shield className="h-4 w-4" />,
   },
   {
-    value: 'medical',
-    label: 'Medical Services',
-    icon: <HeartPulse className="h-4 w-4" />,
-  },
-  {
-    value: 'disaster_response',
-    label: 'Disaster Response',
-    icon: <AlertTriangle className="h-4 w-4" />,
-  },
-  {
-    value: 'rescue',
+    value: 'rescue_team',
     label: 'Rescue Services',
     icon: <LifeBuoy className="h-4 w-4" />,
   },

@@ -1,60 +1,110 @@
+'use client';
+
+import { Users } from 'lucide-react';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { IRecentProvider, ServiceStatus } from '@/types/auth.types';
 
-const teams = [
-  {
-    id: 1,
-    name: 'Fire Dept. Unit 12',
-    status: 'En route' as const,
-    avatar: 'https://avatar.vercel.sh/fire12',
-    fallback: 'FD',
-  },
-  {
-    id: 2,
-    name: 'Paramedic Team A',
-    status: 'On scene' as const,
-    avatar: 'https://avatar.vercel.sh/paramedic-a',
-    fallback: 'PA',
-  },
-  {
-    id: 3,
-    name: 'Police Unit 7',
-    status: 'Available' as const,
-    avatar: 'https://avatar.vercel.sh/police7',
-    fallback: 'PU',
-  },
-];
+interface DashboardTeamsProps {
+  providers?: IRecentProvider[];
+  isLoading?: boolean;
+}
 
-const statusColors = {
-  'En route': 'bg-green-500',
-  'On scene': 'bg-orange-500',
-  Available: 'bg-green-500',
+const statusColors: Record<ServiceStatus, string> = {
+  available: 'bg-green-500',
+  assigned: 'bg-orange-500',
+  off_duty: 'bg-gray-400',
 };
 
-export function DashboardTeams() {
+const statusLabels: Record<ServiceStatus, string> = {
+  available: 'Available',
+  assigned: 'On Assignment',
+  off_duty: 'Off Duty',
+};
+
+// Get initials from name
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+export function DashboardTeams({ providers, isLoading }: DashboardTeamsProps) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Response Teams</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <Skeleton className="h-2.5 w-2.5 rounded-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const teams = providers ?? [];
+
+  if (teams.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Response Teams</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Users className="text-muted-foreground mb-2 h-8 w-8" />
+            <p className="text-muted-foreground text-sm">
+              No service providers yet
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Active Response Teams</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {teams.map(team => (
+        {teams.slice(0, 5).map(team => (
           <div key={team.id} className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage
-                  src={team.avatar || '/placeholder.svg'}
+                  src={`https://avatar.vercel.sh/${team.id}`}
                   alt={team.name}
                 />
-                <AvatarFallback>{team.fallback}</AvatarFallback>
+                <AvatarFallback>{getInitials(team.name)}</AvatarFallback>
               </Avatar>
               <div>
                 <p className="font-medium">{team.name}</p>
-                <p className="text-muted-foreground text-sm">{team.status}</p>
+                <p className="text-muted-foreground text-sm">
+                  {statusLabels[team.serviceStatus]}
+                  {!team.isVerified && ' (Unverified)'}
+                </p>
               </div>
             </div>
             <div
-              className={`h-2.5 w-2.5 rounded-full ${statusColors[team.status]}`}
+              className={`h-2.5 w-2.5 rounded-full ${statusColors[team.serviceStatus]}`}
             />
           </div>
         ))}
