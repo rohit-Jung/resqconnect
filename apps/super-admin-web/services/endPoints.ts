@@ -1,23 +1,37 @@
-export const superAdminEndpoints = {
-  login: `/super-admin/login`,
-  profile: `/super-admin/profile`,
+// API Endpoints that map to the existing backend routes
+// Super admin uses the user/admin role for authentication
 
-  // Organization management
-  organizations: `/super-admin/organizations`,
-  getOrganization: (id: string) => `/super-admin/organizations/${id}`,
-  updateOrganization: (id: string) => `/super-admin/organizations/${id}`,
-  deleteOrganization: (id: string) => `/super-admin/organizations/${id}`,
-  verifyOrganization: (id: string) => `/super-admin/organizations/${id}/verify`,
+export const authEndpoints = {
+  login: `/user/login`,
+  logout: `/user/logout`,
+  profile: `/user/profile`,
+  verify: `/user/verify`,
+};
 
-  // User management
-  users: `/super-admin/users`,
-  getUser: (id: string) => `/super-admin/users/${id}`,
+export const organizationEndpoints = {
+  getAll: `/organization`,
+  getById: (id: string) => `/organization/${id}`,
+  update: (id: string) => `/organization/${id}`,
+  delete: (id: string) => `/organization/${id}`,
+  register: `/organization/register`,
+};
 
-  // Service Provider management
-  serviceProviders: `/super-admin/service-providers`,
-  getServiceProvider: (id: string) => `/super-admin/service-providers/${id}`,
+export const userEndpoints = {
+  getById: (id: string) => `/user/${id}`,
+};
 
-  // Analytics
-  analytics: `/super-admin/analytics`,
-  emergencyReports: `/super-admin/emergency-reports`,
+export const serviceProviderEndpoints = {
+  getNearby: `/service-provider/nearby`,
+  getById: (id: string) => `/service-provider/${id}`,
+};
+
+export const adminEndpoints = {
+  dashboardAnalytics: `/admin/dashboard-analytics`,
+};
+
+export const emergencyEndpoints = {
+  requests: `/emergency-request`,
+  getRequest: (id: string) => `/emergency-request/${id}`,
+  responses: `/emergency-response`,
+  getResponse: (id: string) => `/emergency-response/${id}`,
 };

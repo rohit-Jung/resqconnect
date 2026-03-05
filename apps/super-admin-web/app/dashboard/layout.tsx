@@ -1,5 +1,8 @@
+'use client';
+
 import type React from 'react';
 
+import { AuthGuard } from '@/components/auth-guard';
 import { SuperAdminContent } from '@/components/super-admin-content';
 import { SuperAdminHeader } from '@/components/super-admin-header';
 import { SuperAdminSidebar } from '@/components/super-admin-sidebar';
@@ -11,14 +14,16 @@ export default function SuperAdminDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <div className="bg-background min-h-screen">
-        <SuperAdminSidebar />
-        <SuperAdminContent>
-          <SuperAdminHeader />
-          <main className="p-8">{children}</main>
-        </SuperAdminContent>
-      </div>
-    </SidebarProvider>
+    <AuthGuard>
+      <SidebarProvider>
+        <div className="bg-background min-h-screen">
+          <SuperAdminSidebar />
+          <SuperAdminContent>
+            <SuperAdminHeader />
+            <main className="p-8">{children}</main>
+          </SuperAdminContent>
+        </div>
+      </SidebarProvider>
+    </AuthGuard>
   );
 }
