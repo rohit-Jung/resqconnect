@@ -15,7 +15,7 @@ import {
   updatePushToken,
   updateUser,
   verifyUser,
-} from '@/controllers/user.controller';
+} from '@/controllers/auth.controller';
 import { validateRoleAuth } from '@/middlewares/auth.middleware';
 
 const userRouter = express.Router();
@@ -32,12 +32,17 @@ userRouter
   .route('/update')
   .put(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), updateUser);
 
+// Verify endpoint is public - user doesn't have a valid JWT yet
+// Authentication is done via userId + otpToken in the request body
 userRouter.route('/verify').post(verifyUser);
+
 userRouter.route('/forgot-password').post(forgotPassword);
 userRouter.route('/reset-password').post(resetPassword);
 userRouter.route('/change-password').post(validateUser, changePassword);
 
-userRouter.route('/profile').get(validateUser, getProfile);
+userRouter
+  .route('/profile')
+  .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), getProfile);
 userRouter.route('/:userId').get(validateRoleAuth([UserRoles.ADMIN]), getUser);
 
 userRouter.post('/update-push-token', validateUser, updatePushToken);
