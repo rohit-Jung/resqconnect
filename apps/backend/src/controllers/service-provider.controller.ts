@@ -303,7 +303,7 @@ const verifyServiceProvider = asyncHandler(
     const tokenExpiry = new Date(existingServiceProvider.tokenExpiry);
     const currentTime = new Date(Date.now()).toISOString();
 
-    if (new Date(currentTime) < tokenExpiry) {
+    if (new Date(currentTime) > tokenExpiry) {
       throw new ApiError(400, 'Verification token expired');
     }
 
