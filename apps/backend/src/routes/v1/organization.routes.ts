@@ -5,6 +5,7 @@ import {
   deleteOrgServiceProvider,
   deleteOrganization,
   getAllOrganizations,
+  getOrgDashboardAnalytics,
   getOrgProfile,
   getOrgServiceProviderById,
   // Service Provider Management
@@ -24,15 +25,18 @@ import { validateOrg, validateRoleAuth } from '@/middlewares/auth.middleware';
 const organizationRouter = Router();
 const validateAdmin = validateRoleAuth([UserRoles.ADMIN]);
 
+organizationRouter.route('/').get(validateAdmin, getAllOrganizations);
 organizationRouter.route('/profile').get(validateOrg, getOrgProfile);
+
+// Dashboard analytics for organization
+organizationRouter
+  .route('/dashboard-analytics')
+  .get(validateOrg, getOrgDashboardAnalytics);
 
 // Public endpoint to list organizations for service provider registration
 organizationRouter.route('/list').get(listOrganizationsPublic);
 
-organizationRouter
-  .route('/register')
-  .post(registerOrganization)
-  .get(validateAdmin, getAllOrganizations);
+organizationRouter.route('/register').post(registerOrganization);
 
 organizationRouter.route('/login').post(loginOrganization);
 
