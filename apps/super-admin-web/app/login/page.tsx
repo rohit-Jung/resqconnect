@@ -12,7 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSuperAdminLogin } from '@/services/super-admin/auth.api';
-import { ISuperAdminLoginResponse } from '@/types/auth.types';
+import {
+  IAdminLoginResponse,
+  IOtpResponse,
+  ISuperAdminLoginResponse,
+} from '@/types/auth.types';
 import {
   TSuperAdminLogin,
   superAdminLoginSchema,
@@ -38,11 +42,20 @@ export default function SuperAdminLoginPage() {
   const onSubmit = (data: TSuperAdminLogin) => {
     loginMutation.mutate(data, {
       onSuccess: response => {
-        const responseData = response.data.data as ISuperAdminLoginResponse;
-        if (responseData.token) {
-          localStorage.setItem('superAdminToken', responseData.token);
+        const responseData = response.data.data;
+
+        // Check if the response contains otpToken (user needs verification)
+        if ('otpToken' in responseData) {
+          const otpData = responseData as IOtpResponse;
+          router.push(`/verify?userId=${otpData.userId}`);
+        } else {
+          // User is verified, proceed to dashboard
+          const loginData = responseData as IAdminLoginResponse;
+          if (loginData.token) {
+            localStorage.setItem('adminToken', loginData.token);
+          }
+          router.push('/dashboard');
         }
-        router.push('/super-admin/dashboard');
       },
       onError: error => {
         console.error('Login failed:', error);
