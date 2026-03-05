@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HttpStatusCode } from 'axios';
 import bcrypt from 'bcryptjs';
 import { eq, or, sql } from 'drizzle-orm';
@@ -47,10 +48,9 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (existingUser) {
-    console.log('User with this email or phone number already exists');
     throw new ApiError(
       400,
-      'User with this email or phone number already exists'
+      `${role} with this email or phone number already exists`
     );
   }
 
@@ -101,9 +101,8 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'Error registering user. Please try again');
   }
 
-  console.log('User registered');
   res.status(201).json(
-    new ApiResponse(201, 'User registered successfully', {
+    new ApiResponse(201, `${role} registered successfully`, {
       user: newUser[0],
     })
   );
@@ -142,7 +141,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(400, 'User not found');
+    throw new ApiError(400, `User not found`);
   }
 
   const isPasswordValid = await bcrypt.compare(password, existingUser.password);
@@ -345,7 +344,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const existingUser = await db.query.user.findFirst({
-    where: eq(user.id, userId),
+    where: eq(userId, user.id),
     columns: {
       password: false,
       verificationToken: false,
