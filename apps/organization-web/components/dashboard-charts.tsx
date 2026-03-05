@@ -13,23 +13,19 @@ import {
 } from 'recharts';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const emergencyData = [
-  { month: 'Jan', reports: 65 },
-  { month: 'Feb', reports: 72 },
-  { month: 'Mar', reports: 78 },
-  { month: 'Apr', reports: 88 },
-  { month: 'May', reports: 85 },
-  { month: 'Jun', reports: 92 },
-];
+interface EmergencyRequestsData {
+  total: number;
+  thisMonth: number;
+  pending: number;
+  completed: number;
+}
 
-const responseTimeData = [
-  { range: '<2m', count: 25 },
-  { range: '2-4m', count: 45 },
-  { range: '4-6m', count: 20 },
-  { range: '6-8m', count: 8 },
-  { range: '>8m', count: 2 },
-];
+interface DashboardChartsProps {
+  emergencyRequests?: EmergencyRequestsData;
+  isLoading?: boolean;
+}
 
 const CustomTooltip = ({
   active,
@@ -48,27 +44,81 @@ const CustomTooltip = ({
   return null;
 };
 
-export function DashboardCharts() {
+export function DashboardCharts({
+  emergencyRequests,
+  isLoading,
+}: DashboardChartsProps) {
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Emergency Requests Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Status Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Generate chart data from emergency requests stats
+  const requestsOverviewData = [
+    { label: 'Total', count: emergencyRequests?.total ?? 0 },
+    { label: 'This Month', count: emergencyRequests?.thisMonth ?? 0 },
+    { label: 'Pending', count: emergencyRequests?.pending ?? 0 },
+    { label: 'Completed', count: emergencyRequests?.completed ?? 0 },
+  ];
+
+  const statusDistributionData = [
+    { status: 'Pending', count: emergencyRequests?.pending ?? 0 },
+    { status: 'Completed', count: emergencyRequests?.completed ?? 0 },
+    {
+      status: 'In Progress',
+      count: Math.max(
+        0,
+        (emergencyRequests?.total ?? 0) -
+          (emergencyRequests?.pending ?? 0) -
+          (emergencyRequests?.completed ?? 0)
+      ),
+    },
+  ];
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      {/* Emergency Reports Trend */}
+      {/* Emergency Requests Overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Emergency Reports Trend</CardTitle>
+          <CardTitle>Emergency Requests Overview</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={emergencyData}>
+              <AreaChart data={requestsOverviewData}>
                 <defs>
-                  <linearGradient id="colorReports" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="colorRequests"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   stroke="#6B7280"
                   style={{ fontSize: '12px' }}
                 />
@@ -76,11 +126,11 @@ export function DashboardCharts() {
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
-                  dataKey="reports"
+                  dataKey="count"
                   stroke="#DC2626"
                   strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#colorReports)"
+                  fill="url(#colorRequests)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -88,18 +138,18 @@ export function DashboardCharts() {
         </CardContent>
       </Card>
 
-      {/* Response Time Distribution */}
+      {/* Request Status Distribution */}
       <Card>
         <CardHeader>
-          <CardTitle>Response Time Distribution</CardTitle>
+          <CardTitle>Request Status Distribution</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={responseTimeData}>
+              <BarChart data={statusDistributionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis
-                  dataKey="range"
+                  dataKey="status"
                   stroke="#6B7280"
                   style={{ fontSize: '12px' }}
                 />

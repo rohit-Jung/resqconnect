@@ -6,6 +6,7 @@ import {
   Ambulance,
   ArrowLeft,
   Flame,
+  Info,
   LifeBuoy,
   Loader2,
   Lock,
@@ -17,55 +18,77 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import { useOrgRegisterProvider } from '@/services/service-provider/auth.api';
+import { ServiceCategory } from '@/types/auth.types';
 import {
   type ServiceType,
   type TServiceProviderRegisterForm,
   serviceProviderRegisterFormSchema,
 } from '@/validations/service-provider.schema';
 
-const SERVICE_TYPES: {
-  value: ServiceType;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-}[] = [
+const SERVICE_TYPE_CONFIG: Record<
+  ServiceType,
   {
-    value: 'ambulance',
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+  }
+> = {
+  ambulance: {
     label: 'Ambulance',
     icon: <Ambulance className="h-6 w-6" />,
     description: 'Emergency medical transport services',
   },
-  {
-    value: 'fire_truck',
+  fire_truck: {
     label: 'Fire Truck',
     icon: <Flame className="h-6 w-6" />,
     description: 'Fire fighting and rescue services',
   },
-  {
-    value: 'police',
+  police: {
     label: 'Police',
     icon: <Shield className="h-6 w-6" />,
     description: 'Law enforcement and security',
   },
-  {
-    value: 'rescue_team',
+  rescue_team: {
     label: 'Rescue Team',
     icon: <LifeBuoy className="h-6 w-6" />,
     description: 'Search and rescue operations',
   },
-];
+};
+
+const getCategoryDisplayName = (category: ServiceCategory): string => {
+  const names: Record<ServiceCategory, string> = {
+    ambulance: 'Ambulance Services',
+    police: 'Police Services',
+    fire_truck: 'Fire Brigade Services',
+    rescue_team: 'Rescue Team Services',
+  };
+  return names[category] || category;
+};
 
 export default function NewServiceProviderPage() {
   const router = useRouter();
-  const [selectedType, setSelectedType] = useState<ServiceType | null>(null);
   const createMutation = useOrgRegisterProvider();
+
+  // Fetch org data to get the allowed service type
+  const { data: analyticsResponse, isLoading: isLoadingOrg } =
+    useOrgDashboardAnalytics();
+  const orgServiceCategory =
+    analyticsResponse?.data?.data?.organization?.serviceCategory;
+
+  // The allowed service type is the same as the org's service category
+  const allowedServiceType = orgServiceCategory as ServiceType | undefined;
+  const typeConfig = allowedServiceType
+    ? SERVICE_TYPE_CONFIG[allowedServiceType]
+    : null;
 
   const {
     register,
@@ -75,6 +98,13 @@ export default function NewServiceProviderPage() {
   } = useForm<TServiceProviderRegisterForm>({
     resolver: zodResolver(serviceProviderRegisterFormSchema),
   });
+
+  // Auto-set the service type when org data is loaded
+  useEffect(() => {
+    if (allowedServiceType) {
+      setValue('serviceType', allowedServiceType);
+    }
+  }, [allowedServiceType, setValue]);
 
   const onSubmit = async (data: TServiceProviderRegisterForm) => {
     try {
@@ -89,7 +119,7 @@ export default function NewServiceProviderPage() {
         onSuccess: () => {
           router.push('/dashboard/service-providers');
         },
-        onError(error, variables, onMutateResult, context) {
+        onError(error) {
           alert('Failed to register service provider');
           console.log('Error: ', error);
         },
@@ -97,11 +127,6 @@ export default function NewServiceProviderPage() {
     } catch (error) {
       console.error('Error creating service provider:', error);
     }
-  };
-
-  const handleTypeSelect = (type: ServiceType) => {
-    setSelectedType(type);
-    setValue('serviceType', type);
   };
 
   return (
@@ -122,41 +147,56 @@ export default function NewServiceProviderPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Service Type Selection */}
+        {/* Service Type - Auto-selected based on organization category */}
         <div className="bg-card rounded-xl border p-6">
           <h2 className="mb-4 text-lg font-semibold">Service Type</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {SERVICE_TYPES.map(type => (
-              <button
-                key={type.value}
-                type="button"
-                onClick={() => handleTypeSelect(type.value)}
-                className={`rounded-xl border-2 p-4 text-left transition-all ${
-                  selectedType === type.value
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-primary/50'
-                }`}
-              >
+
+          {isLoadingOrg ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          ) : typeConfig && allowedServiceType ? (
+            <>
+              {/* Info message explaining the restriction */}
+              <div className="bg-muted/50 mb-4 flex items-start gap-3 rounded-lg border p-4">
+                <Info className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium">
+                    Service type automatically assigned
+                  </p>
+                  <p className="text-muted-foreground mt-1">
+                    Your organization is registered as{' '}
+                    <span className="font-medium">
+                      {getCategoryDisplayName(orgServiceCategory!)}
+                    </span>
+                    . Service providers can only be created with the matching
+                    service type.
+                  </p>
+                </div>
+              </div>
+
+              {/* Display the auto-selected service type */}
+              <div className="border-primary bg-primary/5 rounded-xl border-2 p-4">
                 <div className="flex items-start gap-3">
-                  <div
-                    className={`rounded-lg p-2 ${
-                      selectedType === type.value
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    {type.icon}
+                  <div className="bg-primary text-primary-foreground rounded-lg p-2">
+                    {typeConfig.icon}
                   </div>
                   <div>
-                    <p className="font-medium">{type.label}</p>
+                    <p className="font-medium">{typeConfig.label}</p>
                     <p className="text-muted-foreground text-sm">
-                      {type.description}
+                      {typeConfig.description}
                     </p>
                   </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-muted-foreground text-sm">
+              Unable to determine organization service category.
+            </div>
+          )}
+
           {errors.serviceType && (
             <p className="text-destructive mt-2 text-sm">
               {errors.serviceType.message}
@@ -314,7 +354,10 @@ export default function NewServiceProviderPage() {
               Cancel
             </Button>
           </Link>
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || !allowedServiceType}
+          >
             {createMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}

@@ -38,14 +38,12 @@ export interface IChangePasswordResponse {
   message?: string;
 }
 
-// Organization Types
+// Organization Types - matches backend ServiceTypeEnum
 export type ServiceCategory =
   | 'ambulance'
-  | 'fire'
   | 'police'
-  | 'disaster_response'
-  | 'medical'
-  | 'rescue';
+  | 'rescue_team'
+  | 'fire_truck';
 
 export type ServiceType = 'ambulance' | 'police' | 'fire_truck' | 'rescue_team';
 
@@ -140,4 +138,80 @@ export interface IServiceProviderProfileResponse {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+// Dashboard Analytics Types
+export type RequestStatus =
+  | 'pending'
+  | 'accepted'
+  | 'assigned'
+  | 'rejected'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'no_providers_available';
+
+export type ResponseStatusUpdate =
+  | 'accepted'
+  | 'arrived'
+  | 'on_route'
+  | 'rejected';
+
+export interface IRecentProvider {
+  id: string;
+  name: string;
+  email: string;
+  serviceStatus: ServiceStatus;
+  isVerified: boolean;
+  createdAt: string;
+}
+
+export interface IRecentEmergencyRequest {
+  id: string;
+  serviceType: ServiceCategory;
+  requestStatus: RequestStatus;
+  description: string | null;
+  location: {
+    latitude: string;
+    longitude: string;
+    address?: string;
+  };
+  createdAt: string;
+}
+
+export interface IRecentEmergencyResponse {
+  id: string;
+  statusUpdate: ResponseStatusUpdate;
+  respondedAt: string | null;
+  providerName: string;
+  createdAt: string;
+}
+
+export interface IOrgDashboardAnalytics {
+  organization: {
+    id: string;
+    name: string;
+    serviceCategory: ServiceCategory;
+  };
+  providers: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+    available: number;
+    availabilityPercentage: number;
+    recent: IRecentProvider[];
+  };
+  emergencyRequests: {
+    total: number;
+    thisMonth: number;
+    pending: number;
+    completed: number;
+    recent: IRecentEmergencyRequest[];
+  };
+  emergencyResponses: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+    recent: IRecentEmergencyResponse[];
+  };
 }
