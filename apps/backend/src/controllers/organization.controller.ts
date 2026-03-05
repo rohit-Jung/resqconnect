@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import db from '@/db';
 import {
   type TOrganization,
+  emergencyRequest,
+  emergencyResponse,
   loginUserSchema,
   newOrganizationSchema,
   newServiceProviderSchema,
@@ -357,7 +359,7 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
   const tokenExpiry = new Date(existingUser.tokenExpiry);
   const currentTime = new Date(Date.now()).toISOString();
 
-  if (new Date(currentTime) < tokenExpiry) {
+  if (new Date(currentTime) > tokenExpiry) {
     console.log('Verification token expired');
     throw new ApiError(400, 'Verification token expired');
   }
@@ -711,6 +713,262 @@ const verifyOrgServiceProvider = asyncHandler(
   }
 );
 
+// Organization Dashboard Analytics
+const getOrgDashboardAnalytics = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInOrg = req.user;
+
+    if (!loggedInOrg || !loggedInOrg.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    const orgId = loggedInOrg.id;
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      0,
+      23,
+      59,
+      59
+    );
+
+    // Get organization's service type
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, orgId),
+    });
+
+    if (!org) {
+      throw new ApiError(404, 'Organization not found');
+    }
+
+    // Get service providers for this organization
+    const [
+      totalProviders,
+      providersThisMonth,
+      providersLastMonth,
+      availableProviders,
+      recentProviders,
+    ] = await Promise.all([
+      // Total providers
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(eq(serviceProvider.organizationId, orgId)),
+      // Providers created this month
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${serviceProvider.createdAt} >= ${startOfMonth.toISOString()}`
+          )
+        ),
+      // Providers created last month
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${serviceProvider.createdAt} >= ${startOfLastMonth.toISOString()}`,
+            sql`${serviceProvider.createdAt} <= ${endOfLastMonth.toISOString()}`
+          )
+        ),
+      // Available providers
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            eq(serviceProvider.serviceStatus, 'available')
+          )
+        ),
+      // Recent providers (last 5)
+      db
+        .select({
+          id: serviceProvider.id,
+          name: serviceProvider.name,
+          email: serviceProvider.email,
+          serviceStatus: serviceProvider.serviceStatus,
+          isVerified: serviceProvider.isVerified,
+          createdAt: serviceProvider.createdAt,
+        })
+        .from(serviceProvider)
+        .where(eq(serviceProvider.organizationId, orgId))
+        .orderBy(desc(serviceProvider.createdAt))
+        .limit(5),
+    ]);
+
+    // Get emergency requests/responses related to this organization's service type
+    // We need to join emergency_response with service_provider to filter by organization
+    const [
+      totalEmergencyResponses,
+      responsesThisMonth,
+      responsesLastMonth,
+      recentEmergencyResponses,
+    ] = await Promise.all([
+      // Total emergency responses by org's providers
+      db
+        .select({ count: count() })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(eq(serviceProvider.organizationId, orgId)),
+      // Responses this month
+      db
+        .select({ count: count() })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${emergencyResponse.createdAt} >= ${startOfMonth.toISOString()}`
+          )
+        ),
+      // Responses last month
+      db
+        .select({ count: count() })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${emergencyResponse.createdAt} >= ${startOfLastMonth.toISOString()}`,
+            sql`${emergencyResponse.createdAt} <= ${endOfLastMonth.toISOString()}`
+          )
+        ),
+      // Recent emergency responses (last 10)
+      db
+        .select({
+          id: emergencyResponse.id,
+          statusUpdate: emergencyResponse.statusUpdate,
+          respondedAt: emergencyResponse.respondedAt,
+          providerName: serviceProvider.name,
+          createdAt: emergencyResponse.createdAt,
+        })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(eq(serviceProvider.organizationId, orgId))
+        .orderBy(desc(emergencyResponse.createdAt))
+        .limit(10),
+    ]);
+
+    // Get emergency requests by service type (matching org's category)
+    const [
+      totalEmergencyRequests,
+      requestsThisMonth,
+      pendingRequests,
+      completedRequests,
+      recentEmergencyRequests,
+    ] = await Promise.all([
+      // Total emergency requests for this service type
+      db
+        .select({ count: count() })
+        .from(emergencyRequest)
+        .where(eq(emergencyRequest.serviceType, org.serviceCategory)),
+      // Requests this month
+      db
+        .select({ count: count() })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.serviceType, org.serviceCategory),
+            sql`${emergencyRequest.createdAt} >= ${startOfMonth.toISOString()}`
+          )
+        ),
+      // Pending requests
+      db
+        .select({ count: count() })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.serviceType, org.serviceCategory),
+            eq(emergencyRequest.requestStatus, 'pending')
+          )
+        ),
+      // Completed requests
+      db
+        .select({ count: count() })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.serviceType, org.serviceCategory),
+            eq(emergencyRequest.requestStatus, 'completed')
+          )
+        ),
+      // Recent emergency requests (last 10)
+      db
+        .select({
+          id: emergencyRequest.id,
+          serviceType: emergencyRequest.serviceType,
+          requestStatus: emergencyRequest.requestStatus,
+          description: emergencyRequest.description,
+          location: emergencyRequest.location,
+          createdAt: emergencyRequest.createdAt,
+        })
+        .from(emergencyRequest)
+        .where(eq(emergencyRequest.serviceType, org.serviceCategory))
+        .orderBy(desc(emergencyRequest.createdAt))
+        .limit(10),
+    ]);
+
+    // Calculate provider availability percentage
+    const totalProvidersCount = totalProviders[0]?.count ?? 0;
+    const availableProvidersCount = availableProviders[0]?.count ?? 0;
+    const availabilityPercentage =
+      totalProvidersCount > 0
+        ? Math.round((availableProvidersCount / totalProvidersCount) * 100)
+        : 0;
+
+    res.status(200).json(
+      new ApiResponse(200, 'Organization dashboard analytics retrieved', {
+        organization: {
+          id: org.id,
+          name: org.name,
+          serviceCategory: org.serviceCategory,
+        },
+        providers: {
+          total: totalProvidersCount,
+          thisMonth: providersThisMonth[0]?.count ?? 0,
+          lastMonth: providersLastMonth[0]?.count ?? 0,
+          available: availableProvidersCount,
+          availabilityPercentage,
+          recent: recentProviders,
+        },
+        emergencyRequests: {
+          total: totalEmergencyRequests[0]?.count ?? 0,
+          thisMonth: requestsThisMonth[0]?.count ?? 0,
+          pending: pendingRequests[0]?.count ?? 0,
+          completed: completedRequests[0]?.count ?? 0,
+          recent: recentEmergencyRequests,
+        },
+        emergencyResponses: {
+          total: totalEmergencyResponses[0]?.count ?? 0,
+          thisMonth: responsesThisMonth[0]?.count ?? 0,
+          lastMonth: responsesLastMonth[0]?.count ?? 0,
+          recent: recentEmergencyResponses,
+        },
+      })
+    );
+  }
+);
+
 export {
   registerOrganization,
   verifyOrgOTP,
@@ -728,4 +986,6 @@ export {
   updateOrgServiceProvider,
   deleteOrgServiceProvider,
   verifyOrgServiceProvider,
+  // Dashboard Analytics
+  getOrgDashboardAnalytics,
 };
