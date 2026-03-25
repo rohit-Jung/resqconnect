@@ -8,6 +8,7 @@ const envSchema = z.object({
   OTP_SECRET: z.string(),
   TWILIO_ACCOUNT_SID: z.string(),
   TWILIO_AUTH_TOKEN: z.string(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
   GALLI_MAPS_TOKEN: z.string(),
   MAILTRAP_USER: z.string(),
   MAILTRAP_PASS: z.string(),
@@ -15,6 +16,8 @@ const envSchema = z.object({
 
   GOOGLE_MAIL: z.string(),
   GOOGLE_PASS: z.string(),
+  TO_NUMBER: z.string(),
+  EMERGENCY_PHONE_NUMBER: z.string().default('112'),
 });
 
 function createEnvConfig() {
@@ -33,6 +36,7 @@ function createEnvConfig() {
     otp_secret: parsedEnv.data.OTP_SECRET,
     twilio_account_sid: parsedEnv.data.TWILIO_ACCOUNT_SID,
     twilio_auth_token: parsedEnv.data.TWILIO_AUTH_TOKEN,
+    twilio_from_number: parsedEnv.data.TWILIO_FROM_NUMBER,
     galli_maps_token: parsedEnv.data.GALLI_MAPS_TOKEN,
     mailtrap_user: parsedEnv.data.MAILTRAP_USER,
     mailtrap_pass: parsedEnv.data.MAILTRAP_PASS,
@@ -40,6 +44,8 @@ function createEnvConfig() {
     google_mail: parsedEnv.data.GOOGLE_MAIL,
     google_pass: parsedEnv.data.GOOGLE_PASS,
     mapbox_token: parsedEnv.data.MAPBOX_ACCESS_TOKEN,
+    to_number: parsedEnv.data.TO_NUMBER,
+    emergency_phone_number: parsedEnv.data.EMERGENCY_PHONE_NUMBER,
   };
 }
 
