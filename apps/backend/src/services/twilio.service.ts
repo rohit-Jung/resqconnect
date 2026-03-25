@@ -62,12 +62,6 @@ export async function getMessages(
   }
 }
 
-/**
- * Send an SMS message
- * @param to - Recipient phone number
- * @param body - Message body
- * @returns SendSMSResult with success status and message SID
- */
 export async function sendSMS(
   to: string,
   body: string
@@ -108,12 +102,6 @@ export async function sendSMS(
   }
 }
 
-/**
- * Send bulk SMS messages (for notifications)
- * @param recipients - Array of phone numbers
- * @param body - Message body
- * @returns Array of SendSMSResult
- */
 export async function sendBulkSMS(
   recipients: string[],
   body: string
@@ -133,10 +121,6 @@ export async function sendBulkSMS(
   });
 }
 
-/**
- * Verify a phone number exists/is valid using Twilio Lookup
- * @param phoneNumber - Phone number to verify
- */
 export async function verifyPhoneNumber(
   phoneNumber: string
 ): Promise<{ valid: boolean; formatted?: string; error?: string }> {
