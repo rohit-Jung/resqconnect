@@ -18,6 +18,12 @@ const envSchema = z.object({
   GOOGLE_PASS: z.string(),
   TO_NUMBER: z.string(),
   EMERGENCY_PHONE_NUMBER: z.string().default('112'),
+
+  // Khalti Payment Configuration
+  KHALTI_SECRET_KEY: z.string(),
+  KHALTI_BASE_URL: z.string().default('https://dev.khalti.com/api/v2'),
+  KHALTI_RETURN_URL: z.string(),
+  KHALTI_WEBSITE_URL: z.string(),
 });
 
 function createEnvConfig() {
@@ -46,6 +52,12 @@ function createEnvConfig() {
     mapbox_token: parsedEnv.data.MAPBOX_ACCESS_TOKEN,
     to_number: parsedEnv.data.TO_NUMBER,
     emergency_phone_number: parsedEnv.data.EMERGENCY_PHONE_NUMBER,
+
+    // Khalti Payment Configuration
+    khalti_secret_key: parsedEnv.data.KHALTI_SECRET_KEY,
+    khalti_base_url: parsedEnv.data.KHALTI_BASE_URL,
+    khalti_return_url: parsedEnv.data.KHALTI_RETURN_URL,
+    khalti_website_url: parsedEnv.data.KHALTI_WEBSITE_URL,
   };
 }
 
