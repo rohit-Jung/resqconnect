@@ -1,0 +1,25 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{server}}/user/update
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "currentLocation": {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

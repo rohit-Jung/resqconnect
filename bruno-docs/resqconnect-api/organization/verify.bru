@@ -1,0 +1,31 @@
+meta {
+  name: verify
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{server}}/organization/verify
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "ambulance@example.com",
+    "otp": "123456"
+  }
+}
+
+docs {
+  # Verify Organization OTP
+  
+  Verify organization email with OTP code.
+  
+  ## Request Body
+  - email: Organization email
+  - otp: One-time password received via email
+  
+  ## Response
+  Returns success message and verification status.
+}

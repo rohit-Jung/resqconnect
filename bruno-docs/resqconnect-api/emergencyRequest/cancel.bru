@@ -1,0 +1,47 @@
+meta {
+  name: cancel
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{server}}/emergency-request/:id/cancel
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{requestId}}
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  # Cancel Emergency Request
+  
+  Cancels an active emergency request. Only the user who created the request can cancel it.
+  
+  ## Authentication
+  Requires user role authentication (JWT token)
+  
+  ## Path Parameters
+  - `id` - The ID of the emergency request to cancel
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Emergency request cancelled successfully",
+    "data": {
+      "id": "uuid",
+      "status": "cancelled"
+    }
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}
