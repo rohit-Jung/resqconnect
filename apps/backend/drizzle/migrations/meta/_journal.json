@@ -43,6 +43,13 @@
       "when": 1770065293616,
       "tag": "0005_rename_kafkatopic",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774508532143,
+      "tag": "0006_flawless_maelstrom",
+      "breakpoints": true
     }
   ]
 }
