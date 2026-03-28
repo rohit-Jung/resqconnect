@@ -1,135 +1,209 @@
-# Turborepo starter
+# ResQConnect — Emergency Response Platform
 
-This Turborepo starter is maintained by the Turborepo core team.
+Real-time emergency response coordination platform for Nepal. Users request help through the mobile app, service providers respond, and organizations manage everything from their web dashboard.
 
-## Using this example
+## Platform Overview
 
-Run the following command:
+```mermaid
+flowchart TB
+    subgraph Clients
+        A["Mobile App\n(Expo / React Native)"]
+        C["Organization Web\n(Next.js)"]
+        D["Super Admin Panel\n(Next.js)"]
+    end
 
-```sh
-npx create-turbo@latest
+    B["Backend API\n(Express.js)"]
+
+    A --> B
+    C --> B
+    D --> B
 ```
 
-## What's inside?
+### Mobile App (`apps/mobile`)
 
-This Turborepo includes the following packages/apps:
+React Native / Expo — the primary product users interact with.
 
-### Apps and Packages
+- **One-tap emergency requests** — ambulance, police, fire, rescue
+- **Real-time location sharing** via expo-location
+- **Live tracking** of assigned responders on Mapbox maps
+- **SMS fallback** — request help even without internet
+- **Offline support** for emergency requests
+- **Push notifications** via socket.io for status updates
+- **User authentication** with OTP verification
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+### Backend API (`apps/backend`)
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+Express.js + PostgreSQL + Drizzle ORM.
 
-### Utilities
+- JWT authentication with OTP (Twilio)
+- Organization and service provider management
+- Emergency request lifecycle (create → assign → complete)
+- Real-time socket events for live tracking
+- Khalti payment integration for subscription billing
+- Email notifications (Nodemailer + Mailtrap)
+- Mapbox integration for geocoding and routing
 
-This Turborepo has some additional tools already setup for you:
+### Organization Web (`apps/organization-web`)
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+Next.js dashboard for emergency service organizations.
 
-### Build
+- **Dashboard** — KPI cards, area charts, status distribution
+- **Service Providers** — register, verify, manage teams
+- **Live Tracking** — Leaflet map showing all provider locations
+- **Emergency Reports** — view and manage incidents
+- **Plans & Billing** — subscribe via Khalti, view payment history
+- **Settings** — update organization profile
 
-To build all apps and packages, run the following command:
+### Super Admin Web (`apps/super-admin-web`)
 
-```
-cd my-turborepo
+Next.js portal for platform-wide administration.
 
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+- **Dashboard** — system stats, monthly comparison, entity distribution
+- **Organizations** — manage and verify organizations
+- **Users & Providers** — cross-org listings with pagination
+- **Payments** — plan management (CRUD), payment history
+- **Settings** — admin profile management
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+## Tech Stack
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+| Layer           | Technology                                      |
+| --------------- | ----------------------------------------------- |
+| Mobile          | React Native, Expo, NativeWind, Zustand         |
+| Backend         | Express.js, TypeScript, PostgreSQL, Drizzle ORM |
+| Web Frontends   | Next.js 15, React 19, Tailwind CSS, Shadcn/ui   |
+| Real-time       | Socket.io                                       |
+| Maps            | Mapbox (mobile), Leaflet + OpenStreetMap (web)  |
+| Payments        | Khalti (Sandbox)                                |
+| Auth            | JWT + OTP (Twilio) + Email (Nodemailer)         |
+| Package Manager | Bun                                             |
+| Monorepo        | Turborepo                                       |
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Project Structure
 
 ```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+project/
+├── apps/
+│   ├── mobile/            # Expo/React Native mobile app
+│   ├── backend/           # Express.js API server
+│   ├── organization-web/  # Next.js org dashboard
+│   └── super-admin-web/   # Next.js admin portal
+└── packages/
+    ├── eslint-config/     # Shared ESLint rules
+    └── typescript-config/ # Shared TS configs
 ```
 
-### Remote Caching
+## Getting Started
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+### Prerequisites
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+- Node.js >= 18
+- Bun (`npm install -g bun`)
+- PostgreSQL (port 5432)
+- Expo CLI (for mobile app)
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+### 1. Install dependencies
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+```bash
+bun install
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### 2. Configure environment
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+```bash
+cp apps/backend/.env.sample apps/backend/.env
 ```
 
-## Useful Links
+Edit `apps/backend/.env`:
 
-Learn more about the power of Turborepo:
+```env
+PORT=4000
+DATABASE_URL=postgresql://admin:root@localhost:5432/resq_db
+JWT_SECRET=my_jwt_secret
+KHALTI_SECRET_KEY=test_secret_key_xxxxxxxxxxxx
+KHALTI_BASE_URL=https://dev.khalti.com/api/v2
+KHALTI_RETURN_URL=http://localhost:4000/api/v1/payments/callback
+KHALTI_WEBSITE_URL=http://localhost:3000
+```
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+### 3. Set up database
+
+```bash
+cd apps/backend
+bun run db:generate
+bun run db:migrate
+bun run db:seed
+```
+
+### 4. Run all apps
+
+```bash
+bun run dev
+```
+
+Or run individually:
+
+```bash
+bun run dev --filter=backend
+bun run dev --filter=organization-web
+bun run dev --filter=super-admin-web
+bun run dev --filter=mobile       # then press 'a' for Android or 'i' for iOS
+```
+
+### Access
+
+| App                    | URL(DEV)              | 
+| ---------------------- | --------------------- |
+| Organization Dashboard | http://localhost:3000 |
+| Super Admin Portal     | http://localhost:3001 |
+| Backend API            | http://localhost:4000 |
+| Mobile App             | Expo Dev Tools        |
+
+## Some of the API Overview
+
+### Auth
+
+- `POST /api/v1/organization/register` — Register organization
+- `POST /api/v1/organization/login` — Login
+- `POST /api/v1/organization/verify` — Verify OTP
+- `GET/PATCH /api/v1/organization/profile` — Get/Update profile
+
+### Service Providers
+
+- `GET/POST /api/v1/organization/providers` — List/Create
+- `PUT/DELETE /api/v1/organization/providers/:id` — Update/Delete
+- `PATCH /api/v1/organization/providers/:id/verify` — Verify
+
+### Emergency Requests
+
+- `POST /api/v1/emergency-requests` — Create request (from mobile)
+- `GET /api/v1/emergency-requests` — List user's requests
+- `PATCH /api/v1/emergency-requests/:id/status` — Update status
+
+### Payments (Khalti)
+
+- `GET /api/v1/payments/plans` — List subscription plans
+- `POST /api/v1/payments/subscribe` — Initiate payment
+- `GET /api/v1/payments/callback` — Khalti callback
+- `GET /api/v1/payments/history` — Payment history
+- `GET /api/v1/payments/subscription` — Active subscription
+
+## Design System
+
+The web dashboards follow a Swiss-inspired editorial design:
+
+- Monospace uppercase labels (`font-mono text-[10px] uppercase tracking-[0.15em]`)
+- No rounded corners — sharp, architectural precision
+- Hairline borders (`border-b border-border`) for structural division
+- Signal red primary accent used sparingly
+- Left-aligned hierarchy, generous whitespace
+- Geist font family
+
+## Scripts
+
+```bash
+bun run dev          # Start all apps
+bun run build        # Production build
+bun run lint         # Lint all apps
+bun run check-types  # TypeScript checks
+bun run format       # Prettier formatting
+```

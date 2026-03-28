@@ -425,6 +425,47 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
     .json(new ApiResponse(200, 'User found', { user: existingOrg }));
 });
 
+// Update organization's own profile
+const updateOrgProfile = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInOrg = req.user;
+
+  if (!loggedInOrg || !loggedInOrg.id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const { name, generalNumber } = req.body;
+
+  if (!name && !generalNumber) {
+    throw new ApiError(400, 'At least one field is required to update');
+  }
+
+  const updateData: Record<string, unknown> = {};
+  if (name) updateData.name = name;
+  if (generalNumber) updateData.generalNumber = generalNumber;
+
+  const updatedOrg = await db
+    .update(organization)
+    .set(updateData)
+    .where(eq(organization.id, loggedInOrg.id))
+    .returning({
+      id: organization.id,
+      name: organization.name,
+      email: organization.email,
+      serviceCategory: organization.serviceCategory,
+      generalNumber: organization.generalNumber,
+    });
+
+  if (!updatedOrg || updatedOrg.length === 0) {
+    throw new ApiError(500, 'Error updating organization profile');
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, 'Organization profile updated', {
+      organization: updatedOrg[0],
+    })
+  );
+});
+
 // Public endpoint to list organizations for service provider registration
 const listOrganizationsPublic = asyncHandler(
   async (req: Request, res: Response) => {
@@ -936,6 +977,27 @@ const getOrgDashboardAnalytics = asyncHandler(
         ? Math.round((availableProvidersCount / totalProvidersCount) * 100)
         : 0;
 
+    // Monthly trend data (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const monthlyTrend = await db
+      .select({
+        month: sql<string>`to_char(${emergencyRequest.createdAt}, 'Mon YYYY')`,
+        count: count(),
+      })
+      .from(emergencyRequest)
+      .where(
+        and(
+          eq(emergencyRequest.serviceType, org.serviceCategory),
+          sql`${emergencyRequest.createdAt} >= ${sixMonthsAgo.toISOString()}`
+        )
+      )
+      .groupBy(
+        sql`to_char(${emergencyRequest.createdAt}, 'Mon YYYY'), date_trunc('month', ${emergencyRequest.createdAt})`
+      )
+      .orderBy(sql`date_trunc('month', ${emergencyRequest.createdAt})`);
+
     res.status(200).json(
       new ApiResponse(200, 'Organization dashboard analytics retrieved', {
         organization: {
@@ -957,6 +1019,10 @@ const getOrgDashboardAnalytics = asyncHandler(
           pending: pendingRequests[0]?.count ?? 0,
           completed: completedRequests[0]?.count ?? 0,
           recent: recentEmergencyRequests,
+          monthlyTrend: monthlyTrend.map(item => ({
+            month: item.month,
+            count: Number(item.count),
+          })),
         },
         emergencyResponses: {
           total: totalEmergencyResponses[0]?.count ?? 0,
@@ -977,6 +1043,7 @@ export {
   getOrganizationById,
   deleteOrganization,
   updateOrganization,
+  updateOrgProfile,
   loginOrganization,
   listOrganizationsPublic,
   // Service Provider Management

@@ -1,5 +1,6 @@
 import type React from 'react';
 
+import { AuthGuard } from '@/components/auth-guard';
 import { DashboardContent } from '@/components/dashboard-content';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { DashboardSidebar } from '@/components/dashboard-sidebar';
@@ -11,14 +12,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <div className="bg-background min-h-screen">
-        <DashboardSidebar />
-        <DashboardContent>
-          <DashboardHeader />
-          <main className="p-8">{children}</main>
-        </DashboardContent>
-      </div>
-    </SidebarProvider>
+    <AuthGuard>
+      <SidebarProvider>
+        <div className="bg-background min-h-screen">
+          <DashboardSidebar />
+          <DashboardContent>
+            <DashboardHeader />
+            <main className="p-8">{children}</main>
+          </DashboardContent>
+        </div>
+      </SidebarProvider>
+    </AuthGuard>
   );
 }

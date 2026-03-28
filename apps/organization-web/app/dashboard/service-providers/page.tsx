@@ -258,7 +258,7 @@ export default function ServiceProvidersPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-muted/50">
+              <thead className="border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium">
                     Provider

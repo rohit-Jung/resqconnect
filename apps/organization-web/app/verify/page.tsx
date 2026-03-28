@@ -2,17 +2,12 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import {
-  ArrowLeft,
-  CheckCircle,
-  KeyRound,
-  Loader2,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle, KeyRound, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +15,21 @@ import { Label } from '@/components/ui/label';
 import { useOrgVerify } from '@/services/organization/auth.api';
 import { useVerifyUser } from '@/services/user/auth.api';
 import { TVerifyUser, verifyUserSchema } from '@/validations/auth.schema';
+
+function parseApiError(err: unknown): string {
+  const axiosErr = err as {
+    response?: {
+      data?: { message?: string; errors?: string[]; error?: string };
+    };
+  };
+  const data = axiosErr?.response?.data;
+  if (!data) return 'Something went wrong. Please try again.';
+  if (data.errors && Array.isArray(data.errors) && data.errors.length > 0)
+    return data.errors.join(', ');
+  if (data.error) return data.error;
+  if (data.message) return data.message;
+  return 'Something went wrong. Please try again.';
+}
 
 function VerifyPageContent() {
   const [isSuccess, setIsSuccess] = useState(false);
@@ -51,59 +61,72 @@ function VerifyPageContent() {
     verifyMutation.mutate(data, {
       onSuccess: response => {
         setIsSuccess(true);
+        toast.success('Account verified successfully');
         // If token is returned, store it
         if (response.data.data?.token) {
           localStorage.setItem('token', response.data.data.token);
         }
       },
       onError: error => {
-        console.error('Verification failed:', error);
+        toast.error(parseApiError(error));
       },
     });
   };
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Side - Red Background */}
-      <div className="hidden flex-col justify-between bg-gradient-to-br from-[#C53030] to-[#7A1F1F] p-12 text-white lg:flex lg:w-1/2">
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="mb-6 flex items-center justify-center rounded-2xl bg-white/10 p-6 backdrop-blur-sm">
-            <ShieldCheck className="h-16 w-16" />
-          </div>
-          <h1 className="mb-2 text-5xl font-bold">ResqConnect</h1>
-          <p className="mb-8 text-xl opacity-90">Emergency Response Platform</p>
-
-          <p className="mb-16 max-w-md text-lg leading-relaxed opacity-90">
-            We&apos;ve sent a verification code to your email. Enter the code to
-            complete your account setup and start using ResqConnect.
+      {/* Left Side - Swiss Design Dark Panel */}
+      <div className="hidden flex-col justify-between bg-foreground p-12 text-background lg:flex lg:w-[45%]">
+        <div className="flex flex-1 flex-col items-start justify-center px-8">
+          <span className="mb-6 font-mono text-[10px] uppercase tracking-[0.2em] text-background/40">
+            Account Verification
+          </span>
+          <h1 className="mb-4 text-5xl font-bold leading-[1.05] tracking-tight">
+            RESQ<span className="text-primary">.</span>
+          </h1>
+          <p className="mb-10 max-w-sm text-lg leading-relaxed text-background/70">
+            Verify your email to complete account setup and access the
+            dashboard.
           </p>
-
-          <div className="flex gap-16">
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">24/7</p>
-              <p className="text-sm opacity-90">Support</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">99.9%</p>
-              <p className="text-sm opacity-90">Uptime</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">30s</p>
-              <p className="text-sm opacity-90">Response</p>
+          <div className="w-full max-w-xs border-t border-background/10 pt-6">
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-2xl font-bold">24/7</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Support
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">99.9%</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Uptime
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">30s</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Response
+                </p>
+              </div>
             </div>
           </div>
+        </div>
+        <div className="border-t border-background/10 pt-6">
+          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-background/30">
+            Nepals Emergency Response Network
+          </span>
         </div>
       </div>
 
       {/* Right Side - Verify Form */}
-      <div className="bg-muted/30 flex w-full items-center justify-center p-8 lg:w-1/2">
-        <div className="bg-card w-full max-w-md rounded-2xl p-8 shadow-xl">
+      <div className="bg-background flex w-full items-center justify-center p-8 lg:w-[55%]">
+        <div className="w-full max-w-md">
           {!isSuccess ? (
             <>
               <div className="mb-8 text-center">
                 <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-blue-100 p-3">
-                    <KeyRound className="h-8 w-8 text-blue-600" />
+                  <div className="rounded-full bg-primary/10 p-3">
+                    <KeyRound className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <h2 className="mb-2 text-3xl font-bold">Verify Your Account</h2>
@@ -183,7 +206,7 @@ function VerifyPageContent() {
                   Didn&apos;t receive the code?{' '}
                   <button
                     type="button"
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                     onClick={() => {
                       console.log('Resend OTP');
                     }}
@@ -193,7 +216,7 @@ function VerifyPageContent() {
                 </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center text-sm text-blue-600 hover:underline"
+                  className="inline-flex items-center text-sm text-primary hover:underline"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Sign in
@@ -222,19 +245,6 @@ function VerifyPageContent() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Footer Links */}
-      <div className="text-muted-foreground absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-6 text-sm lg:right-1/2 lg:left-auto lg:translate-x-1/2">
-        <Link href="/help" className="hover:text-foreground">
-          Help Center
-        </Link>
-        <Link href="/support" className="hover:text-foreground">
-          Contact Support
-        </Link>
-        <Link href="/guide" className="hover:text-foreground">
-          Emergency Guide
-        </Link>
       </div>
     </div>
   );

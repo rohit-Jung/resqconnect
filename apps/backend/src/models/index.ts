@@ -8,3 +8,4 @@ export * from './feedback.model';
 export * from './notification.model';
 export * from './outbox.model';
 export * from './request-events.model';
+export * from './subscription.model';

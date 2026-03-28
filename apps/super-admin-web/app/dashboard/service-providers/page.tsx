@@ -121,46 +121,54 @@ export default function ServiceProvidersPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Providers
-            </CardTitle>
-            <UserCog className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalProviders}</div>
-            <p className="text-muted-foreground text-xs">
+          <CardContent className="p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                TOTAL PROVIDERS
+              </span>
+              <UserCog className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+            <p className="text-3xl font-bold tracking-tight">
+              {totalProviders}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
               All registered providers
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <UserCog className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{thisMonthProviders}</div>
-            <p className="text-muted-foreground text-xs">
+          <CardContent className="p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                THIS MONTH
+              </span>
+              <UserCog className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+            <p className="text-3xl font-bold tracking-tight">
+              {thisMonthProviders}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
               New providers this month
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Growth</CardTitle>
-            <UserCog className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${growthPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}
+          <CardContent className="p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                GROWTH
+              </span>
+              <UserCog className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+            <p
+              className={`text-3xl font-bold tracking-tight ${growthPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}
             >
               {growthPercentage >= 0 ? '+' : ''}
               {growthPercentage}%
-            </div>
-            <p className="text-muted-foreground text-xs">
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
               vs last month ({lastMonthProviders} providers)
             </p>
           </CardContent>
@@ -231,9 +239,8 @@ export default function ServiceProvidersPage() {
 
       {/* Service Providers Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCog className="h-5 w-5" />
+        <CardHeader className="border-b border-border pb-3">
+          <CardTitle className="text-base font-semibold">
             All Service Providers
           </CardTitle>
         </CardHeader>
@@ -249,13 +256,13 @@ export default function ServiceProvidersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="text-muted-foreground pb-3 text-sm font-medium">
+                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
                       Provider
                     </th>
-                    <th className="text-muted-foreground pb-3 text-sm font-medium">
+                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
                       Email
                     </th>
-                    <th className="text-muted-foreground pb-3 text-sm font-medium">
+                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
                       Joined
                     </th>
                   </tr>
@@ -267,21 +274,21 @@ export default function ServiceProvidersPage() {
                         key={`${provider.email}-${index}`}
                         className="border-b last:border-0"
                       >
-                        <td className="py-4">
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
+                            <div className="bg-primary/10 flex h-10 w-10 items-center justify-center">
                               <UserCog className="text-primary h-5 w-5" />
                             </div>
                             <span className="font-medium">{provider.name}</span>
                           </div>
                         </td>
-                        <td className="py-4">
+                        <td className="px-6 py-4">
                           <div className="text-muted-foreground flex items-center gap-2">
                             <Mail className="h-4 w-4" />
                             {provider.email}
                           </div>
                         </td>
-                        <td className="text-muted-foreground py-4">
+                        <td className="text-muted-foreground px-6 py-4">
                           {new Date(provider.createdAt).toLocaleDateString(
                             'en-US',
                             {
