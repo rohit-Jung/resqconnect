@@ -14,6 +14,7 @@ export interface ServiceProvider {
   phoneNumber?: number;
   age?: number;
   primaryAddress?: string;
+  profilePicture?: string | null;
   serviceType: 'ambulance' | 'police' | 'fire_truck' | 'rescue_team';
   serviceStatus: 'available' | 'assigned' | 'off_duty';
   organizationId: string;
@@ -53,6 +54,7 @@ interface ProviderState {
   addIncomingRequest: (request: IncomingRequest) => void;
   removeIncomingRequest: (requestId: string) => void;
   clearIncomingRequests: () => void;
+  updateProfilePicture: (profilePicture: string | null) => void;
 }
 
 export const useProviderStore = create<ProviderState>()(
@@ -131,6 +133,13 @@ export const useProviderStore = create<ProviderState>()(
 
       clearIncomingRequests: () =>
         set({ incomingRequests: [], currentRequest: null }),
+
+      updateProfilePicture: profilePicture =>
+        set(state => ({
+          provider: state.provider
+            ? { ...state.provider, profilePicture }
+            : null,
+        })),
     }),
     {
       name: 'provider-storage',
