@@ -1,3 +1,8 @@
+'use client';
+
+import { Loader2, Lock, Save } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -6,8 +11,58 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  useAdminProfile,
+  useAdminUpdateProfile,
+} from '@/services/super-admin/auth.api';
 
 export default function SettingsPage() {
+  const { data: profileData, isLoading } = useAdminProfile();
+  const updateProfileMutation = useAdminUpdateProfile();
+
+  const profile = profileData?.data?.data?.user;
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setEmail(profile.email || '');
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setSaveSuccess(false);
+    try {
+      await updateProfileMutation.mutateAsync({
+        name: name !== profile?.name ? name : undefined,
+        email: email !== profile?.email ? email : undefined,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch {
+      // error is handled by mutation
+    }
+  };
+
+  const hasChanges =
+    name !== (profile?.name || '') || email !== (profile?.email || '');
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -20,6 +75,63 @@ export default function SettingsPage() {
       <div className="grid gap-6">
         <Card>
           <CardHeader>
+            <CardTitle>Profile Settings</CardTitle>
+            <CardDescription>Update your admin profile details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="adminName">Name</Label>
+              <Input
+                id="adminName"
+                placeholder="Enter your name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adminEmail">Email</Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              {saveSuccess && (
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  Profile updated successfully!
+                </p>
+              )}
+              {updateProfileMutation.isError && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {updateProfileMutation.error?.message || 'Failed to update'}
+                </p>
+              )}
+              <Button
+                onClick={handleSave}
+                disabled={!hasChanges || updateProfileMutation.isPending}
+                className="ml-auto"
+              >
+                {updateProfileMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>System Settings</CardTitle>
             <CardDescription>
               Configure global system parameters
@@ -27,25 +139,17 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">System Name</label>
-              <input
-                type="text"
+              <Label htmlFor="systemName">System Name</Label>
+              <Input
+                id="systemName"
                 placeholder="Enter system name"
-                className="bg-background mt-1.5 w-full rounded-lg border px-3 py-2 text-sm"
+                className="mt-1.5"
                 defaultValue="ResqConnect"
+                disabled
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Support Email</label>
-              <input
-                type="email"
-                placeholder="Enter support email"
-                className="bg-background mt-1.5 w-full rounded-lg border px-3 py-2 text-sm"
-                defaultValue="support@resqconnect.com"
-              />
-            </div>
-            <div className="flex justify-end pt-2">
-              <Button>Save Changes</Button>
+              <p className="text-muted-foreground mt-1 text-xs">
+                System name is configured via environment variables
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -56,14 +160,11 @@ export default function SettingsPage() {
             <CardDescription>Manage admin security options</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
-              Change Password
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Two-Factor Authentication
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Audit Logs
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <a href="/change-password">
+                <Lock className="mr-2 h-4 w-4" />
+                Change Password
+              </a>
             </Button>
           </CardContent>
         </Card>

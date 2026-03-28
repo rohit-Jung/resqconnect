@@ -2,17 +2,12 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import {
-  ArrowLeft,
-  CheckCircle,
-  KeyRound,
-  Loader2,
-  Shield,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle, KeyRound, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +17,21 @@ import {
   TSuperAdminVerify,
   superAdminVerifySchema,
 } from '@/validations/super-admin.schema';
+
+function parseApiError(err: unknown): string {
+  const axiosErr = err as {
+    response?: {
+      data?: { message?: string; errors?: string[]; error?: string };
+    };
+  };
+  const data = axiosErr?.response?.data;
+  if (!data) return 'Something went wrong. Please try again.';
+  if (data.errors && Array.isArray(data.errors) && data.errors.length > 0)
+    return data.errors.join(', ');
+  if (data.error) return data.error;
+  if (data.message) return data.message;
+  return 'Something went wrong. Please try again.';
+}
 
 function VerifyPageContent() {
   const [isSuccess, setIsSuccess] = useState(false);
@@ -53,61 +63,71 @@ function VerifyPageContent() {
     verifyMutation.mutate(data, {
       onSuccess: response => {
         setIsSuccess(true);
+        toast.success('Account verified successfully');
         // If token is returned, store it
         if (response.data.data?.token) {
           localStorage.setItem('adminToken', response.data.data.token);
         }
       },
       onError: error => {
-        console.error('Verification failed:', error);
+        toast.error(parseApiError(error));
       },
     });
   };
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Side - Dark Background */}
-      <div className="hidden flex-col justify-between bg-gradient-to-br from-slate-900 to-slate-800 p-12 text-white lg:flex lg:w-1/2">
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="mb-6 flex items-center justify-center rounded-2xl bg-white/10 p-6 backdrop-blur-sm">
-            <Shield className="h-16 w-16" />
-          </div>
-          <h1 className="mb-2 text-5xl font-bold">Super Admin</h1>
-          <p className="mb-8 text-xl opacity-90">
-            ResqConnect Management Portal
+      {/* Left Side - Swiss Design Dark Panel */}
+      <div className="hidden flex-col justify-between bg-foreground p-12 text-background lg:flex lg:w-[45%]">
+        <div className="flex flex-1 flex-col items-start justify-center px-8">
+          <span className="mb-6 font-mono text-[10px] uppercase tracking-[0.2em] text-background/40">
+            Admin Verification
+          </span>
+          <h1 className="mb-4 text-5xl font-bold leading-[1.05] tracking-tight">
+            RESQ<span className="text-primary">.</span>
+          </h1>
+          <p className="mb-10 max-w-sm text-lg leading-relaxed text-background/70">
+            Verify your email to access the admin management portal.
           </p>
-
-          <p className="mb-16 max-w-md text-lg leading-relaxed opacity-90">
-            We&apos;ve sent a verification code to your email. Enter the code to
-            complete your account verification and access the admin portal.
-          </p>
-
-          <div className="flex gap-16">
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">Full</p>
-              <p className="text-sm opacity-90">Access</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">All</p>
-              <p className="text-sm opacity-90">Organizations</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <p className="mb-1 text-4xl font-bold">System</p>
-              <p className="text-sm opacity-90">Analytics</p>
+          <div className="w-full max-w-xs border-t border-background/10 pt-6">
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-2xl font-bold">24/7</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Support
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">99.9%</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Uptime
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">30s</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-background/50">
+                  Response
+                </p>
+              </div>
             </div>
           </div>
+        </div>
+        <div className="border-t border-background/10 pt-6">
+          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-background/30">
+            Authorized Administrators Only
+          </span>
         </div>
       </div>
 
       {/* Right Side - Verify Form */}
-      <div className="bg-muted/30 flex w-full items-center justify-center p-8 lg:w-1/2">
-        <div className="bg-card w-full max-w-md rounded-2xl p-8 shadow-xl">
+      <div className="bg-background flex w-full items-center justify-center p-8 lg:w-[55%]">
+        <div className="w-full max-w-md">
           {!isSuccess ? (
             <>
               <div className="mb-8 text-center">
                 <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900">
-                    <KeyRound className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  <div className="rounded-full bg-primary/10 p-3">
+                    <KeyRound className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <h2 className="mb-2 text-3xl font-bold">Verify Your Account</h2>
@@ -117,14 +137,14 @@ function VerifyPageContent() {
               </div>
 
               {verifyMutation.isError && (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
                   {verifyMutation.error?.message ||
                     'Verification failed. Please check your code and try again.'}
                 </div>
               )}
 
               {!userId && (
-                <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400">
+                <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700">
                   Invalid verification link. Please{' '}
                   <Link href="/login" className="font-medium underline">
                     login again
@@ -163,7 +183,7 @@ function VerifyPageContent() {
 
                 <Button
                   type="submit"
-                  className="h-12 w-full bg-slate-900 text-base hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
+                  className="h-12 w-full text-base"
                   size="lg"
                   disabled={verifyMutation.isPending || !userId}
                 >
@@ -183,7 +203,7 @@ function VerifyPageContent() {
                   Didn&apos;t receive the code?{' '}
                   <button
                     type="button"
-                    className="text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-primary hover:underline"
                     onClick={() => {
                       // TODO: Implement resend OTP functionality
                       console.log('Resend OTP');
@@ -194,7 +214,7 @@ function VerifyPageContent() {
                 </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  className="inline-flex items-center text-sm text-primary hover:underline"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Sign in
@@ -204,8 +224,8 @@ function VerifyPageContent() {
           ) : (
             <div className="text-center">
               <div className="mb-6 flex justify-center">
-                <div className="rounded-full bg-green-100 p-4 dark:bg-green-900">
-                  <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+                <div className="rounded-full bg-green-100 p-4">
+                  <CheckCircle className="h-12 w-12 text-green-600" />
                 </div>
               </div>
               <h2 className="mb-2 text-3xl font-bold">Account Verified!</h2>
@@ -215,7 +235,7 @@ function VerifyPageContent() {
               </p>
               <Button
                 onClick={() => router.push('/dashboard')}
-                className="h-12 w-full bg-slate-900 text-base hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
+                className="h-12 w-full text-base"
                 size="lg"
               >
                 Go to Dashboard
