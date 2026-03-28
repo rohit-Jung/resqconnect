@@ -18,6 +18,10 @@ const envSchema = z.object({
   GOOGLE_PASS: z.string(),
   TO_NUMBER: z.string(),
   EMERGENCY_PHONE_NUMBER: z.string().default('112'),
+
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 function createEnvConfig() {
@@ -46,6 +50,10 @@ function createEnvConfig() {
     mapbox_token: parsedEnv.data.MAPBOX_ACCESS_TOKEN,
     to_number: parsedEnv.data.TO_NUMBER,
     emergency_phone_number: parsedEnv.data.EMERGENCY_PHONE_NUMBER,
+
+    cloudinary_cloud_name: parsedEnv.data.CLOUDINARY_CLOUD_NAME,
+    cloudinary_api_key: parsedEnv.data.CLOUDINARY_API_KEY,
+    cloudinary_api_secret: parsedEnv.data.CLOUDINARY_API_SECRET,
   };
 }
 
