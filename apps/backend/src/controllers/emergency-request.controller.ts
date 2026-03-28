@@ -25,43 +25,23 @@ import {
   user,
 } from '@/models';
 import { publishWithRetry } from '@/services/kafka/kafka.utils';
-import { notifyEmergencyContacts } from '@/services/notification.service';
 import {
   acquireLock,
   clearEmergencyProviders,
   getEmergencyProviders,
   releaseLock,
 } from '@/services/redis.service';
-import { emitSocketEvent, getIo } from '@/socket';
+import { getIo } from '@/socket';
 import { getKafkaTopic } from '@/utils';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { CreateNewRequestSchema } from '@/validations/emergency-request';
 
 const createEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const parsedValues = CreateNewRequestSchema.safeParse(req.body);
-
-    if (!parsedValues.success) {
-      return res
-        .status(HttpStatusCode.BadRequest)
-        .json(ApiError.validationError(parsedValues.error));
-    }
-
-    const { emergencyType, emergencyDescription, userLocation } =
-      parsedValues.data;
-
+    const { emergencyType, emergencyDescription, userLocation } = req.body;
     const loggedInUser = req.user;
-    console.log('loggedin', loggedInUser);
-    if (!loggedInUser?.id) {
-      throw new ApiError(
-        HttpStatusCode.Unauthorized,
-        'Unauthorized access to request creation.'
-      );
-    }
 
-    // Convert location to H3 index
     const h3Index = latLngToCell(
       userLocation.latitude,
       userLocation.longitude,
@@ -69,20 +49,15 @@ const createEmergencyRequest = asyncHandler(
     );
 
     const h3IndexBigInt = BigInt(`0x${h3Index}`);
-
-    // Create PostGIS POINT geometry string
     const locationPoint = `POINT(${userLocation.longitude} ${userLocation.latitude})`;
-
-    // Calculate expiry time
     const expiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
 
     try {
-      // database transaction for atomicity
       const result = await db.transaction(async tx => {
         const [newRequest] = await tx
           .insert(emergencyRequest)
           .values({
-            userId: loggedInUser.id,
+            userId: loggedInUser!.id,
             serviceType: String(emergencyType).toLowerCase() as any,
             description: emergencyDescription,
             location: {
@@ -110,7 +85,6 @@ const createEmergencyRequest = asyncHandler(
           throw new ApiError(500, 'Error creating emergency request');
         }
 
-        // outbox event (Outbox pattern for kafka)
         const eventPayload = {
           requestId: newRequest.id,
           userId: newRequest.userId,
@@ -118,7 +92,7 @@ const createEmergencyRequest = asyncHandler(
           emergencyDescription: newRequest.emergencyDescription,
           emergencyLocation: newRequest.emergencyLocation,
           status: newRequest.status,
-          h3Index: h3Index, // Send hex string, not BigInt
+          h3Index: h3Index,
           searchRadius: newRequest.searchRadius,
           expiresAt: newRequest.expiresAt,
         };
@@ -140,14 +114,11 @@ const createEmergencyRequest = asyncHandler(
               longitude: userLocation.longitude.toString(),
             },
           })
-          .where(eq(user.id, loggedInUser.id));
+          .where(eq(user.id, loggedInUser!.id));
 
         return newRequest;
       });
-      console.log('result', result);
 
-      // Transaction committed successfully
-      // Try to publish to Kafka immediately (with retry)
       const published = await publishWithRetry(KAFKA_TOPICS.MEDICAL_EVENTS, {
         key: result.id,
         value: JSON.stringify({
@@ -165,7 +136,6 @@ const createEmergencyRequest = asyncHandler(
       });
 
       if (published) {
-        // Mark outbox event as published
         await db
           .update(outbox)
           .set({ status: 'published', publishedAt: new Date().toISOString() })
@@ -176,22 +146,6 @@ const createEmergencyRequest = asyncHandler(
         );
       }
 
-      // Notify emergency contacts asynchronously (don't block response)
-      // TODO: do this in the topic
-      // notifyEmergencyContacts({
-      //   requestId: result.id,
-      //   userId: result.userId,
-      //   userName: loggedInUser.name || 'User',
-      //   emergencyType: result.emergencyType || emergencyType,
-      //   location: {
-      //     latitude: userLocation.latitude,
-      //     longitude: userLocation.longitude,
-      //   },
-      //   message: emergencyDescription,
-      // }).catch(err => {
-      //   console.error('Failed to notify emergency contacts:', err);
-      // });
-      //
       res.status(201).json(
         new ApiResponse(201, 'Emergency request created', {
           emergencyRequest: result,
@@ -199,7 +153,6 @@ const createEmergencyRequest = asyncHandler(
       );
     } catch (error) {
       console.error('Error creating emergency request:', error);
-      console.log('loggedin', error);
       throw new ApiError(500, 'Failed to create emergency request');
     }
   }
@@ -207,7 +160,7 @@ const createEmergencyRequest = asyncHandler(
 
 const getEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!id) {
       throw new ApiError(400, 'Emergency request ID is required');
@@ -247,7 +200,7 @@ const getUsersEmergencyRequests = asyncHandler(
 
 const updateEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
 
     if (!id) {
@@ -310,7 +263,7 @@ const updateEmergencyRequest = asyncHandler(
 
 const deleteEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
@@ -386,7 +339,7 @@ const getRecentEmergencyRequests = asyncHandler(
 
 const cancelEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
@@ -426,24 +379,17 @@ const cancelEmergencyRequest = asyncHandler(
       .where(eq(emergencyRequest.id, id))
       .returning();
 
-    // Notify all providers who received this request
     try {
       const io = getIo();
 
       if (io) {
-        // 1. Always emit to EMERGENCY room (covers case where provider already accepted and joined)
         io.to(SocketRoom.EMERGENCY(id)).emit(SocketEvents.REQUEST_CANCELLED, {
           requestId: id,
           message: 'The user has cancelled this emergency request.',
         });
-        console.log(
-          `Emitted cancellation to EMERGENCY room: ${SocketRoom.EMERGENCY(id)}`
-        );
 
-        // 2. Get providers from Redis cache
         let providerIds = await getEmergencyProviders(id);
 
-        // 3. If Redis cache is empty, check if there's an assigned provider in DB
         if (providerIds.length === 0) {
           const assignedResponse = await db.query.emergencyResponse.findFirst({
             where: eq(emergencyResponse.emergencyRequestId, id),
@@ -451,13 +397,9 @@ const cancelEmergencyRequest = asyncHandler(
 
           if (assignedResponse?.serviceProviderId) {
             providerIds = [assignedResponse.serviceProviderId];
-            console.log(
-              `Found assigned provider from DB: ${assignedResponse.serviceProviderId}`
-            );
           }
         }
 
-        // 4. Notify each provider in their PROVIDER room (for dashboard listeners)
         if (providerIds.length > 0) {
           for (const providerId of providerIds) {
             io.to(SocketRoom.PROVIDER(providerId)).emit(
@@ -468,17 +410,12 @@ const cancelEmergencyRequest = asyncHandler(
               }
             );
           }
-          console.log(
-            `Notified ${providerIds.length} providers about cancelled request ${id}`
-          );
         }
       }
 
-      // Clean up Redis cache
       await clearEmergencyProviders(id);
     } catch (error) {
       console.error('Error notifying providers about cancellation:', error);
-      // Don't fail the request if notification fails
     }
 
     return res
@@ -489,12 +426,9 @@ const cancelEmergencyRequest = asyncHandler(
   }
 );
 
-/**
- * Accept an emergency request (called by service provider)
- */
 const acceptEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: requestId } = req.params;
+    const requestId = req.params.id as string;
     const providerId = req.user?.id;
 
     if (!providerId) {
@@ -505,7 +439,6 @@ const acceptEmergencyRequest = asyncHandler(
       throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
     }
 
-    // Acquire distributed lock to prevent race conditions
     const lockAcquired = await acquireLock(requestId, providerId, 30);
 
     if (!lockAcquired) {
@@ -516,7 +449,6 @@ const acceptEmergencyRequest = asyncHandler(
     }
 
     try {
-      // Check if request exists and is still pending/in_progress
       const existingRequest = await db.query.emergencyRequest.findFirst({
         where: eq(emergencyRequest.id, requestId),
       });
@@ -539,7 +471,6 @@ const acceptEmergencyRequest = asyncHandler(
         throw new ApiError(HttpStatusCode.Gone, 'Request was cancelled');
       }
 
-      // Update request and provider status atomically
       await Promise.all([
         db
           .update(emergencyRequest)
@@ -557,12 +488,10 @@ const acceptEmergencyRequest = asyncHandler(
         }),
       ]);
 
-      // Notify other providers that request is taken
       const providerIds = await getEmergencyProviders(requestId);
       const io = getIo();
 
       if (io) {
-        // Notify other providers
         for (const pid of providerIds) {
           if (pid !== providerId) {
             io.to(SocketRoom.PROVIDER(pid)).emit(
@@ -575,7 +504,6 @@ const acceptEmergencyRequest = asyncHandler(
           }
         }
 
-        // Notify the user
         io.to(SocketRoom.USER(existingRequest.userId)).emit(
           SocketEvents.REQUEST_ACCEPTED,
           {
@@ -584,14 +512,12 @@ const acceptEmergencyRequest = asyncHandler(
           }
         );
 
-        // Emit decision for worker to pick up
         io.emit(SocketEvents.PROVIDER_DECISION, {
           requestId,
           providerId,
           decision: 'ACCEPTED',
         });
 
-        // Join both to emergency room for real-time updates
         io.in(SocketRoom.PROVIDER(providerId)).socketsJoin(
           SocketRoom.EMERGENCY(requestId)
         );
@@ -600,7 +526,6 @@ const acceptEmergencyRequest = asyncHandler(
         );
       }
 
-      // Clean up
       await clearEmergencyProviders(requestId);
       await releaseLock(requestId, providerId);
 
@@ -620,12 +545,9 @@ const acceptEmergencyRequest = asyncHandler(
   }
 );
 
-/**
- * Reject an emergency request (called by service provider)
- */
 const rejectEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: requestId } = req.params;
+    const requestId = req.params.id as string;
     const providerId = req.user?.id;
     const { reason } = req.body;
 
@@ -637,7 +559,6 @@ const rejectEmergencyRequest = asyncHandler(
       throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
     }
 
-    // Log the rejection
     await db.insert(requestEvents).values({
       requestId,
       eventType: 'rejected',
@@ -648,7 +569,6 @@ const rejectEmergencyRequest = asyncHandler(
       },
     });
 
-    // Emit rejection event (worker listens to track rejections)
     const io = getIo();
     if (io) {
       io.emit(SocketEvents.PROVIDER_DECISION, {
@@ -662,12 +582,9 @@ const rejectEmergencyRequest = asyncHandler(
   }
 );
 
-/**
- * Complete an emergency request (called by service provider)
- */
 const completeEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: requestId } = req.params;
+    const requestId = req.params.id as string;
     const providerId = req.user?.id;
 
     if (!providerId) {
@@ -696,7 +613,6 @@ const completeEmergencyRequest = asyncHandler(
       );
     }
 
-    // Update statuses
     await Promise.all([
       db
         .update(emergencyRequest)
@@ -714,7 +630,6 @@ const completeEmergencyRequest = asyncHandler(
       }),
     ]);
 
-    // Notify user
     const io = getIo();
     if (io) {
       io.to(SocketRoom.USER(existingRequest.userId)).emit(
@@ -732,13 +647,9 @@ const completeEmergencyRequest = asyncHandler(
   }
 );
 
-/**
- * Confirm provider arrival (called by user)
- * Changes status from 'accepted' or 'assigned' to 'in_progress'
- */
 const confirmProviderArrival = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: requestId } = req.params;
+    const requestId = req.params.id as string;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -773,14 +684,12 @@ const confirmProviderArrival = asyncHandler(
       );
     }
 
-    // Get the assigned provider from emergency response
     const response = await db.query.emergencyResponse.findFirst({
       where: eq(emergencyResponse.emergencyRequestId, requestId),
     });
 
     const arrivedAt = new Date().toISOString();
 
-    // Update request status to in_progress
     await Promise.all([
       db
         .update(emergencyRequest)
@@ -793,7 +702,6 @@ const confirmProviderArrival = asyncHandler(
       }),
     ]);
 
-    // Notify provider about arrival confirmation
     const io = getIo();
     if (io && response?.serviceProviderId) {
       io.to(SocketRoom.PROVIDER(response.serviceProviderId)).emit(
@@ -812,6 +720,107 @@ const confirmProviderArrival = asyncHandler(
   }
 );
 
+const getUserEmergencyHistory = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInUser = req.user;
+    const { page, limit, sortBy, status } = (req as any).validatedQuery as {
+      page: number;
+      limit: number;
+      sortBy: 'asc' | 'desc';
+      status?:
+        | 'pending'
+        | 'accepted'
+        | 'assigned'
+        | 'rejected'
+        | 'in_progress'
+        | 'completed'
+        | 'cancelled'
+        | 'no_providers_available';
+    };
+
+    const offset = (page - 1) * limit;
+
+    const whereConditions = status
+      ? and(
+          eq(emergencyRequest.userId, loggedInUser!.id),
+          eq(emergencyRequest.requestStatus, status)
+        )
+      : eq(emergencyRequest.userId, loggedInUser!.id);
+
+    const emergencyRequests = await db.query.emergencyRequest.findMany({
+      where: whereConditions,
+      orderBy:
+        sortBy === 'asc'
+          ? emergencyRequest.createdAt
+          : desc(emergencyRequest.createdAt),
+      limit: limit,
+      offset: offset,
+    });
+
+    const [totalCountResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyRequest)
+      .where(whereConditions);
+
+    const totalCount = totalCountResult?.count ?? 0;
+
+    const [[completedResult], [cancelledResult]] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.userId, loggedInUser!.id),
+            eq(emergencyRequest.requestStatus, 'completed')
+          )
+        ),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.userId, loggedInUser!.id),
+            eq(emergencyRequest.requestStatus, 'cancelled')
+          )
+        ),
+    ]);
+
+    const [totalResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyRequest)
+      .where(eq(emergencyRequest.userId, loggedInUser!.id));
+
+    const history = emergencyRequests.map(request => ({
+      id: request.id,
+      emergencyType: request.serviceType,
+      emergencyDescription: request.description,
+      status: request.requestStatus,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      emergencyLocation: request.location,
+    }));
+
+    const stats = {
+      total: totalResult?.count ?? 0,
+      completed: completedResult?.count ?? 0,
+      cancelled: cancelledResult?.count ?? 0,
+    };
+
+    return res.status(200).json(
+      new ApiResponse(200, 'User emergency history retrieved', {
+        history,
+        stats,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+      })
+    );
+  }
+);
+
 export {
   createEmergencyRequest,
   getEmergencyRequest,
@@ -824,4 +833,5 @@ export {
   rejectEmergencyRequest,
   completeEmergencyRequest,
   confirmProviderArrival,
+  getUserEmergencyHistory,
 };
