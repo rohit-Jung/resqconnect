@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,9 +17,11 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import OfflineFallbackModal from '@/components/OfflineFallbackModal';
 import OfflineIndicator from '@/components/OfflineIndicator';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useEmergencyNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useCreateEmergencyRequest } from '@/services/emergency/emergency.api';
+import { SyncSummary } from '@/services/syncService';
 import { TEmergencyType } from '@/validations/emergency.schema';
 
 interface LocationCoords {
@@ -42,10 +44,34 @@ const EMERGENCY_TYPES: {
 export default function EmergencyRequestScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
-  const { isConnected, isInternetReachable } = useNetworkStatus();
-  const isOffline = !isConnected || !isInternetReachable;
+
+  // Offline modal state
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [offlineModalLocation, setOfflineModalLocation] =
+    useState<Location.LocationObject | null>(null);
+
+  // Handle offline detection
+  const handleOfflineDetected = useCallback(() => {
+    console.log('[EmergencyRequest] Offline detected');
+  }, []);
+
+  // Handle back online with sync summary
+  const handleBackOnline = useCallback((summary: SyncSummary) => {
+    if (summary.synced > 0) {
+      Alert.alert(
+        'Requests Synced',
+        `${summary.synced} emergency request(s) have been synced successfully.`,
+        [{ text: 'OK' }]
+      );
+    }
+  }, []);
+
+  const { isConnected, isInternetReachable, isOffline, refresh, triggerSync } =
+    useEmergencyNetworkStatus(handleOfflineDetected, handleBackOnline);
 
   const [location, setLocation] = useState<LocationCoords | null>(null);
+  const [fullLocationObject, setFullLocationObject] =
+    useState<Location.LocationObject | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [selectedType, setSelectedType] = useState<TEmergencyType | null>(null);
 
@@ -79,6 +105,7 @@ export default function EmergencyRequestScreen() {
 
       setLocation(coords);
       setMarkerLocation(coords);
+      setFullLocationObject(currentLocation);
       setIsLoadingLocation(false);
     })();
   }, []);
@@ -99,6 +126,62 @@ export default function EmergencyRequestScreen() {
     }
   };
 
+  // Retry function for offline modal
+  const handleRetryOnline = useCallback(async (): Promise<boolean> => {
+    // Force a connectivity check
+    await refresh();
+
+    // Check if we're back online
+    if (isConnected && isInternetReachable) {
+      // Try to submit the request again
+      return new Promise(resolve => {
+        if (!selectedType || !markerLocation) {
+          resolve(false);
+          return;
+        }
+
+        createEmergency(
+          {
+            emergencyType: selectedType,
+            emergencyDescription: description || selectedType,
+            userLocation: markerLocation,
+          },
+          {
+            onSuccess: response => {
+              setShowOfflineModal(false);
+              const requestId = response.data?.data?.emergencyRequest?.id;
+              router.replace({
+                pathname: '/emergency-tracking',
+                params: {
+                  requestId,
+                  emergencyType: selectedType,
+                  latitude: markerLocation.latitude.toString(),
+                  longitude: markerLocation.longitude.toString(),
+                  role: 'user',
+                },
+              });
+              resolve(true);
+            },
+            onError: () => {
+              resolve(false);
+            },
+          }
+        );
+      });
+    }
+
+    return false;
+  }, [
+    refresh,
+    isConnected,
+    isInternetReachable,
+    selectedType,
+    markerLocation,
+    description,
+    createEmergency,
+    router,
+  ]);
+
   const handleSubmit = () => {
     if (!selectedType) {
       Alert.alert('Error', 'Please select an emergency type.');
@@ -115,24 +198,26 @@ export default function EmergencyRequestScreen() {
       return;
     }
 
-    // Check if offline - redirect to SMS emergency
+    // Check if offline - show offline fallback modal
     if (isOffline) {
-      Alert.alert(
-        "You're Offline",
-        'Internet connection is not available. Would you like to send an emergency request via SMS instead?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Use SMS',
-            onPress: () => {
-              router.push({
-                pathname: '/sms-emergency',
-                params: { emergencyType: selectedType },
-              });
-            },
+      // Create a location object for the modal
+      if (fullLocationObject) {
+        setOfflineModalLocation(fullLocationObject);
+      } else {
+        setOfflineModalLocation({
+          coords: {
+            latitude: markerLocation.latitude,
+            longitude: markerLocation.longitude,
+            altitude: null,
+            accuracy: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
           },
-        ]
-      );
+          timestamp: Date.now(),
+        });
+      }
+      setShowOfflineModal(true);
       return;
     }
 
@@ -158,11 +243,33 @@ export default function EmergencyRequestScreen() {
           });
         },
         onError: (error: any) => {
-          Alert.alert(
-            'Error',
-            error.response?.data?.message ||
-              'Failed to create emergency request. Please try again.'
-          );
+          // Check if it's a network error
+          if (!error.response) {
+            // Network error - show offline modal
+            if (fullLocationObject) {
+              setOfflineModalLocation(fullLocationObject);
+            } else {
+              setOfflineModalLocation({
+                coords: {
+                  latitude: markerLocation.latitude,
+                  longitude: markerLocation.longitude,
+                  altitude: null,
+                  accuracy: null,
+                  altitudeAccuracy: null,
+                  heading: null,
+                  speed: null,
+                },
+                timestamp: Date.now(),
+              });
+            }
+            setShowOfflineModal(true);
+          } else {
+            Alert.alert(
+              'Error',
+              error.response?.data?.message ||
+                'Failed to create emergency request. Please try again.'
+            );
+          }
         },
       }
     );
@@ -194,6 +301,17 @@ export default function EmergencyRequestScreen() {
               params: selectedType ? { emergencyType: selectedType } : {},
             })
           }
+        />
+
+        {/* Offline Fallback Modal */}
+        <OfflineFallbackModal
+          visible={showOfflineModal}
+          onClose={() => setShowOfflineModal(false)}
+          emergencyType={selectedType || 'ambulance'}
+          location={offlineModalLocation}
+          description={description}
+          onRetryOnline={handleRetryOnline}
+          autoSMSAfterTimeout={15}
         />
 
         {/* Header */}

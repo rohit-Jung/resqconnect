@@ -1,6 +1,6 @@
 import { redis } from './kafka/kafka.service';
 
-// Emergency request cache keys
+// request cache keys
 export const EMERGENCY_PROVIDERS_KEY = (requestId: string) =>
   `emergency:${requestId}:providers`;
 export const EMERGENCY_LOCK_KEY = (requestId: string) =>
@@ -8,11 +8,17 @@ export const EMERGENCY_LOCK_KEY = (requestId: string) =>
 export const PROVIDER_LOCATION_KEY = (providerId: string) =>
   `provider:${providerId}:location`;
 
-// Cache expiry times (in seconds)
+// SMS deduplication keys
+export const SMS_PROCESSED_KEY = (messageSid: string) =>
+  `sms:processed:${messageSid}`;
+export const SMS_LAST_POLL_KEY = 'sms:last_poll_timestamp';
+
 export const CACHE_EXPIRY = {
-  PROVIDERS_LIST: 600, // 10 minutes
-  LOCK: 10, // 10 seconds
-  PROVIDER_LOCATION: 3600, // 1 hour
+  PROVIDERS_LIST: 600,
+  LOCK: 10,
+  PROVIDER_LOCATION: 3600,
+  SMS_PROCESSED: 86400, // 24 hours - to prevent reprocessing
+  SMS_LAST_POLL: 3600,
 };
 
 /**
@@ -40,7 +46,6 @@ export async function releaseLock(
   const lockKey = EMERGENCY_LOCK_KEY(requestId);
 
   if (providerId) {
-    // Only release if we own the lock (atomic operation)
     const script = `
       if redis.call("get", KEYS[1]) == ARGV[1] then
         return redis.call("del", KEYS[1])
@@ -73,9 +78,6 @@ export async function cacheEmergencyProviders(
   );
 }
 
-/**
- * Get the list of providers for an emergency request
- */
 export async function getEmergencyProviders(
   requestId: string
 ): Promise<string[]> {
@@ -185,3 +187,97 @@ export async function getAllActiveProviderLocations(): Promise<
 }
 
 export { redis };
+
+// SMS Deduplication Functions
+/**
+ * Check if an SMS message has already been processed
+ */
+export async function isMessageProcessed(messageSid: string): Promise<boolean> {
+  const key = SMS_PROCESSED_KEY(messageSid);
+  const exists = await redis.exists(key);
+  return exists === 1;
+}
+
+/**
+ * Mark an SMS message as processed
+ */
+export async function markMessageProcessed(
+  messageSid: string,
+  metadata?: {
+    requestId?: string;
+    userId?: string;
+    status: 'success' | 'failed' | 'invalid';
+    error?: string;
+  }
+): Promise<void> {
+  const key = SMS_PROCESSED_KEY(messageSid);
+  const value = JSON.stringify({
+    processedAt: new Date().toISOString(),
+    ...metadata,
+  });
+  await redis.set(key, value, 'EX', CACHE_EXPIRY.SMS_PROCESSED);
+}
+
+/**
+ * Get processing metadata for a message
+ */
+export async function getMessageProcessingInfo(messageSid: string): Promise<{
+  processedAt: string;
+  requestId?: string;
+  userId?: string;
+  status: 'success' | 'failed' | 'invalid';
+  error?: string;
+} | null> {
+  const key = SMS_PROCESSED_KEY(messageSid);
+  const data = await redis.get(key);
+  return data ? JSON.parse(data) : null;
+}
+
+/**
+ * Get the last poll timestamp for SMS messages
+ * Used to only fetch messages newer than the last poll
+ */
+export async function getLastSMSPollTimestamp(): Promise<Date | null> {
+  const timestamp = await redis.get(SMS_LAST_POLL_KEY);
+  return timestamp ? new Date(timestamp) : null;
+}
+
+/**
+ * Update the last poll timestamp for SMS messages
+ */
+export async function setLastSMSPollTimestamp(timestamp: Date): Promise<void> {
+  await redis.set(
+    SMS_LAST_POLL_KEY,
+    timestamp.toISOString(),
+    'EX',
+    CACHE_EXPIRY.SMS_LAST_POLL
+  );
+}
+
+/**
+ * Batch check if multiple messages have been processed
+ */
+export async function batchCheckMessagesProcessed(
+  messageSids: string[]
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+
+  if (messageSids.length === 0) {
+    return result;
+  }
+
+  // Use pipeline for efficiency
+  const pipeline = redis.pipeline();
+  messageSids.forEach(sid => {
+    pipeline.exists(SMS_PROCESSED_KEY(sid));
+  });
+
+  const responses = await pipeline.exec();
+
+  messageSids.forEach((sid, index) => {
+    const [err, exists] = responses?.[index] || [null, 0];
+    result.set(sid, !err && exists === 1);
+  });
+
+  return result;
+}

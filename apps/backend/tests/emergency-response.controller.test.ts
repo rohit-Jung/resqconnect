@@ -1,9 +1,5 @@
-/**
- * Emergency Response Controller Tests
- * Tests for emergency response CRUD and status updates
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createEmergencyResponse,
@@ -36,7 +32,6 @@ describe('Emergency Response Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Create Emergency Response Tests
   describe('createEmergencyResponse', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
@@ -56,7 +51,6 @@ describe('Emergency Response Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {
         destLocation: testLocations.kathmandu,
-        // Missing emergencyRequestId
       };
 
       await createEmergencyResponse(mockReq as any, mockRes as any, mockNext);
@@ -88,7 +82,6 @@ describe('Emergency Response Controller Tests', () => {
     it.todo('should update service provider status to assigned');
   });
 
-  //   Get Emergency Response Tests
   describe('getEmergencyResponse', () => {
     it('should reject request without ID', async () => {
       mockReq.params = {};
@@ -104,7 +97,6 @@ describe('Emergency Response Controller Tests', () => {
     it.todo('should return 404 for non-existent response');
   });
 
-  //   Update Emergency Response Tests
   describe('updateEmergencyResponse', () => {
     it('should reject request without ID', async () => {
       mockReq.params = {};
@@ -125,7 +117,6 @@ describe('Emergency Response Controller Tests', () => {
     it.todo('should set request to completed when provider completes');
   });
 
-  //   Delete Emergency Response Tests
   describe('deleteEmergencyResponse', () => {
     it('should reject request without ID', async () => {
       mockReq.params = {};
@@ -141,7 +132,6 @@ describe('Emergency Response Controller Tests', () => {
     it.todo('should return 404 for non-existent response');
   });
 
-  //   Get Provider Responses Tests
   describe('getProviderResponses', () => {
     it('should reject request from unauthenticated provider', async () => {
       mockReq.user = null;
@@ -158,7 +148,6 @@ describe('Emergency Response Controller Tests', () => {
     it.todo('should reject if user is not a service provider');
   });
 
-  //   Status Update Scenarios
   describe('Status Update Scenarios', () => {
     it.todo('should handle on_route status update');
     it.todo('should handle arrived status update');

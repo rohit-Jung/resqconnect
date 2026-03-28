@@ -1,40 +1,22 @@
-/**
- * Authentication Tests
- * Tests for user registration, login, and verification flows
- *
- * Test Categories:
- * 1. User Registration
- * 2. User Login
- * 3. Service Provider Registration (blocked for direct registration)
- * 4. Password Validation
- * 5. OTP Verification Flow
- */
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 
 import {
-  createMockNext,
   createMockRequest,
   createMockResponse,
   generateRandomEmail,
   generateRandomPhone,
-  getResponseData,
-  getStatusCode,
   testServiceProviders,
   testUsers,
 } from './setup';
 
-// User Registration Tests
 describe('User Registration', () => {
   describe('Validation', () => {
     it('should reject registration with missing required fields', async () => {
       const req = createMockRequest({
-        body: {
-          // Missing email, password, phoneNumber, name
-        },
+        body: {},
       });
       const res = createMockResponse();
 
-      // Simulate validation error response
       const validationResult = {
         success: false,
         error: {
@@ -61,9 +43,8 @@ describe('User Registration', () => {
         },
       });
 
-      // Email validation should fail
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      expect(emailRegex.test(req.body.email)).toBe(false);
+      expect(emailRegex.test(req.body.email as string)).toBe(false);
     });
 
     it('should reject registration with invalid phone number format', async () => {
@@ -72,20 +53,18 @@ describe('User Registration', () => {
           name: 'Test User',
           email: 'test@example.com',
           password: 'Password123!',
-          phoneNumber: '123', // Invalid phone number
+          phoneNumber: '123',
         },
       });
 
-      // Nepal phone regex pattern (10 digits starting with 98)
       const phoneRegex = /^98\d{8}$/;
-      expect(phoneRegex.test(req.body.phoneNumber)).toBe(false);
+      expect(phoneRegex.test(req.body.phoneNumber as string)).toBe(false);
     });
 
     it('should reject weak passwords', async () => {
       const weakPasswords = ['123', 'password', 'abc', '12345678'];
 
       weakPasswords.forEach(password => {
-        // Password should be at least 8 characters with mixed case and numbers
         const isStrong =
           password.length >= 8 &&
           /[A-Z]/.test(password) &&
@@ -139,7 +118,6 @@ describe('User Registration', () => {
 
   describe('Admin Registration', () => {
     it('should identify admin emails correctly', () => {
-      // Admin emails should be in a whitelist
       const adminEmails = [
         'admin@resqconnect.com',
         'superadmin@resqconnect.com',
@@ -153,8 +131,6 @@ describe('User Registration', () => {
     it.todo('should allow admin role for whitelisted emails');
   });
 });
-
-//   User Login Tests
 
 describe('User Login', () => {
   describe('Validation', () => {
@@ -200,7 +176,6 @@ describe('User Login', () => {
 
   describe('Password Comparison', () => {
     it('should correctly compare passwords using bcrypt pattern', async () => {
-      // bcrypt.compare returns true for matching passwords
       const correctPassword = 'Password123!';
       const wrongPassword = 'WrongPassword!';
 
@@ -211,8 +186,6 @@ describe('User Login', () => {
   });
 });
 
-//   Service Provider Registration Tests
-
 describe('Service Provider Registration', () => {
   describe('Direct Registration Block', () => {
     it('should have service provider fixture data', () => {
@@ -221,14 +194,12 @@ describe('Service Provider Registration', () => {
     });
 
     it('should require organization ID for service providers', () => {
-      // Service providers must be registered through an organization
       const providerWithoutOrg = {
         name: 'Independent Driver',
         email: 'driver@example.com',
         password: 'Password123!',
         phoneNumber: '9841234567',
         serviceType: 'ambulance',
-        // organizationId is missing
       };
 
       expect(providerWithoutOrg).not.toHaveProperty('organizationId');
@@ -257,8 +228,6 @@ describe('Service Provider Registration', () => {
   });
 });
 
-//   OTP Verification Tests
-
 describe('OTP Verification', () => {
   describe('OTP Generation', () => {
     it('should have verification token for unverified users', () => {
@@ -281,14 +250,14 @@ describe('OTP Verification', () => {
 
   describe('OTP Validation', () => {
     it('should reject expired tokens', () => {
-      const expiredTokenExpiry = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+      const expiredTokenExpiry = new Date(Date.now() - 10 * 60 * 1000);
       const isExpired = expiredTokenExpiry.getTime() < Date.now();
 
       expect(isExpired).toBe(true);
     });
 
     it('should accept valid tokens within expiry', () => {
-      const validTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+      const validTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
       const isValid = validTokenExpiry.getTime() > Date.now();
 
       expect(isValid).toBe(true);
@@ -306,8 +275,6 @@ describe('OTP Verification', () => {
     it.todo('should invalidate old OTP when new one is sent');
   });
 });
-
-//   JWT Token Tests
 
 describe('JWT Token', () => {
   describe('Token Generation', () => {
@@ -335,8 +302,6 @@ describe('JWT Token', () => {
   });
 });
 
-//   Cookie Handling Tests
-
 describe('Cookie Handling', () => {
   describe('Login Cookies', () => {
     it('should set cookie on mock response', () => {
@@ -358,8 +323,6 @@ describe('Cookie Handling', () => {
     it.todo('should clear cookie on logout');
   });
 });
-
-//   Error Response Tests
 
 describe('Error Responses', () => {
   describe('API Error Format', () => {
@@ -384,7 +347,7 @@ describe('Error Responses', () => {
         errors: ['email: Invalid email format', 'password: Password too weak'],
       };
 
-      expect(validationErrorResponse.errors).toBeArray();
+      expect(validationErrorResponse.errors).toBeInstanceOf(Array);
       expect(validationErrorResponse.errors.length).toBe(2);
     });
   });
@@ -411,8 +374,6 @@ describe('Error Responses', () => {
     });
   });
 });
-
-//   Mock Request/Response Tests
 
 describe('Test Utilities', () => {
   it('should create mock request with defaults', () => {
@@ -459,13 +420,5 @@ describe('Test Utilities', () => {
 
     expect(res.json).toHaveBeenCalledWith(data);
     expect(res.data).toEqual(data);
-  });
-
-  it('should create mock next function', () => {
-    const next = createMockNext();
-    const error = new Error('Test error');
-    next(error);
-
-    expect(next).toHaveBeenCalledWith(error);
   });
 });

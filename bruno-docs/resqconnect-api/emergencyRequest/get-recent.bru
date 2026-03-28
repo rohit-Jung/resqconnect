@@ -1,0 +1,45 @@
+meta {
+  name: get-recent
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{server}}/emergency-request/recent
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  # Get Recent Emergency Requests
+  
+  Returns recent emergency requests for the authenticated user.
+  
+  ## Authentication
+  Requires user role authentication (JWT token)
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Recent emergency requests fetched successfully",
+    "data": [
+      {
+        "id": "uuid",
+        "emergencyType": "police",
+        "emergencyDescription": "Description",
+        "status": "completed",
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,9 +1,5 @@
-/**
- * Service Provider Controller Tests
- * Tests for service provider registration, authentication, status updates, and location management
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   changeProviderPassword,
@@ -46,13 +42,11 @@ describe('Service Provider Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Registration Tests
   describe('registerServiceProvider', () => {
     it('should reject registration with missing required fields', async () => {
       mockReq.body = {
         name: 'Test Driver',
         email: generateRandomEmail(),
-        // Missing password, phoneNumber, serviceType, organizationId
       };
 
       await registerServiceProvider(mockReq as any, mockRes as any, mockNext);
@@ -66,7 +60,7 @@ describe('Service Provider Controller Tests', () => {
         name: 'Test Driver',
         email: generateRandomEmail(),
         password: 'DriverPass123!',
-        phoneNumber: '123', // Invalid - too short
+        phoneNumber: '123',
         serviceType: 'ambulance',
         organizationId: testOrganizations.validOrg.id,
       };
@@ -101,12 +95,10 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should reject if provider already exists with same email/phone');
   });
 
-  //   Login Tests
   describe('loginServiceProvider', () => {
     it('should reject login with missing credentials', async () => {
       mockReq.body = {
         email: 'driver@example.com',
-        // Missing password
       };
 
       await loginServiceProvider(mockReq as any, mockRes as any, mockNext);
@@ -133,7 +125,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should reject login for non-existent provider');
   });
 
-  //   Logout Tests
   describe('logoutServiceProvider', () => {
     it('should reject logout for unauthenticated provider', async () => {
       mockReq.user = null;
@@ -149,12 +140,10 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should clear authentication cookie');
   });
 
-  //   Verification Tests
   describe('verifyServiceProvider', () => {
     it('should reject verification without OTP token', async () => {
       mockReq.body = {
         userId: 'test-provider-id',
-        // Missing otpToken
       };
 
       await verifyServiceProvider(mockReq as any, mockRes as any, mockNext);
@@ -167,7 +156,6 @@ describe('Service Provider Controller Tests', () => {
     it('should reject verification without provider ID', async () => {
       mockReq.body = {
         otpToken: '123456',
-        // Missing userId
       };
 
       await verifyServiceProvider(mockReq as any, mockRes as any, mockNext);
@@ -182,7 +170,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should reject invalid OTP');
   });
 
-  //   Update Provider Tests
   describe('updateServiceProvider', () => {
     it('should reject update for unauthenticated provider', async () => {
       mockReq.user = null;
@@ -214,7 +201,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should not expose password in response');
   });
 
-  //   Password Management Tests
   describe('forgotServiceProviderPassword', () => {
     it('should reject request without phone number', async () => {
       mockReq.body = {};
@@ -239,7 +225,6 @@ describe('Service Provider Controller Tests', () => {
       mockReq.body = {
         serviceProviderId: 'test-provider-id',
         password: 'NewPass123!',
-        // Missing otpToken
       };
 
       await resetServiceProviderPassword(
@@ -257,7 +242,6 @@ describe('Service Provider Controller Tests', () => {
       mockReq.body = {
         otpToken: '123456',
         password: 'NewPass123!',
-        // Missing serviceProviderId
       };
 
       await resetServiceProviderPassword(
@@ -275,7 +259,6 @@ describe('Service Provider Controller Tests', () => {
       mockReq.body = {
         otpToken: '123456',
         serviceProviderId: 'test-provider-id',
-        // Missing password
       };
 
       await resetServiceProviderPassword(
@@ -314,7 +297,6 @@ describe('Service Provider Controller Tests', () => {
       };
       mockReq.body = {
         newPassword: 'NewPass123!',
-        // Missing oldPassword
       };
 
       await changeProviderPassword(mockReq as any, mockRes as any, mockNext);
@@ -331,7 +313,6 @@ describe('Service Provider Controller Tests', () => {
       };
       mockReq.body = {
         oldPassword: 'OldPass123!',
-        // Missing newPassword
       };
 
       await changeProviderPassword(mockReq as any, mockRes as any, mockNext);
@@ -345,7 +326,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should reject with wrong old password');
   });
 
-  //   Profile Tests
   describe('getServiceProviderProfile', () => {
     it('should reject profile request for unauthenticated provider', async () => {
       mockReq.user = null;
@@ -387,7 +367,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should return 404 for non-existent provider');
   });
 
-  //   Status Update Tests
   describe('updateServiceProviderStatus', () => {
     it('should reject for unauthenticated provider', async () => {
       mockReq.user = null;
@@ -427,7 +406,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should handle reassignment when provider goes off duty');
   });
 
-  //   Location Tests
   describe('updateServiceProviderLocation', () => {
     it('should reject for unauthenticated provider', async () => {
       mockReq.user = null;
@@ -510,7 +488,7 @@ describe('Service Provider Controller Tests', () => {
         id: testServiceProviders.validProvider.id,
       };
       mockReq.body = {
-        currentLocation: { latitude: 100, longitude: 85.324 }, // latitude > 90
+        currentLocation: { latitude: 100, longitude: 85.324 },
       };
 
       await updateServiceProviderLocation(
@@ -530,7 +508,7 @@ describe('Service Provider Controller Tests', () => {
         id: testServiceProviders.validProvider.id,
       };
       mockReq.body = {
-        currentLocation: { latitude: 27.7172, longitude: 200 }, // longitude > 180
+        currentLocation: { latitude: 27.7172, longitude: 200 },
       };
 
       await updateServiceProviderLocation(
@@ -548,7 +526,6 @@ describe('Service Provider Controller Tests', () => {
     it.todo('should compute H3 index for location');
   });
 
-  //   Nearby Providers Tests
   describe('getNearbyProviders', () => {
     it('should reject without latitude', async () => {
       mockReq.query = {

@@ -56,11 +56,11 @@ export default function HomeScreen() {
     <SafeAreaContainer>
       <ScrollView className="flex-1 bg-white">
         <View className="flex-row items-center justify-between bg-primary px-6 pb-6 pt-4">
-          <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center">
             <View>
               <Text
-                className="text-sm text-white/80"
-                style={{ fontFamily: 'Inter' }}
+                className="text-sm"
+                style={{ fontFamily: 'Inter', color: 'rgba(255,255,255,0.8)' }}
               >
                 Welcome back,
               </Text>
@@ -74,7 +74,8 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             onPress={logout}
-            className="h-10 w-10 items-center justify-center rounded-full bg-white/20"
+            className="h-10 w-10 items-center justify-center rounded-full"
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
           >
             <Ionicons name="log-out-outline" size={22} color="white" />
           </TouchableOpacity>
@@ -147,11 +148,11 @@ export default function HomeScreen() {
             Safety Status
           </Text>
           <View className="rounded-2xl bg-green-50 p-4">
-            <View className="flex-row items-center gap-3">
+            <View className="flex-row items-center">
               <View className="h-10 w-10 items-center justify-center rounded-full bg-green-500">
                 <Ionicons name="shield-checkmark" size={24} color="white" />
               </View>
-              <View className="flex-1">
+              <View className="flex-1 ml-3">
                 <Text
                   className="font-medium text-green-800"
                   style={{ fontFamily: 'Inter' }}

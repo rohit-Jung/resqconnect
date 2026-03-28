@@ -1,0 +1,47 @@
+meta {
+  name: reject
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{server}}/emergency-request/:id/reject
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{requestId}}
+}
+
+auth:bearer {
+  token: {{providerToken}}
+}
+
+docs {
+  # Reject Emergency Request (Provider)
+  
+  Allows a service provider to reject an emergency request.
+  
+  ## Authentication
+  Requires service provider authentication (JWT token)
+  
+  ## Path Parameters
+  - `id` - The ID of the emergency request to reject
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Emergency request rejected successfully",
+    "data": {
+      "id": "uuid",
+      "status": "pending"
+    }
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}

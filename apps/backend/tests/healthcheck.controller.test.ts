@@ -1,9 +1,5 @@
-/**
- * Healthcheck Controller Tests
- * Tests for server health check endpoint
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { healthCheck } from '@/controllers/healthcheck.controller';
 
@@ -37,15 +33,18 @@ describe('Healthcheck Controller Tests', () => {
     it('should return success message', async () => {
       await healthCheck(mockReq as any, mockRes as any, mockNext);
 
-      const response = getResponseData(mockRes);
+      const response = getResponseData(mockRes) as { message?: string } | null;
       expect(response).toBeDefined();
-      expect(response.message).toContain('running');
+      expect(response?.message).toContain('running');
     });
 
     it('should return ApiResponse format', async () => {
       await healthCheck(mockReq as any, mockRes as any, mockNext);
 
-      const response = getResponseData(mockRes);
+      const response = getResponseData(mockRes) as Record<
+        string,
+        unknown
+      > | null;
       expect(response).toHaveProperty('statusCode');
       expect(response).toHaveProperty('message');
       expect(response).toHaveProperty('data');

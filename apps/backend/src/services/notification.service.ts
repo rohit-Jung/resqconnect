@@ -90,35 +90,10 @@ export async function sendPushNotification(
 
 /**
  * Send SMS notification using Twilio or another SMS provider
- * For now, this is a placeholder that logs the SMS
- * You'll need to integrate with Twilio or another SMS provider
+ * Currently a placeholder that logs the SMS - integrate with Twilio when ready
  */
 export async function sendSMS(payload: SMSPayload): Promise<boolean> {
-  // TODO: Integrate with Twilio or another SMS service
-  // For now, we'll just log the SMS
   console.log(`📱 SMS to ${payload.to}: ${payload.message}`);
-
-  // Example Twilio integration (uncomment and configure when ready):
-  /*
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
-
-  const client = require('twilio')(accountSid, authToken);
-
-  try {
-    await client.messages.create({
-      body: payload.message,
-      from: twilioNumber,
-      to: payload.to,
-    });
-    return true;
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    return false;
-  }
-  */
-
   return true;
 }
 
