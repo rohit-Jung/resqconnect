@@ -11,6 +11,7 @@ export interface SMSEmergencyData {
   description?: string;
   userName?: string;
   userPhone?: string;
+  userId?: string; // User's UUID for backend identification
 }
 
 /**
@@ -35,9 +36,11 @@ export const getGoogleMapsLink = (lat: number, lng: number): string => {
 
 /**
  * Format emergency message for SMS
+ * This format is parsed by the backend SMS worker
  */
 export const formatEmergencyMessage = (data: SMSEmergencyData): string => {
-  const { emergencyType, location, description, userName, userPhone } = data;
+  const { emergencyType, location, description, userName, userPhone, userId } =
+    data;
 
   const parts = [
     `[${APP_NAME} EMERGENCY]`,
@@ -45,6 +48,11 @@ export const formatEmergencyMessage = (data: SMSEmergencyData): string => {
     `Location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`,
     `Maps: ${getGoogleMapsLink(location.latitude, location.longitude)}`,
   ];
+
+  // Include userId for backend identification (critical for processing)
+  if (userId) {
+    parts.push(`UserID: ${userId}`);
+  }
 
   if (userName) {
     parts.push(`User: ${userName}`);
