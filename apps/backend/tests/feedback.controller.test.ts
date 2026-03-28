@@ -1,9 +1,5 @@
-/**
- * Feedback Controller Tests
- * Tests for feedback CRUD operations
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createFeedback,
@@ -35,7 +31,6 @@ describe('Feedback Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Create Feedback Tests
   describe('createFeedback', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -57,7 +52,6 @@ describe('Feedback Controller Tests', () => {
       mockReq.body = {
         message: 'Great service!',
         serviceRatings: 5,
-        // Missing serviceProviderId
       };
 
       await createFeedback(mockReq as any, mockRes as any, mockNext);
@@ -72,7 +66,6 @@ describe('Feedback Controller Tests', () => {
       mockReq.body = {
         serviceProviderId: testServiceProviders.validProvider.id,
         serviceRatings: 5,
-        // Missing message
       };
 
       await createFeedback(mockReq as any, mockRes as any, mockNext);
@@ -87,7 +80,6 @@ describe('Feedback Controller Tests', () => {
       mockReq.body = {
         serviceProviderId: testServiceProviders.validProvider.id,
         message: 'Great service!',
-        // Missing serviceRatings
       };
 
       await createFeedback(mockReq as any, mockRes as any, mockNext);
@@ -101,7 +93,6 @@ describe('Feedback Controller Tests', () => {
     it.todo('should include timestamps in created feedback');
   });
 
-  //   Update Feedback Tests
   describe('updateFeedback', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -134,7 +125,6 @@ describe('Feedback Controller Tests', () => {
     it.todo('should reject update with invalid fields');
   });
 
-  //   Delete Feedback Tests
   describe('deleteFeedback', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -153,15 +143,12 @@ describe('Feedback Controller Tests', () => {
     it.todo('should allow admin to delete any feedback');
   });
 
-  //   Get Feedback Tests
   describe('getFeedback', () => {
     it('should reject request without feedback ID', async () => {
       mockReq.params = {};
 
       await getFeedback(mockReq as any, mockRes as any, mockNext);
 
-      // Should fail validation since no param is provided
-      // The controller should check for missing params
       expect(mockRes.json.mock.calls.length >= 0).toBe(true);
     });
 
@@ -169,7 +156,6 @@ describe('Feedback Controller Tests', () => {
     it.todo('should return 404 for non-existent feedback');
   });
 
-  //   Get Users Feedback Tests
   describe('getUsersFeedback', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -185,7 +171,6 @@ describe('Feedback Controller Tests', () => {
     it.todo('should return empty array if no feedback');
   });
 
-  //   Rating Validation Tests
   describe('Rating Validation', () => {
     it.todo('should accept ratings from 1 to 5');
     it.todo('should reject ratings less than 1');

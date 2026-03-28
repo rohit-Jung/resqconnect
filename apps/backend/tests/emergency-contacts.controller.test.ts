@@ -1,9 +1,5 @@
-/**
- * Emergency Contacts Controller Tests
- * Tests for emergency contacts CRUD and notification settings
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createEmergencyContact,
@@ -38,7 +34,6 @@ describe('Emergency Contacts Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  // Create Emergency Contact Tests
   describe('createEmergencyContact', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -59,7 +54,6 @@ describe('Emergency Contacts Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {
         name: 'Emergency Contact',
-        // Missing phoneNumber, relationship
       };
 
       await createEmergencyContact(mockReq as any, mockRes as any, mockNext);
@@ -74,7 +68,6 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should set default notificationMethod to sms');
   });
 
-  //   Update Emergency Contact Tests
   describe('updateEmergencyContact', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -119,7 +112,6 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should reject update with invalid fields');
   });
 
-  //   Delete Emergency Contact Tests
   describe('deleteEmergencyContact', () => {
     it('should reject request without contact ID', async () => {
       mockReq.user = {
@@ -142,7 +134,6 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should allow admin to delete any contact');
   });
 
-  //   Get Emergency Contact Tests
   describe('getEmergencyContact', () => {
     it('should reject request without contact ID', async () => {
       mockReq.params = {};
@@ -158,7 +149,6 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should return 404 for non-existent contact');
   });
 
-  //   Get User Emergency Contacts Tests
   describe('getUserEmergencyContacts', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -175,14 +165,12 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should order contacts by creation date');
   });
 
-  //   Get Common Emergency Contacts Tests
   describe('getCommonEmergencyContacts', () => {
     it.todo('should return all common contacts');
     it.todo('should only return contacts where isCommanContact is true');
     it.todo('should order contacts by creation date');
   });
 
-  //   Toggle Contact Notification Tests
   describe('toggleContactNotification', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;
@@ -211,7 +199,6 @@ describe('Emergency Contacts Controller Tests', () => {
     it.todo('should reject for contact not owned by user');
   });
 
-  //   Update Contact Push Token Tests
   describe('updateContactPushToken', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null as any;

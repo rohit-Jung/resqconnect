@@ -1,9 +1,5 @@
-/**
- * Organization Controller Tests
- * Tests for organization CRUD, authentication, and service provider management
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   deleteOrgServiceProvider,
@@ -46,12 +42,10 @@ describe('Organization Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Registration Tests
   describe('registerOrganization', () => {
     it('should reject registration with missing required fields', async () => {
       mockReq.body = {
         name: 'Test Hospital',
-        // Missing email, password, serviceCategory
       };
 
       await registerOrganization(mockReq as any, mockRes as any, mockNext);
@@ -97,12 +91,10 @@ describe('Organization Controller Tests', () => {
     it.todo('should hash password before storing');
   });
 
-  //   Login Tests
   describe('loginOrganization', () => {
     it('should reject login with missing credentials', async () => {
       mockReq.body = {
         email: 'hospital@example.com',
-        // Missing password
       };
 
       await loginOrganization(mockReq as any, mockRes as any, mockNext);
@@ -129,12 +121,10 @@ describe('Organization Controller Tests', () => {
     it.todo('should reject login for non-existent organization');
   });
 
-  //   OTP Verification Tests
   describe('verifyOrgOTP', () => {
     it('should reject verification without OTP token', async () => {
       mockReq.body = {
         userId: 'test-org-id',
-        // Missing otpToken
       };
 
       await verifyOrgOTP(mockReq as any, mockRes as any, mockNext);
@@ -147,7 +137,6 @@ describe('Organization Controller Tests', () => {
     it('should reject verification without user ID', async () => {
       mockReq.body = {
         otpToken: '123456',
-        // Missing userId
       };
 
       await verifyOrgOTP(mockReq as any, mockRes as any, mockNext);
@@ -162,7 +151,6 @@ describe('Organization Controller Tests', () => {
     it.todo('should reject invalid OTP');
   });
 
-  //   Profile Tests
   describe('getOrgProfile', () => {
     it('should reject profile request for unauthenticated organization', async () => {
       mockReq.user = null;
@@ -177,7 +165,6 @@ describe('Organization Controller Tests', () => {
     it.todo('should return organization profile without sensitive data');
   });
 
-  //   Admin Operations Tests
   describe('getAllOrganizations', () => {
     it('should reject request from non-admin user', async () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
@@ -286,13 +273,11 @@ describe('Organization Controller Tests', () => {
     it.todo('should reject update with invalid fields');
   });
 
-  //   Public Endpoint Tests
   describe('listOrganizationsPublic', () => {
     it.todo('should return list of verified organizations');
     it.todo('should only return id, name, email, and serviceCategory fields');
   });
 
-  //   Service Provider Management Tests
   describe('getOrgServiceProviders', () => {
     it('should reject request from unauthenticated organization', async () => {
       mockReq.user = null;
