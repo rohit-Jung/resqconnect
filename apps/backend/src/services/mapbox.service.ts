@@ -21,7 +21,6 @@ export async function getRouteFromMapbox(
     if (!response.ok) {
       const errorText = await response.text();
       logger.error(`Mapbox API error: ${response.status} ${errorText}`);
-      // console.error('Mapbox API error:', response.status, errorText);
       return {
         success: false,
         error: `Mapbox API error: ${response.status}`,
