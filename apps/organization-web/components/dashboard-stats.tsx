@@ -11,29 +11,31 @@ interface DashboardStatsProps {
   isLoading?: boolean;
 }
 
+function StatSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="space-y-3">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map(i => (
-          <Card key={i}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-16" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-                <Skeleton className="h-12 w-12 rounded-lg" />
-              </div>
-            </CardContent>
-          </Card>
+          <StatSkeleton key={i} />
         ))}
       </div>
     );
   }
 
-  // Calculate percentage changes
   const providersChange =
     data?.providers.lastMonth && data.providers.lastMonth > 0
       ? Math.round(
@@ -59,75 +61,72 @@ export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
 
   const stats = [
     {
-      title: 'Service Providers',
+      label: 'SERVICE PROVIDERS',
       value: data?.providers.total.toString() ?? '0',
-      change: `${providersChange >= 0 ? '+' : ''}${providersChange}% vs last month`,
-      changeType:
-        providersChange >= 0 ? ('positive' as const) : ('neutral' as const),
+      trend: `${providersChange >= 0 ? '+' : ''}${providersChange}%`,
+      trendUp: providersChange >= 0,
+      detail: 'vs last month',
       icon: Users,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
     },
     {
-      title: 'Emergency Requests',
+      label: 'EMERGENCY REQUESTS',
       value: data?.emergencyRequests.total.toString() ?? '0',
-      change: `${data?.emergencyRequests.pending ?? 0} pending`,
-      changeType:
-        (data?.emergencyRequests.pending ?? 0) > 0
-          ? ('warning' as const)
-          : ('positive' as const),
+      trend: `${data?.emergencyRequests.pending ?? 0}`,
+      trendUp: (data?.emergencyRequests.pending ?? 0) === 0,
+      detail: 'pending',
       icon: AlertTriangle,
-      iconBg: 'bg-red-100',
-      iconColor: 'text-red-600',
     },
     {
-      title: 'Active Providers',
+      label: 'ACTIVE PROVIDERS',
       value: data?.providers.available.toString() ?? '0',
-      change: `${data?.providers.availabilityPercentage ?? 0}% availability`,
-      changeType: 'positive' as const,
+      trend: `${data?.providers.availabilityPercentage ?? 0}%`,
+      trendUp: true,
+      detail: 'availability',
       icon: TrendingUp,
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
     },
     {
-      title: 'Emergency Responses',
+      label: 'EMERGENCY RESPONSES',
       value: data?.emergencyResponses.total.toString() ?? '0',
-      change: `${responsesChange >= 0 ? '+' : ''}${responsesChange}% vs last month`,
-      changeType:
-        responsesChange >= 0 ? ('positive' as const) : ('neutral' as const),
+      trend: `${responsesChange >= 0 ? '+' : ''}${responsesChange}%`,
+      trendUp: responsesChange >= 0,
+      detail: 'vs last month',
       icon: Clock,
-      iconBg: 'bg-yellow-100',
-      iconColor: 'text-yellow-600',
     },
   ];
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {stats.map(stat => (
-        <Card key={stat.title}>
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm font-medium">
-                  {stat.title}
-                </p>
-                <p className="mt-2 text-3xl font-bold">{stat.value}</p>
-                <p
-                  className={`mt-2 text-sm ${
-                    stat.changeType === 'positive'
-                      ? 'text-green-600'
-                      : stat.changeType === 'warning'
-                        ? 'text-red-600'
-                        : 'text-muted-foreground'
-                  }`}
-                >
-                  {stat.change}
-                </p>
-              </div>
-              <div className={`rounded-lg p-3 ${stat.iconBg}`}>
-                <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
-              </div>
+        <Card key={stat.label} className="overflow-hidden">
+          <CardContent className="">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                {stat.label}
+              </span>
+              <stat.icon className="h-4 w-4 text-muted-foreground/50" />
             </div>
+            <div className="text-3xl font-bold tracking-tight">
+              {stat.value}
+            </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-0.5 font-mono text-[11px] font-medium tracking-tight ${
+                  stat.trendUp
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-primary'
+                }`}
+              >
+                {stat.trend}
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground/60">
+                {stat.detail}
+              </span>
+            </div>
+            {/* Signal red accent bar on active stat */}
+            {stat.label === 'EMERGENCY REQUESTS' &&
+              (data?.emergencyRequests.pending ?? 0) > 0 && (
+                <div className="mt-3 h-[2px] w-8 bg-primary" />
+              )}
           </CardContent>
         </Card>
       ))}
