@@ -1,0 +1,47 @@
+meta {
+  name: confirm-arrival
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{server}}/emergency-request/:id/confirm-arrival
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{requestId}}
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  # Confirm Provider Arrival
+  
+  Confirms that the service provider has arrived at the emergency location. Called by the user.
+  
+  ## Authentication
+  Requires user role authentication (JWT token)
+  
+  ## Path Parameters
+  - `id` - The ID of the emergency request
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Provider arrival confirmed successfully",
+    "data": {
+      "id": "uuid",
+      "status": "provider_arrived"
+    }
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}

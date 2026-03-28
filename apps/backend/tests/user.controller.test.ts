@@ -1,9 +1,5 @@
-/**
- * User Controller Tests
- * Tests for user registration, login, profile management, and password operations
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   changePassword,
@@ -19,17 +15,15 @@ import {
   updatePushToken,
   updateUser,
   verifyUser,
-} from '@/controllers/user.controller';
+} from '@/controllers/auth.controller';
 
 import {
   createMockNext,
   createMockRequest,
   createMockResponse,
   generateRandomEmail,
-  generateRandomPhone,
   getResponseData,
   getStatusCode,
-  testLocations,
   testUsers,
 } from './setup';
 
@@ -44,15 +38,13 @@ describe('User Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Registration Tests
   describe('registerUser', () => {
     it('should reject registration with missing required fields', async () => {
       mockReq.body = {
         email: 'test@example.com',
-        // Missing password, phoneNumber
       };
 
-      await registerUser(mockReq as any, mockRes as any, mockNext);
+      await registerUser(mockReq as never, mockRes as never, mockNext);
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -66,7 +58,7 @@ describe('User Controller Tests', () => {
         phoneNumber: '9841234567',
       };
 
-      await registerUser(mockReq as any, mockRes as any, mockNext);
+      await registerUser(mockReq as never, mockRes as never, mockNext);
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -77,13 +69,12 @@ describe('User Controller Tests', () => {
         name: 'Test User',
         email: generateRandomEmail(),
         password: 'Password123!',
-        phoneNumber: '123', // Invalid - too short
+        phoneNumber: '123',
       };
 
-      await registerUser(mockReq as any, mockRes as any, mockNext);
+      await registerUser(mockReq as never, mockRes as never, mockNext);
 
       const statusCode = getStatusCode(mockRes);
-      // Should reject due to invalid phone
       expect([HttpStatusCode.BadRequest, 400]).toContain(statusCode);
     });
 
@@ -96,9 +87,8 @@ describe('User Controller Tests', () => {
         role: 'admin',
       };
 
-      await registerUser(mockReq as any, mockRes as any, mockNext);
+      await registerUser(mockReq as never, mockRes as never, mockNext);
 
-      // Should throw unauthorized error for non-admin emails trying to register as admin
       const statusCode = getStatusCode(mockRes);
       expect([
         HttpStatusCode.Unauthorized,
@@ -114,15 +104,13 @@ describe('User Controller Tests', () => {
     it.todo('should generate H3 index from location');
   });
 
-  //   Login Tests
   describe('loginUser', () => {
     it('should reject login with missing credentials', async () => {
       mockReq.body = {
         email: 'test@example.com',
-        // Missing password
       };
 
-      await loginUser(mockReq as any, mockRes as any, mockNext);
+      await loginUser(mockReq as never, mockRes as never, mockNext);
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -134,7 +122,7 @@ describe('User Controller Tests', () => {
         password: 'Password123!',
       };
 
-      await loginUser(mockReq as any, mockRes as any, mockNext);
+      await loginUser(mockReq as never, mockRes as never, mockNext);
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -146,14 +134,12 @@ describe('User Controller Tests', () => {
     it.todo('should reject login for non-existent user');
   });
 
-  //   Logout Tests
   describe('logoutUser', () => {
     it('should reject logout for unauthenticated user', async () => {
       mockReq.user = null;
 
-      await logoutUser(mockReq as any, mockRes as any, mockNext);
+      await logoutUser(mockReq as never, mockRes as never, mockNext);
 
-      // Should call next with error or return unauthorized
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
       ).toBe(true);
@@ -163,12 +149,11 @@ describe('User Controller Tests', () => {
     it.todo('should clear authentication cookie');
   });
 
-  //   Profile Tests
   describe('getProfile', () => {
     it('should reject profile request for unauthenticated user', async () => {
       mockReq.user = null;
 
-      await getProfile(mockReq as any, mockRes as any, mockNext);
+      await getProfile(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -184,10 +169,9 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.adminUser, id: testUsers.adminUser.id };
       mockReq.params = {};
 
-      await getUser(mockReq as any, mockRes as any, mockNext);
+      await getUser(mockReq as never, mockRes as never, mockNext);
 
       const response = getResponseData(mockRes);
-      // Should return error or empty response for missing userId
       expect(response).toBeDefined();
     });
 
@@ -195,7 +179,7 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.params = { userId: 'some-user-id' };
 
-      await getUser(mockReq as any, mockRes as any, mockNext);
+      await getUser(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -205,13 +189,12 @@ describe('User Controller Tests', () => {
     it.todo('should allow admin to fetch any user');
   });
 
-  //   Update User Tests
   describe('updateUser', () => {
     it('should reject update for unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.body = { name: 'New Name' };
 
-      await updateUser(mockReq as any, mockRes as any, mockNext);
+      await updateUser(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -222,7 +205,7 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {};
 
-      await updateUser(mockReq as any, mockRes as any, mockNext);
+      await updateUser(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -233,15 +216,13 @@ describe('User Controller Tests', () => {
     it.todo('should successfully update valid fields');
   });
 
-  //   OTP Verification Tests
   describe('verifyUser', () => {
     it('should reject verification without OTP token', async () => {
       mockReq.body = {
         userId: 'test-user-id',
-        // Missing otpToken
       };
 
-      await verifyUser(mockReq as any, mockRes as any, mockNext);
+      await verifyUser(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -251,10 +232,9 @@ describe('User Controller Tests', () => {
     it('should reject verification without user ID', async () => {
       mockReq.body = {
         otpToken: '123456',
-        // Missing userId
       };
 
-      await verifyUser(mockReq as any, mockRes as any, mockNext);
+      await verifyUser(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -266,12 +246,11 @@ describe('User Controller Tests', () => {
     it.todo('should reject invalid OTP');
   });
 
-  //  Password Reset Tests
   describe('forgotPassword', () => {
     it('should reject request without email or phone', async () => {
       mockReq.body = {};
 
-      await forgotPassword(mockReq as any, mockRes as any, mockNext);
+      await forgotPassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -288,10 +267,9 @@ describe('User Controller Tests', () => {
       mockReq.body = {
         userId: 'test-user-id',
         password: 'NewPassword123!',
-        // Missing otpToken
       };
 
-      await resetPassword(mockReq as any, mockRes as any, mockNext);
+      await resetPassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -302,10 +280,9 @@ describe('User Controller Tests', () => {
       mockReq.body = {
         otpToken: '123456',
         password: 'NewPassword123!',
-        // Missing userId
       };
 
-      await resetPassword(mockReq as any, mockRes as any, mockNext);
+      await resetPassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -316,10 +293,9 @@ describe('User Controller Tests', () => {
       mockReq.body = {
         otpToken: '123456',
         userId: 'test-user-id',
-        // Missing password
       };
 
-      await resetPassword(mockReq as any, mockRes as any, mockNext);
+      await resetPassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -338,7 +314,7 @@ describe('User Controller Tests', () => {
         newPassword: 'NewPass123!',
       };
 
-      await changePassword(mockReq as any, mockRes as any, mockNext);
+      await changePassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -349,10 +325,9 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {
         newPassword: 'NewPass123!',
-        // Missing oldPassword
       };
 
-      await changePassword(mockReq as any, mockRes as any, mockNext);
+      await changePassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -363,10 +338,9 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {
         oldPassword: 'OldPass123!',
-        // Missing newPassword
       };
 
-      await changePassword(mockReq as any, mockRes as any, mockNext);
+      await changePassword(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -377,13 +351,12 @@ describe('User Controller Tests', () => {
     it.todo('should reject with wrong old password');
   });
 
-  //   Push Token Tests
   describe('updatePushToken', () => {
     it('should reject for unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.body = { pushToken: 'ExponentPushToken[xxx]' };
 
-      await updatePushToken(mockReq as any, mockRes as any, mockNext);
+      await updatePushToken(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -393,13 +366,16 @@ describe('User Controller Tests', () => {
     it.todo('should update push token for authenticated user');
   });
 
-  //   Emergency Settings Tests
   describe('updateEmergencySettings', () => {
     it('should reject for unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.body = { notifyEmergencyContacts: true };
 
-      await updateEmergencySettings(mockReq as any, mockRes as any, mockNext);
+      await updateEmergencySettings(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -410,7 +386,11 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = { emergencyNotificationMethod: 'invalid-method' };
 
-      await updateEmergencySettings(mockReq as any, mockRes as any, mockNext);
+      await updateEmergencySettings(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -421,7 +401,11 @@ describe('User Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.body = {};
 
-      await updateEmergencySettings(mockReq as any, mockRes as any, mockNext);
+      await updateEmergencySettings(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -435,7 +419,7 @@ describe('User Controller Tests', () => {
     it('should reject for unauthenticated user', async () => {
       mockReq.user = null;
 
-      await getEmergencySettings(mockReq as any, mockRes as any, mockNext);
+      await getEmergencySettings(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401

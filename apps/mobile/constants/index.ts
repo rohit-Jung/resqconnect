@@ -15,7 +15,8 @@ export const AVAILABLE_SERVICES = [
 
 // Emergency contact numbers
 export const EMERGENCY_PHONE_NUMBER = '112'; // Universal emergency number (change based on region)
-export const SMS_FALLBACK_NUMBER = '+919999999999'; // Backend SMS gateway number for offline fallback
+export const SMS_FALLBACK_NUMBER =
+  process.env.EXPO_PUBLIC_EMERGENCY_PHONE_NUMBER || '+919999999999'; // Backend SMS gateway number for offline fallback
 
 // App info
 export const APP_VERSION = '1.0.0';

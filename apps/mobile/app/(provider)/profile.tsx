@@ -17,7 +17,8 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function ProviderProfileScreen() {
-  const { provider, isAuthenticated, logout, isLoading } = useProviderStore();
+  const { provider, isAuthenticated, logout, isLoading, updateProfilePicture } =
+    useProviderStore();
 
   // Show loading while checking auth
   if (isLoading) {
@@ -94,14 +95,20 @@ export default function ProviderProfileScreen() {
     </View>
   ) : null;
 
+  const handleProfilePictureChange = (newUrl: string | null) => {
+    updateProfilePicture(newUrl);
+  };
+
   return (
     <ProfileScreenContent
       name={provider?.name || 'Provider'}
       email={provider?.email || ''}
       role="service_provider"
+      profilePicture={provider?.profilePicture}
       profileInfoItems={profileInfoItems}
       additionalSections={VehicleInfoSection}
       onLogout={logout}
+      onProfilePictureChange={handleProfilePictureChange}
       editProfileRoute="/edit-provider-profile"
       changePasswordRoute="/(auth)/provider-change-password"
     />

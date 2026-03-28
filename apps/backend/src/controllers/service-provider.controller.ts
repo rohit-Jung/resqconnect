@@ -389,9 +389,10 @@ const updateServiceProvider = asyncHandler(
   }
 );
 
-// TODO Implement this method
 const deleteServiceProvider = asyncHandler(
-  async (req: Request, res: Response) => {}
+  async (_req: Request, _res: Response) => {
+    // Not yet implemented
+  }
 );
 
 const forgotServiceProviderPassword = asyncHandler(

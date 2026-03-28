@@ -17,10 +17,7 @@ import {
   requestEvents,
   serviceProvider,
 } from '@/models';
-import {
-  // isKafkaProducerConnected,
-  safeSend,
-} from '@/services/kafka/kafka.service';
+import { safeSend } from '@/services/kafka/kafka.service';
 import {
   cacheEmergencyProviders,
   getEmergencyProviders,
@@ -54,21 +51,10 @@ export function startOutboxPublisher(): NodeJS.Timeout {
 
       if (pendingEvents.length === 0) return;
 
-      // // Check if producer is connected before processing
-      // if (!isKafkaProducerConnected()) {
-      //   logger.log({
-      //     level: 'info',
-      //     message:
-      //       'Kafka producer not connected, skipping outbox processing...',
-      //   });
-      //   return;
-      // }
-
       console.log(`Processing ${pendingEvents.length} outbox events...`);
 
       for (const event of pendingEvents) {
         try {
-          // const topic = getTopicForEventType(event.eventType);
           const topic = event.kafkaTopic as KAFKA_TOPICS;
 
           await safeSend({

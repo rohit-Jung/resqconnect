@@ -1,0 +1,46 @@
+meta {
+  name: createServiceProvider
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{server}}/organization/service-providers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{orgToken}}
+}
+
+body:json {
+  {
+    "name": "John Doe",
+    "age": 30,
+    "email": "provider@example.com",
+    "password": "password123",
+    "primaryAddress": "Kathmandu, Nepal",
+    "phoneNumber": 9841234567,
+    "serviceType": "ambulance"
+  }
+}
+
+docs {
+  # Create Service Provider (Organization)
+  
+  Register a new service provider for the logged-in organization.
+  
+  ## Important
+  - serviceType MUST match the organization's serviceCategory
+  - organizationId is automatically assigned from the JWT token
+  
+  ## Request Body
+  - name: Provider's full name
+  - age: Provider's age (number)
+  - email: Provider's email (unique)
+  - password: Temporary password
+  - primaryAddress: Provider's address
+  - phoneNumber: Contact number (number)
+  - serviceType: Must match org category (ambulance|police|fire_truck|rescue_team)
+}
