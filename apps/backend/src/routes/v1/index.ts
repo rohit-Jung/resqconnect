@@ -10,6 +10,7 @@ import emergencyResponseRouter from './emergency-response.routes';
 import mapsRouter from './maps.routes';
 import organizationRouter from './organization.routes';
 import serviceProviderRouter from './service-provider.routes';
+import uploadRouter from './upload.routes';
 
 const v1Router = Router();
 
@@ -22,5 +23,6 @@ v1Router.use('/emergency-contacts', emergencyContactsRouter);
 v1Router.use('/service-provider', serviceProviderRouter);
 v1Router.use('/maps', mapsRouter);
 v1Router.use('/admin', adminRouter);
+v1Router.use('/upload', uploadRouter);
 
 export { v1Router };
