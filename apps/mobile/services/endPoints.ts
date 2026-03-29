@@ -29,6 +29,9 @@ export const serviceProviderEndpoints = {
   updateStatus: `/service-provider/status`,
   updateLocation: `/service-provider/update-location`,
   nearby: `/service-provider/nearby`,
+  // Document verification
+  uploadDocuments: `/service-provider/documents`,
+  documentStatus: `/service-provider/documents/status`,
 };
 
 export const emergencyRequestEndpoints = {
