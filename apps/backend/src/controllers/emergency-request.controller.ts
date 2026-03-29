@@ -821,6 +821,154 @@ const getUserEmergencyHistory = asyncHandler(
   }
 );
 
+const getProviderEmergencyHistory = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+    const { page, limit, sortBy, status } = (req as any).validatedQuery as {
+      page: number;
+      limit: number;
+      sortBy: 'asc' | 'desc';
+      status?: 'completed' | 'cancelled' | 'in_progress';
+    };
+
+    const offset = (page - 1) * limit;
+
+    const baseCondition = eq(
+      emergencyResponse.serviceProviderId,
+      loggedInProvider!.id
+    );
+
+    let queryConditions: ReturnType<typeof eq> = baseCondition;
+    if (status) {
+      queryConditions = and(
+        baseCondition,
+        eq(emergencyRequest.requestStatus, status)
+      ) as ReturnType<typeof eq>;
+    }
+
+    const emergencyResponses = await db
+      .select({
+        response: emergencyResponse,
+        request: emergencyRequest,
+        user: user,
+      })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .innerJoin(user, eq(emergencyRequest.userId, user.id))
+      .where(queryConditions)
+      .orderBy(
+        sortBy === 'asc'
+          ? emergencyResponse.respondedAt
+          : desc(emergencyResponse.respondedAt)
+      )
+      .limit(limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .where(baseCondition);
+
+    const [completedResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'completed')
+        )
+      );
+
+    const [cancelledResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'cancelled')
+        )
+      );
+
+    const [avgResult] = await db
+      .select({
+        avgTime: sql<number>`AVG(EXTRACT(EPOCH FROM (${emergencyResponse.respondedAt} - ${emergencyRequest.createdAt})))::int`,
+      })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'completed'),
+          sql`${emergencyResponse.respondedAt} IS NOT NULL`
+        )
+      );
+
+    const totalCount = totalResult?.count ?? 0;
+
+    const history = emergencyResponses.map(
+      ({ response, request, user: userData }) => ({
+        id: request.id,
+        emergencyType: request.serviceType,
+        emergencyDescription: request.description,
+        status: request.requestStatus,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+        emergencyLocation: request.location,
+        responseTime:
+          response.respondedAt && request.createdAt
+            ? Math.floor(
+                (new Date(response.respondedAt).getTime() -
+                  new Date(request.createdAt).getTime()) /
+                  1000
+              )
+            : null,
+        distanceTraveled: null,
+        user: userData
+          ? {
+              id: userData.id,
+              name: userData.name,
+              phoneNumber: userData.phoneNumber,
+            }
+          : null,
+      })
+    );
+
+    const stats = {
+      total: totalCount,
+      completed: completedResult?.count ?? 0,
+      cancelled: cancelledResult?.count ?? 0,
+      avgResponseTime: avgResult?.avgTime ?? null,
+    };
+
+    return res.status(200).json(
+      new ApiResponse(200, 'Provider emergency history retrieved', {
+        history,
+        stats,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+      })
+    );
+  }
+);
+
 export {
   createEmergencyRequest,
   getEmergencyRequest,
@@ -834,4 +982,5 @@ export {
   completeEmergencyRequest,
   confirmProviderArrival,
   getUserEmergencyHistory,
+  getProviderEmergencyHistory,
 };
