@@ -111,6 +111,45 @@ const SigninScreen: React.FC = () => {
           const responseData = response.data.data;
           loginEntity('service_provider', responseData, data);
         },
+        onError: (error: any) => {
+          const errorData = error?.response?.data?.data;
+          const code = errorData?.code;
+
+          // Handle document verification states
+          if (code === 'DOCUMENTS_REQUIRED') {
+            Alert.alert(
+              'Documents Required',
+              'Please upload your PAN card and citizenship documents to complete verification.',
+              [
+                {
+                  text: 'Upload Documents',
+                  onPress: () => router.replace('/(auth)/upload-documents'),
+                },
+              ]
+            );
+          } else if (code === 'VERIFICATION_PENDING') {
+            router.replace({
+              pathname: '/(auth)/verification-pending',
+              params: { fromLogin: 'true' },
+            });
+          } else if (code === 'DOCUMENTS_REJECTED') {
+            router.replace({
+              pathname: '/(auth)/verification-pending',
+              params: {
+                rejectionReason:
+                  errorData?.rejectionReason || 'Documents were rejected',
+                fromLogin: 'true',
+              },
+            });
+          } else {
+            // Generic error handling
+            Alert.alert(
+              'Login Failed',
+              error?.response?.data?.message ||
+                'Invalid credentials. Please try again.'
+            );
+          }
+        },
       });
     } else {
       loginUserMutation(data, {

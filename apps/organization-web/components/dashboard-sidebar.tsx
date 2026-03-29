@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  FileCheck,
   LayoutDashboard,
   Navigation,
   Settings,
@@ -26,6 +27,11 @@ const navigation = [
     name: 'Service Providers',
     href: '/dashboard/service-providers',
     icon: Users,
+  },
+  {
+    name: 'Document Verification',
+    href: '/dashboard/verifications',
+    icon: FileCheck,
   },
   { name: 'Mobile Apps', href: '/dashboard/mobile-apps', icon: Smartphone },
   {
