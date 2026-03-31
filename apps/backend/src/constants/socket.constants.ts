@@ -9,6 +9,7 @@ export enum SocketEvents {
   PROVIDER_CONNECT = 'provider-connect',
   PROVIDER_LOCATION_UPDATED = 'provider-location-updated',
   USER_LOCATION_UPDATED = 'user-location-updated',
+  PROVIDER_CONFIRM_ARRIVAL = 'provider-confirm-arrival',
 
   // Emergency events
   NEW_EMERGENCY = 'emergency:new',
@@ -40,6 +41,7 @@ export enum SocketEvents {
   // Location events
   LOCATION_UPDATE = 'location-update',
   PROVIDER_LOCATION = 'provider-location',
+  PROVIDER_PERIODIC_LOCATION = 'provider-periodic-location',
 
   // Search escalation
   SEARCH_EXPANDED = 'search-expanded',
