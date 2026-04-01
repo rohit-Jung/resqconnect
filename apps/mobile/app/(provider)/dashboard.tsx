@@ -2,20 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Linking,
+  Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
 import { SocketEvents } from '@/constants/socket.constants';
 import { TEST_CORDS } from '@/constants/test.constants';
 import { newEmergencyEventPayloadSchema } from '@/lib/validations/socket';
@@ -23,27 +24,37 @@ import { serviceProviderApi } from '@/services/provider/provider.api';
 import { socketManager } from '@/socket/socket-manager';
 import { IncomingRequest, useProviderStore } from '@/store/providerStore';
 
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const BLACK = '#000000';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const WARNING_AMBER = '#F59E0B';
+const SUCCESS_GREEN = '#10B981';
+
 const STATUS_COLORS = {
-  available: '#22c55e',
-  assigned: '#f59e0b',
-  off_duty: '#6b7280',
+  available: SUCCESS_GREEN,
+  assigned: WARNING_AMBER,
+  off_duty: MID_GRAY,
 };
 
 const STATUS_LABELS = {
-  available: 'Available',
-  assigned: 'On Assignment',
-  off_duty: 'Off Duty',
+  available: 'AVAILABLE',
+  assigned: 'ON DUTY',
+  off_duty: 'OFF DUTY',
 };
 
-const EMERGENCY_ICONS: Record<string, string> = {
-  ambulance: '🚑',
-  police: '🚔',
-  fire_truck: '🚒',
-  rescue_team: '🆘',
-};
+const EMERGENCY_TYPES = ['ambulance', 'police', 'fire_truck', 'rescue_team'];
+
+interface LocationCoords {
+  latitude: number;
+  longitude: number;
+}
 
 export default function ProviderDashboardScreen() {
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
   const {
     provider,
     serviceStatus,
@@ -57,45 +68,62 @@ export default function ProviderDashboardScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<LocationCoords | null>(
+    null
+  );
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pulse animation for incoming requests
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLoadingLocation(false);
+        return;
+      }
+
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      } catch (error) {
+        console.log('Error getting location:', error);
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (incomingRequests.length > 0) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 500,
+            toValue: 1.02,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
         ])
       );
       pulse.start();
-      Vibration.vibrate([0, 500, 200, 500]); // Vibrate on new request
       return () => pulse.stop();
     }
   }, [incomingRequests.length, pulseAnim]);
 
   useEffect(() => {
     const handleNewEmergency = (data: any) => {
-      console.log('NEW_EMERGENCY event received:', data);
       const parsedData = newEmergencyEventPayloadSchema.safeParse(data);
-      if (!parsedData.success) {
-        console.error(
-          'Error validating emergency data:',
-          JSON.stringify(parsedData.error.issues)
-        );
-        return;
-      }
-      console.log('Emergency data validated, adding to requests');
+      if (!parsedData.success) return;
 
-      // Transform the data to include computed properties for UI
       const requestData = {
         ...parsedData.data,
         location: parsedData.data.emergencyLocation,
@@ -105,27 +133,18 @@ export default function ProviderDashboardScreen() {
     };
 
     const handleRequestTaken = (data: any) => {
-      console.log('Request taken by another provider:', data);
+      if (data.providerId === provider?.id) return;
       removeIncomingRequest(data.requestId);
-      if (currentRequest?.requestId === data.requestId) {
-        setCurrentRequest(null);
-        Alert.alert(
-          'Request Taken',
-          'This request was accepted by another provider.'
-        );
-      }
+      setCurrentRequest(prev =>
+        prev?.requestId === data.requestId ? null : prev
+      );
     };
 
     const handleRequestCancelled = (data: any) => {
-      console.log('Request cancelled:', data);
       removeIncomingRequest(data.requestId);
-      if (currentRequest?.requestId === data.requestId) {
-        setCurrentRequest(null);
-        Alert.alert(
-          'Request Cancelled',
-          'The user has cancelled this emergency request.'
-        );
-      }
+      setCurrentRequest(prev =>
+        prev?.requestId === data.requestId ? null : prev
+      );
     };
 
     socketManager.on(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
@@ -138,60 +157,15 @@ export default function ProviderDashboardScreen() {
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
     };
   }, [
-    currentRequest,
     addIncomingRequest,
+    provider?.id,
     removeIncomingRequest,
     setCurrentRequest,
   ]);
 
   useEffect(() => {
-    if (serviceStatus !== 'available') return;
-
-    let interval: NodeJS.Timeout;
-
-    const updateLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        console.log(
-          'Current Location: ',
-          location.coords.longitude,
-          location.coords.latitude
-        );
-        console.log(
-          'Test Location: ',
-          TEST_CORDS.latitude,
-          TEST_CORDS.longitude
-        );
-
-        await serviceProviderApi.updateLocation(
-          TEST_CORDS.latitude,
-          TEST_CORDS.longitude
-        );
-
-        // Emit via socketManager
-        if (socketManager.isConnected()) {
-          socketManager.emit(SocketEvents.LOCATION_UPDATE, {
-            providerId: provider?.id,
-            latitude: TEST_CORDS.latitude,
-            longitude: TEST_CORDS.longitude,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to update location:', error);
-      }
-    };
-
-    updateLocation();
-    interval = setInterval(updateLocation, 30 * 1000); // Update every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [serviceStatus, provider?.id]);
+    console.log('currentRequest changed:', currentRequest);
+  }, [currentRequest]);
 
   const handleStatusChange = async (
     newStatus: 'available' | 'assigned' | 'off_duty'
@@ -202,14 +176,6 @@ export default function ProviderDashboardScreen() {
       setIsLoading(true);
       await serviceProviderApi.updateStatus(newStatus);
       setServiceStatus(newStatus);
-
-      // Emit status change via socketManager
-      if (socketManager.isConnected()) {
-        socketManager.emit(SocketEvents.UPDATE_STATUS, {
-          providerId: provider?.id,
-          status: newStatus,
-        });
-      }
     } catch (error: any) {
       Alert.alert(
         'Error',
@@ -223,62 +189,26 @@ export default function ProviderDashboardScreen() {
   const handleAcceptRequest = async (request: IncomingRequest) => {
     try {
       setIsAccepting(true);
+      const response = await serviceProviderApi.acceptRequest(
+        request.requestId
+      );
 
-      // Use HTTP endpoint (more reliable with proper error handling)
-      await serviceProviderApi.acceptRequest(request.requestId);
+      if (response.requestId !== request.requestId) {
+        console.log("[ERROR]: Didn't match the id");
+        return;
+      }
 
       setCurrentRequest(request);
+      console.log('SETTING current request successful');
       removeIncomingRequest(request.requestId);
       setServiceStatus('assigned');
 
-      Alert.alert(
-        'Request Accepted',
-        'Navigate to the emergency location now.',
-        [
-          {
-            text: 'Start Tracking',
-            onPress: () => {
-              // Navigate to the tracking screen with provider role
-              router.push({
-                pathname: '/emergency-tracking',
-                params: {
-                  requestId: request.requestId,
-                  emergencyType: request.emergencyType,
-                  latitude: request.location.latitude.toString(),
-                  longitude: request.location.longitude.toString(),
-                  role: 'provider',
-                },
-              });
-            },
-          },
-          {
-            text: 'Open External Maps',
-            onPress: () =>
-              openMaps(request.location.latitude, request.location.longitude),
-          },
-        ]
-      );
+      console.log(currentRequest);
     } catch (error: any) {
-      const message =
-        error?.response?.data?.message || 'Failed to accept request';
-      const status = error?.response?.status;
-
-      // Handle specific error cases
-      if (status === 409) {
-        Alert.alert(
-          'Request Taken',
-          'This request was already accepted by another provider.'
-        );
-        removeIncomingRequest(request.requestId);
-      } else if (status === 410) {
-        Alert.alert(
-          'Request Cancelled',
-          'This request was cancelled by the user.'
-        );
-        removeIncomingRequest(request.requestId);
-      } else {
-        Alert.alert('Error', message);
-      }
+      Alert.alert(
+        'Error',
+        error?.response?.data?.message || 'Failed to accept request'
+      );
     } finally {
       setIsAccepting(false);
     }
@@ -287,386 +217,789 @@ export default function ProviderDashboardScreen() {
   const handleRejectRequest = (request: IncomingRequest) => {
     Alert.alert(
       'Reject Request',
-      'Are you sure you want to reject this emergency request?',
+      'Are you sure you want to reject this request?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await serviceProviderApi.rejectRequest(request.requestId);
-              removeIncomingRequest(request.requestId);
-            } catch {
-              // Still remove from UI even if API fails
-              removeIncomingRequest(request.requestId);
-            }
-          },
+          onPress: () => removeIncomingRequest(request.requestId),
         },
       ]
     );
   };
 
-  const handleCompleteRequest = () => {
-    if (!currentRequest) return;
+  const handleMapsNavigation = () => {
+    if (!currentRequest) {
+      Alert.alert('Current Request not found');
+      return;
+    }
 
-    Alert.alert(
-      'Complete Request',
-      'Mark this emergency request as completed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Complete',
-          onPress: async () => {
-            try {
-              // Use HTTP endpoint
-              await serviceProviderApi.completeRequest(
-                currentRequest.requestId
-              );
-              setCurrentRequest(null);
-              setServiceStatus('available');
-              Alert.alert('Success', 'Request completed successfully!');
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                error?.response?.data?.message || 'Failed to complete request'
-              );
-            }
-          },
-        },
-      ]
-    );
+    const lat = currentRequest.location.latitude;
+    const lng = currentRequest.location.longitude;
+
+    // FIX: OPEN GOOGLE MAPS
+    // const url = `https://maps.google.com/?q=${lat},${lng}`;
+    // Linking.openURL(url);
+
+    // OPEN IN APP
+    router.push({
+      pathname: '/emergency-tracking',
+      params: {
+        requestId: currentRequest.requestId,
+        emergencyType: currentRequest.emergencyType,
+        role: 'provider',
+      },
+    });
   };
 
-  const openMaps = (lat: number, lng: number) => {
-    const url = `https://maps.google.com/?q=${lat},${lng}`;
-    Linking.openURL(url);
-  };
-
-  const renderStatusSelector = () => (
-    <View
-      className="mb-6 rounded-2xl bg-white p-4 shadow-sm"
-      style={{ elevation: 2 }}
-    >
-      <Text
-        className="mb-3 text-sm font-medium text-gray-700"
-        style={{ fontFamily: 'Inter' }}
-      >
-        Your Status
-      </Text>
-      <View className="flex-row justify-between">
-        {(['available', 'assigned', 'off_duty'] as const).map(status => (
-          <TouchableOpacity
-            key={status}
-            onPress={() => handleStatusChange(status)}
-            disabled={isLoading || (status === 'assigned' && !currentRequest)}
-            className={`mx-1 flex-1 items-center rounded-xl py-3 ${
-              serviceStatus === status ? 'border-2' : 'bg-gray-100'
-            }`}
-            style={{
-              borderColor:
-                serviceStatus === status
-                  ? STATUS_COLORS[status]
-                  : 'transparent',
-              backgroundColor:
-                serviceStatus === status
-                  ? `${STATUS_COLORS[status]}20`
-                  : '#f3f4f6',
-            }}
-          >
-            <View
-              className="mb-1 h-3 w-3 rounded-full"
-              style={{ backgroundColor: STATUS_COLORS[status] }}
-            />
-            <Text
-              className={`text-xs ${serviceStatus === status ? 'font-semibold' : ''}`}
-              style={{
-                fontFamily: 'Inter',
-                color:
-                  serviceStatus === status ? STATUS_COLORS[status] : '#6b7280',
-              }}
-            >
-              {STATUS_LABELS[status]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderCurrentRequest = () => {
-    if (!currentRequest) return null;
-
-    return (
-      <View
-        className="mb-6 rounded-2xl bg-amber-50 p-4 shadow-sm"
-        style={{
-          elevation: 2,
-          borderLeftWidth: 4,
-          borderLeftColor: '#f59e0b',
-        }}
-      >
-        <View className="mb-3 flex-row items-center justify-between">
-          <Text
-            className="text-lg text-amber-800"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Current Assignment
-          </Text>
-          <Text className="text-2xl">
-            {EMERGENCY_ICONS[currentRequest.emergencyType]}
-          </Text>
-        </View>
-
-        <View className="mb-3">
-          <Text
-            className="text-base font-medium text-gray-800"
-            style={{ fontFamily: 'Inter' }}
-          >
-            {currentRequest.emergencyType.toUpperCase()} Emergency
-          </Text>
-          {currentRequest.description && (
-            <Text
-              className="mt-1 text-sm text-gray-600"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {currentRequest.description}
-            </Text>
-          )}
-          {currentRequest.username && (
-            <Text
-              className="mt-1 text-sm text-gray-500"
-              style={{ fontFamily: 'Inter' }}
-            >
-              User: {currentRequest.username}
-            </Text>
-          )}
-        </View>
-
-        <View className="flex-row">
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: '/emergency-tracking',
-                params: {
-                  requestId: currentRequest.requestId,
-                  emergencyType: currentRequest.emergencyType,
-                  latitude: currentRequest.location.latitude.toString(),
-                  longitude: currentRequest.location.longitude.toString(),
-                  role: 'provider',
-                },
-              })
-            }
-            className="mr-2 flex-1 flex-row items-center justify-center rounded-xl bg-blue-500 py-3"
-          >
-            <Ionicons name="navigate-outline" size={20} color="#fff" />
-            <Text
-              className="ml-2 font-semibold text-white"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Track
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleCompleteRequest}
-            className="flex-1 flex-row items-center justify-center rounded-xl bg-green-500 py-3"
-          >
-            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-            <Text
-              className="ml-2 font-semibold text-white"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Complete
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderIncomingRequest = (request: IncomingRequest) => (
-    <Animated.View
-      key={request.requestId}
-      style={{ transform: [{ scale: pulseAnim }] }}
-      className="mb-4 rounded-2xl bg-red-50 p-4 shadow-md"
-    >
-      <View className="mb-3 flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <Text className="mr-2 text-2xl">
-            {EMERGENCY_ICONS[request.emergencyType]}
-          </Text>
-          <View>
-            <Text
-              className="text-base font-semibold text-red-800"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {request.emergencyType.toUpperCase()}
-            </Text>
-            <Text
-              className="text-sm text-red-600"
-              style={{ fontFamily: 'Inter' }}
-            >
-              20 km away
-            </Text>
-          </View>
-        </View>
-        <View className="items-end">
-          <Text
-            className="text-xs text-gray-500"
-            style={{ fontFamily: 'Inter' }}
-          >
-            {new Date(Date.now()).toLocaleTimeString()}
-          </Text>
-        </View>
-      </View>
-
-      {request.description && (
-        <Text
-          className="mb-3 text-sm text-gray-700"
-          style={{ fontFamily: 'Inter' }}
-        >
-          {request.description}
-        </Text>
-      )}
-
-      <View className="flex-row">
-        <TouchableOpacity
-          onPress={() => handleAcceptRequest(request)}
-          disabled={isAccepting}
-          className="mr-2 flex-1 flex-row items-center justify-center rounded-xl bg-green-500 py-3"
-        >
-          {isAccepting ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text
-                className="ml-2 font-semibold text-white"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Accept
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleRejectRequest(request)}
-          className="flex-1 flex-row items-center justify-center rounded-xl bg-gray-400 py-3"
-        >
-          <Ionicons name="close" size={20} color="#fff" />
-          <Text
-            className="ml-2 font-semibold text-white"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Reject
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-
-  // ✅ Get connection status from socketManager
   const isConnected = socketManager.isConnected();
 
+  const emitPeriodicLocation = useCallback(async () => {
+    if (serviceStatus !== 'available' || !currentLocation) {
+      return;
+    }
+
+    try {
+      socketManager.emit(SocketEvents.PROVIDER_PERIODIC_LOCATION, {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        serviceStatus,
+      });
+    } catch (error) {
+      console.log('Error emitting periodic location:', error);
+    }
+  }, [currentLocation, serviceStatus]);
+
+  useEffect(() => {
+    if (serviceStatus !== 'available' || !currentLocation) {
+      return;
+    }
+
+    emitPeriodicLocation();
+
+    const intervalId = setInterval(() => {
+      emitPeriodicLocation();
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [serviceStatus, currentLocation, emitPeriodicLocation]);
+
   return (
-    <SafeAreaContainer>
-      <View className="flex-1 bg-gray-50">
-        {/* Header */}
-        <View className="bg-primary px-6 pb-4 pt-2">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text
-                className="text-2xl text-white"
-                style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandMark}>RESQ</Text>
+              <Text style={styles.brandDot}>.</Text>
+            </View>
+            <View style={styles.headerLine} />
+            <Text style={styles.tagline}>RESPONDER DASHBOARD</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <View
+              style={[
+                styles.connectionDot,
+                { backgroundColor: isConnected ? SUCCESS_GREEN : SIGNAL_RED },
+              ]}
+            />
+            <TouchableOpacity
+              onPress={() => router.push('/(provider)/profile')}
+              style={styles.profileButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-outline" size={20} color={OFF_WHITE} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.providerInfo}>
+          <Text style={styles.providerLabel}>ACTIVE RESPONDER</Text>
+          <Text style={styles.providerName}>
+            {provider?.name || 'Responder'}
+          </Text>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Current Location Map */}
+        <View style={styles.mapSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>YOUR LOCATION</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.mapContainer}>
+            {isLoadingLocation ? (
+              <View style={styles.mapLoading}>
+                <ActivityIndicator size="small" color={MID_GRAY} />
+                <Text style={styles.mapLoadingText}>
+                  Getting your location...
+                </Text>
+              </View>
+            ) : currentLocation ? (
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={{
+                  latitude: currentLocation.latitude,
+                  longitude: currentLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                showsCompass={false}
+                scrollEnabled={true}
+                zoomEnabled={true}
               >
-                Provider Dashboard
+                <Marker
+                  coordinate={currentLocation}
+                  title="Your Location"
+                  description="You are here"
+                  pinColor={SUCCESS_GREEN}
+                />
+              </MapView>
+            ) : (
+              <View style={styles.mapError}>
+                <Ionicons name="location-outline" size={32} color={MID_GRAY} />
+                <Text style={styles.mapErrorText}>Location unavailable</Text>
+              </View>
+            )}
+          </View>
+
+          {currentLocation && (
+            <View style={styles.locationRow}>
+              <Text style={styles.locationText}>
+                {currentLocation.latitude.toFixed(6)},{' '}
+                {currentLocation.longitude.toFixed(6)}
               </Text>
-              <Text
-                className="text-sm text-white/80"
-                style={{ fontFamily: 'Inter' }}
+              <TouchableOpacity
+                style={styles.refreshLocationButton}
+                onPress={async () => {
+                  setIsLoadingLocation(true);
+                  try {
+                    const location = await Location.getCurrentPositionAsync({
+                      accuracy: Location.Accuracy.High,
+                    });
+                    setCurrentLocation({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude,
+                    });
+                    mapRef.current?.animateToRegion({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    });
+                  } catch (error) {
+                    console.log('Error refreshing location:', error);
+                  } finally {
+                    setIsLoadingLocation(false);
+                  }
+                }}
+                disabled={isLoadingLocation}
               >
-                {provider?.name || 'Provider'}
+                <Ionicons name="refresh" size={16} color={MID_GRAY} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Status Selector */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>YOUR STATUS</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.statusSelector}>
+            {(
+              Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>
+            ).map(status => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.statusButton,
+                  serviceStatus === status && styles.statusButtonActive,
+                  {
+                    borderColor:
+                      serviceStatus === status
+                        ? STATUS_COLORS[status]
+                        : LIGHT_GRAY,
+                  },
+                ]}
+                onPress={() => handleStatusChange(status)}
+                disabled={
+                  isLoading || (status === 'assigned' && !currentRequest)
+                }
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: STATUS_COLORS[status] },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    serviceStatus === status && {
+                      color: STATUS_COLORS[status],
+                    },
+                  ]}
+                >
+                  {STATUS_LABELS[status]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Current Assignment */}
+        {currentRequest && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>CURRENT ASSIGNMENT</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            <View style={styles.assignmentCard}>
+              <View style={styles.assignmentHeader}>
+                <View
+                  style={[
+                    styles.emergencyBadge,
+                    { backgroundColor: WARNING_AMBER },
+                  ]}
+                >
+                  <Text style={styles.emergencyBadgeText}>
+                    {currentRequest.emergencyType.toUpperCase()}
+                  </Text>
+                </View>
+                {currentRequest.description && (
+                  <Text style={styles.assignmentDescription}>
+                    {currentRequest.description}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.assignmentActions}>
+                <TouchableOpacity
+                  style={styles.assignmentButton}
+                  onPress={handleMapsNavigation}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="navigate-outline"
+                    size={18}
+                    color={OFF_WHITE}
+                  />
+                  <Text style={styles.assignmentButtonText}>NAVIGATE</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.assignmentButton, styles.completeButton]}
+                  onPress={() => {
+                    setCurrentRequest(null);
+                    setServiceStatus('available');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark" size={18} color={OFF_WHITE} />
+                  <Text style={styles.assignmentButtonText}>COMPLETE</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Incoming Requests */}
+        {incomingRequests.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                INCOMING REQUESTS ({incomingRequests.length})
+              </Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            {incomingRequests.map(request => (
+              <Animated.View
+                key={request.requestId}
+                style={[
+                  styles.requestCard,
+                  { transform: [{ scale: pulseAnim }] },
+                ]}
+              >
+                <View style={styles.requestHeader}>
+                  <View
+                    style={[
+                      styles.emergencyBadge,
+                      { backgroundColor: SIGNAL_RED },
+                    ]}
+                  >
+                    <Text style={styles.emergencyBadgeText}>
+                      {request.emergencyType.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.requestTime}>
+                    {new Date().toLocaleTimeString()}
+                  </Text>
+                </View>
+
+                {request.description && (
+                  <Text style={styles.requestDescription}>
+                    {request.description}
+                  </Text>
+                )}
+
+                <View style={styles.requestActions}>
+                  <TouchableOpacity
+                    style={styles.acceptButton}
+                    onPress={() => handleAcceptRequest(request)}
+                    disabled={isAccepting}
+                    activeOpacity={0.7}
+                  >
+                    {isAccepting ? (
+                      <ActivityIndicator color={OFF_WHITE} size="small" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="checkmark"
+                          size={18}
+                          color={OFF_WHITE}
+                        />
+                        <Text style={styles.requestButtonText}>ACCEPT</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.rejectButton}
+                    onPress={() => handleRejectRequest(request)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={18} color={OFF_WHITE} />
+                    <Text style={styles.requestButtonText}>REJECT</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            ))}
+          </View>
+        )}
+
+        {/* Empty State */}
+        {serviceStatus === 'available' &&
+          !currentRequest &&
+          incomingRequests.length === 0 && (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="radio-outline" size={48} color={LIGHT_GRAY} />
+              </View>
+              <Text style={styles.emptyTitle}>LISTENING FOR EMERGENCIES</Text>
+              <Text style={styles.emptyDescription}>
+                You will be notified when an emergency request is received
+                nearby
               </Text>
             </View>
-            <View className="flex-row items-center">
-              <View
-                className={`mr-2 h-3 w-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}
-              />
+          )}
+
+        {serviceStatus === 'off_duty' && (
+          <View style={styles.offDutyContainer}>
+            <View style={styles.offDutyCard}>
+              <View style={styles.offDutyIcon}>
+                <Ionicons name="moon-outline" size={48} color={MID_GRAY} />
+              </View>
+              <Text style={styles.offDutyTitle}>YOU ARE OFF DUTY</Text>
+              <Text style={styles.offDutyDescription}>
+                Switch to Available to start receiving emergency requests
+              </Text>
               <TouchableOpacity
-                onPress={() => router.push('/(provider)/profile')}
-                className="rounded-full bg-white/20 p-2"
+                style={styles.goOnlineButton}
+                onPress={() => handleStatusChange('available')}
+                disabled={isLoading}
+                activeOpacity={0.8}
               >
-                <Ionicons name="person-outline" size={20} color="#fff" />
+                {isLoading ? (
+                  <ActivityIndicator color={OFF_WHITE} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="radio-button-on"
+                      size={20}
+                      color={OFF_WHITE}
+                    />
+                    <Text style={styles.goOnlineButtonText}>GO ONLINE</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        )}
 
-        <ScrollView
-          className="flex-1 px-4 pt-4"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Status Selector */}
-          {renderStatusSelector()}
-
-          {/* Current Assignment */}
-          {renderCurrentRequest()}
-
-          {/* Incoming Requests */}
-          {incomingRequests.length > 0 && (
-            <View className="mb-6">
-              <Text
-                className="mb-3 text-lg text-gray-800"
-                style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-              >
-                🚨 Incoming Requests ({incomingRequests.length})
-              </Text>
-              {incomingRequests.map(renderIncomingRequest)}
-            </View>
-          )}
-
-          {/* Empty State */}
-          {serviceStatus === 'available' &&
-            !currentRequest &&
-            incomingRequests.length === 0 && (
-              <View className="items-center justify-center py-12">
-                <Ionicons name="radio-outline" size={64} color="#d1d5db" />
-                <Text
-                  className="mt-4 text-center text-lg text-gray-400"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Listening for emergencies...
-                </Text>
-                <Text
-                  className="mt-1 text-center text-sm text-gray-400"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  {"You'll be notified when there's an emergency nearby"}
-                </Text>
-              </View>
-            )}
-
-          {serviceStatus === 'off_duty' && (
-            <View className="items-center justify-center py-12">
-              <Ionicons name="moon-outline" size={64} color="#d1d5db" />
-              <Text
-                className="mt-4 text-center text-lg text-gray-400"
-                style={{ fontFamily: 'Inter' }}
-              >
-                {"You're currently off duty"}
-              </Text>
-              <Text
-                className="mt-1 text-center text-sm text-gray-400"
-                style={{ fontFamily: 'Inter' }}
-              >
-                {'Switch to "Available" to receive emergency requests'}
-              </Text>
-            </View>
-          )}
-
-          <View className="h-8" />
-        </ScrollView>
-      </View>
-    </SafeAreaContainer>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 34,
+  },
+  headerLine: {
+    width: 36,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    marginRight: 12,
+  },
+  profileButton: {
+    padding: 8,
+    backgroundColor: SIGNAL_RED,
+  },
+  providerInfo: {
+    borderLeftWidth: 3,
+    borderLeftColor: SIGNAL_RED,
+    paddingLeft: 12,
+  },
+  providerLabel: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  providerName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 24,
+  },
+  mapSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  mapContainer: {
+    height: 200,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    overflow: 'hidden',
+  },
+  map: {
+    flex: 1,
+  },
+  mapLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+  },
+  mapLoadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  mapError: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+  },
+  mapErrorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  locationText: {
+    marginTop: 8,
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  refreshLocationButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  section: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  statusSelector: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+  },
+  statusButton: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: LIGHT_GRAY,
+  },
+  statusButtonActive: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    marginBottom: 8,
+  },
+  statusLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  assignmentCard: {
+    borderWidth: 1,
+    borderColor: WARNING_AMBER,
+    padding: 16,
+  },
+  assignmentHeader: {
+    marginBottom: 16,
+  },
+  emergencyBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  emergencyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 1,
+  },
+  assignmentDescription: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    lineHeight: 18,
+  },
+  assignmentActions: {
+    flexDirection: 'row',
+  },
+  assignmentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    marginRight: 8,
+  },
+  completeButton: {
+    backgroundColor: SUCCESS_GREEN,
+    marginRight: 0,
+    marginLeft: 0,
+  },
+  assignmentButtonText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 1,
+    marginLeft: 8,
+  },
+  requestCard: {
+    borderWidth: 1,
+    borderColor: SIGNAL_RED,
+    padding: 16,
+    marginBottom: 12,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  requestTime: {
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  requestDescription: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  requestActions: {
+    flexDirection: 'row',
+  },
+  acceptButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SUCCESS_GREEN,
+    paddingVertical: 12,
+    marginRight: 8,
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: MID_GRAY,
+    paddingVertical: 12,
+    marginLeft: 8,
+  },
+  requestButtonText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 1,
+    marginLeft: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  bottomSpacer: {
+    height: 40,
+  },
+  offDutyContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  offDutyCard: {
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 32,
+    alignItems: 'center',
+  },
+  offDutyIcon: {
+    marginBottom: 16,
+  },
+  offDutyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  offDutyDescription: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
+  },
+  goOnlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SUCCESS_GREEN,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+  },
+  goOnlineButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+});

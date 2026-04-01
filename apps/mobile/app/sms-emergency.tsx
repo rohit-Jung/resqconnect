@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -26,8 +28,15 @@ import {
   getSMSFallbackNumber,
 } from '@/utils/sms.utils';
 
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
+
 const EMERGENCY_TYPES = [
-  { value: 'ambulance', label: 'Medical', icon: 'medical', color: '#EF4444' },
+  { value: 'ambulance', label: 'Medical', icon: 'medical', color: SIGNAL_RED },
   { value: 'police', label: 'Police', icon: 'shield', color: '#3B82F6' },
   { value: 'fire_truck', label: 'Fire', icon: 'flame', color: '#F97316' },
   { value: 'rescue_team', label: 'Rescue', icon: 'people', color: '#8B5CF6' },
@@ -64,7 +73,7 @@ export default function SMSEmergencyScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Denied',
+          'PERMISSION DENIED',
           'Location permission is required to send your location in the emergency SMS.'
         );
         setIsLoadingLocation(false);
@@ -77,25 +86,25 @@ export default function SMSEmergencyScreen() {
       setLocation(loc);
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get your location. Please try again.');
+      Alert.alert('ERROR', 'Failed to get your location. Please try again.');
     }
     setIsLoadingLocation(false);
   };
 
   const handleSendSMS = async () => {
     if (!location) {
-      Alert.alert('Error', 'Location is required. Please wait or refresh.');
+      Alert.alert('ERROR', 'Location is required. Please wait or refresh.');
       return;
     }
 
     if (!smsAvailable) {
       Alert.alert(
-        'SMS Not Available',
+        'SMS NOT AVAILABLE',
         'SMS is not available on this device. Please call emergency services instead.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Call ' + EMERGENCY_PHONE_NUMBER,
+            text: 'CALL ' + EMERGENCY_PHONE_NUMBER,
             onPress: () => Linking.openURL(`tel:${EMERGENCY_PHONE_NUMBER}`),
           },
         ]
@@ -115,7 +124,7 @@ export default function SMSEmergencyScreen() {
         description: description.trim() || undefined,
         userName: user?.name,
         userPhone: user?.phoneNumber?.toString(),
-        userId: user?.id, // Include userId for backend identification
+        userId: user?.id,
       };
 
       const message = formatEmergencyMessage(emergencyData);
@@ -125,7 +134,7 @@ export default function SMSEmergencyScreen() {
 
       if (result === 'sent') {
         Alert.alert(
-          'Emergency SMS Sent',
+          'EMERGENCY SMS SENT',
           'Your emergency request has been sent via SMS. Help is on the way. You can also call emergency services directly.',
           [
             {
@@ -133,7 +142,7 @@ export default function SMSEmergencyScreen() {
               onPress: () => router.back(),
             },
             {
-              text: 'Call ' + EMERGENCY_PHONE_NUMBER,
+              text: 'CALL ' + EMERGENCY_PHONE_NUMBER,
               onPress: () => {
                 Linking.openURL(`tel:${EMERGENCY_PHONE_NUMBER}`);
                 router.back();
@@ -142,16 +151,15 @@ export default function SMSEmergencyScreen() {
           ]
         );
       } else if (result === 'cancelled') {
-        Alert.alert('Cancelled', 'SMS was not sent.');
+        Alert.alert('CANCELLED', 'SMS was not sent.');
       } else {
-        // Unknown or unavailable
         Alert.alert(
-          'SMS Status Unknown',
+          'SMS STATUS UNKNOWN',
           'We could not confirm if the SMS was sent. Please try again or call emergency services.',
           [
-            { text: 'Retry', onPress: () => setIsSending(false) },
+            { text: 'RETRY', onPress: () => setIsSending(false) },
             {
-              text: 'Call ' + EMERGENCY_PHONE_NUMBER,
+              text: 'CALL ' + EMERGENCY_PHONE_NUMBER,
               onPress: () => Linking.openURL(`tel:${EMERGENCY_PHONE_NUMBER}`),
             },
           ]
@@ -160,12 +168,12 @@ export default function SMSEmergencyScreen() {
     } catch (error) {
       console.error('Error sending SMS:', error);
       Alert.alert(
-        'Error',
+        'ERROR',
         'Failed to send SMS. Please call emergency services directly.',
         [
           { text: 'OK' },
           {
-            text: 'Call ' + EMERGENCY_PHONE_NUMBER,
+            text: 'CALL ' + EMERGENCY_PHONE_NUMBER,
             onPress: () => Linking.openURL(`tel:${EMERGENCY_PHONE_NUMBER}`),
           },
         ]
@@ -180,85 +188,73 @@ export default function SMSEmergencyScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-      {/* Header */}
-      <View className="bg-amber-500 px-5 py-4">
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View>
-            <Text
-              className="text-2xl text-white"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              Offline Emergency
-            </Text>
-            <Text
-              className="text-sm text-white/80"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Send emergency via SMS
-            </Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header - Swiss style */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={BLACK} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
           </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>OFFLINE EMERGENCY</Text>
         </View>
       </View>
 
       {/* Offline Banner */}
-      <View className="bg-amber-100 px-5 py-3 flex-row items-center">
-        <Ionicons name="cloud-offline" size={20} color="#D97706" />
-        <Text
-          className="ml-2 text-amber-800 flex-1"
-          style={{ fontFamily: 'Inter' }}
-        >
-          You appear to be offline. Use SMS to request emergency help.
+      <View style={styles.offlineBanner}>
+        <Ionicons name="cloud-offline" size={18} color="#F59E0B" />
+        <Text style={styles.offlineText}>
+          YOU APPEAR TO BE OFFLINE. USE SMS TO REQUEST EMERGENCY HELP.
         </Text>
       </View>
 
       <ScrollView
-        className="flex-1 px-5 pt-4"
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Emergency Type Selection */}
-        <View className="mb-6">
-          <Text
-            className="text-lg text-gray-800 mb-3"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Emergency Type
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>EMERGENCY TYPE</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.typeGrid}>
             {EMERGENCY_TYPES.map(type => (
               <TouchableOpacity
                 key={type.value}
                 onPress={() => setSelectedType(type.value)}
-                className={`flex-1 min-w-[45%] rounded-2xl p-4 items-center ${
-                  selectedType === type.value
-                    ? 'border-2'
-                    : 'bg-white border border-gray-200'
-                }`}
-                style={{
-                  borderColor:
-                    selectedType === type.value ? type.color : '#E5E7EB',
-                  backgroundColor:
-                    selectedType === type.value ? `${type.color}15` : '#fff',
-                }}
+                style={[
+                  styles.typeCard,
+                  selectedType === type.value && styles.typeCardActive,
+                  {
+                    borderColor:
+                      selectedType === type.value ? type.color : LIGHT_GRAY,
+                  },
+                ]}
+                activeOpacity={0.7}
               >
                 <Ionicons
                   name={type.icon as any}
-                  size={32}
-                  color={selectedType === type.value ? type.color : '#6B7280'}
+                  size={28}
+                  color={selectedType === type.value ? type.color : MID_GRAY}
                 />
                 <Text
-                  className={`mt-2 font-medium ${
-                    selectedType === type.value
-                      ? 'text-gray-800'
-                      : 'text-gray-600'
-                  }`}
-                  style={{ fontFamily: 'Inter' }}
+                  style={[
+                    styles.typeLabel,
+                    selectedType === type.value && { color: type.color },
+                  ]}
                 >
-                  {type.label}
+                  {type.label.toUpperCase()}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -266,42 +262,29 @@ export default function SMSEmergencyScreen() {
         </View>
 
         {/* Location Status */}
-        <View className="mb-6">
-          <Text
-            className="text-lg text-gray-800 mb-3"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Your Location
-          </Text>
-          <View
-            className="bg-white rounded-2xl p-4 shadow-sm"
-            style={{ elevation: 2 }}
-          >
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>YOUR LOCATION</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.locationCard}>
             {isLoadingLocation ? (
-              <View className="flex-row items-center">
-                <ActivityIndicator size="small" color="#E13333" />
-                <Text
-                  className="ml-3 text-gray-600"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Getting your location...
+              <View style={styles.locationLoading}>
+                <ActivityIndicator size="small" color={SIGNAL_RED} />
+                <Text style={styles.locationLoadingText}>
+                  GETTING YOUR LOCATION...
                 </Text>
               </View>
             ) : location ? (
               <View>
-                <View className="flex-row items-center mb-2">
-                  <Ionicons name="location" size={20} color="#10B981" />
-                  <Text
-                    className="ml-2 text-green-600 font-medium"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    Location acquired
+                <View style={styles.locationStatus}>
+                  <Ionicons name="location" size={18} color="#10B981" />
+                  <Text style={styles.locationStatusText}>
+                    LOCATION ACQUIRED
                   </Text>
                 </View>
-                <Text
-                  className="text-gray-500 text-sm"
-                  style={{ fontFamily: 'Inter' }}
-                >
+                <Text style={styles.locationCoords}>
                   {location.coords.latitude.toFixed(6)},{' '}
                   {location.coords.longitude.toFixed(6)}
                 </Text>
@@ -314,38 +297,29 @@ export default function SMSEmergencyScreen() {
                       )
                     )
                   }
-                  className="mt-2 flex-row items-center"
+                  style={styles.mapsLink}
                 >
                   <Ionicons name="map-outline" size={16} color="#3B82F6" />
-                  <Text
-                    className="ml-1 text-blue-500 text-sm"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    View on Maps
-                  </Text>
+                  <Text style={styles.mapsLinkText}>VIEW ON MAPS</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View>
-                <View className="flex-row items-center mb-2">
-                  <Ionicons name="location-outline" size={20} color="#EF4444" />
-                  <Text
-                    className="ml-2 text-red-500 font-medium"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    Location not available
+                <View style={styles.locationStatus}>
+                  <Ionicons
+                    name="location-outline"
+                    size={18}
+                    color={SIGNAL_RED}
+                  />
+                  <Text style={styles.locationErrorText}>
+                    LOCATION NOT AVAILABLE
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={getLocation}
-                  className="bg-gray-100 rounded-lg py-2 px-4 self-start"
+                  style={styles.retryButton}
                 >
-                  <Text
-                    className="text-gray-700"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    Retry
-                  </Text>
+                  <Text style={styles.retryButtonText}>RETRY</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -353,50 +327,36 @@ export default function SMSEmergencyScreen() {
         </View>
 
         {/* Description */}
-        <View className="mb-6">
-          <Text
-            className="text-lg text-gray-800 mb-3"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Additional Details (Optional)
-          </Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              ADDITIONAL DETAILS (OPTIONAL)
+            </Text>
+            <View style={styles.sectionLine} />
+          </View>
+
           <TextInput
-            value={description}
-            onChangeText={setDescription}
+            style={styles.descriptionInput}
             placeholder="Describe your emergency..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={MID_GRAY}
             multiline
             numberOfLines={4}
-            className="bg-white rounded-2xl p-4 text-gray-800 shadow-sm"
-            style={{
-              fontFamily: 'Inter',
-              textAlignVertical: 'top',
-              minHeight: 100,
-              elevation: 2,
-            }}
+            value={description}
+            onChangeText={setDescription}
           />
         </View>
 
         {/* SMS Preview */}
-        <View className="mb-6">
-          <Text
-            className="text-lg text-gray-800 mb-3"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            SMS Preview
-          </Text>
-          <View className="bg-gray-100 rounded-2xl p-4">
-            <Text
-              className="text-gray-600 text-sm"
-              style={{ fontFamily: 'Inter' }}
-            >
-              To: {SMS_FALLBACK_NUMBER}
-            </Text>
-            <View className="h-px bg-gray-300 my-2" />
-            <Text
-              className="text-gray-800 text-sm"
-              style={{ fontFamily: 'Inter' }}
-            >
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>SMS PREVIEW</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.smsPreview}>
+            <Text style={styles.smsPreviewTo}>TO: {SMS_FALLBACK_NUMBER}</Text>
+            <View style={styles.smsPreviewDivider} />
+            <Text style={styles.smsPreviewContent}>
               [ResQ Connect EMERGENCY]{'\n'}
               Type: {formatEmergencyType(selectedType)}
               {'\n'}
@@ -411,48 +371,287 @@ export default function SMSEmergencyScreen() {
       </ScrollView>
 
       {/* Bottom Actions */}
-      <View className="px-5 pb-6 pt-3 bg-white border-t border-gray-100">
+      <View style={styles.footer}>
         <TouchableOpacity
           onPress={handleSendSMS}
           disabled={
             isSending || isLoadingLocation || !location || !smsAvailable
           }
-          className={`rounded-2xl py-4 flex-row items-center justify-center mb-3 ${
-            isSending || isLoadingLocation || !location || !smsAvailable
-              ? 'bg-gray-300'
-              : 'bg-primary'
-          }`}
+          style={[
+            styles.sendButton,
+            (isSending || isLoadingLocation || !location || !smsAvailable) &&
+              styles.sendButtonDisabled,
+          ]}
           activeOpacity={0.8}
         >
           {isSending ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={OFF_WHITE} />
           ) : (
             <>
-              <Ionicons name="send" size={20} color="#fff" />
-              <Text
-                className="ml-2 text-white font-bold text-lg"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Send Emergency SMS
-              </Text>
+              <Ionicons name="send" size={20} color={OFF_WHITE} />
+              <Text style={styles.sendButtonText}>SEND EMERGENCY SMS</Text>
             </>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={handleCallEmergency}
-          className="rounded-2xl py-4 flex-row items-center justify-center bg-green-500"
+          style={styles.callButton}
           activeOpacity={0.8}
         >
-          <Ionicons name="call" size={20} color="#fff" />
-          <Text
-            className="ml-2 text-white font-bold text-lg"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Call {EMERGENCY_PHONE_NUMBER}
+          <Ionicons name="call" size={20} color={OFF_WHITE} />
+          <Text style={styles.callButtonText}>
+            CALL {EMERGENCY_PHONE_NUMBER}
           </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+    backgroundColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  offlineText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+    letterSpacing: 0.5,
+    marginLeft: 10,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  section: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  typeCard: {
+    width: '48%',
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginHorizontal: '1%',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  typeCardActive: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  typeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginTop: 12,
+  },
+  locationCard: {
+    backgroundColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  locationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationLoadingText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    marginLeft: 12,
+    letterSpacing: 1,
+  },
+  locationStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+    marginLeft: 8,
+    letterSpacing: 1,
+  },
+  locationErrorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: SIGNAL_RED,
+    marginLeft: 8,
+    letterSpacing: 1,
+  },
+  locationCoords: {
+    fontSize: 12,
+    color: BLACK,
+    marginBottom: 8,
+  },
+  mapsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mapsLinkText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    marginLeft: 6,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  retryButton: {
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BLACK,
+    letterSpacing: 1,
+  },
+  descriptionInput: {
+    backgroundColor: LIGHT_GRAY,
+    padding: 16,
+    fontSize: 14,
+    color: BLACK,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  smsPreview: {
+    backgroundColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  smsPreviewTo: {
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  smsPreviewDivider: {
+    height: 1,
+    backgroundColor: MID_GRAY,
+    marginVertical: 12,
+    opacity: 0.3,
+  },
+  smsPreviewContent: {
+    fontSize: 12,
+    color: BLACK,
+    lineHeight: 20,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  sendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SIGNAL_RED,
+    paddingVertical: 16,
+    marginBottom: 12,
+  },
+  sendButtonDisabled: {
+    backgroundColor: MID_GRAY,
+  },
+  sendButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+  callButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 16,
+  },
+  callButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+});

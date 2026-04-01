@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState } from 'react';
@@ -8,24 +9,38 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
-  Image,
-  StatusBar,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
-import InputBox from '@/components/ui/InputBox';
 import { TOKEN_KEY } from '@/constants';
 import {
   useLoginServiceProvider,
   useLoginUser,
 } from '@/services/user/auth.api';
 import { useAuthStore } from '@/store/authStore';
+import { useProviderStore } from '@/store/providerStore';
 import { ILoginResponse, IOtpResponse } from '@/types/auth.types';
 import { TLoginUser, loginUserSchema } from '@/validations/auth.schema';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 const isLoginResponse = (
   data: ILoginResponse | IOtpResponse
@@ -40,7 +55,10 @@ async function save(key: string, value: string) {
 const SigninScreen: React.FC = () => {
   const router = useRouter();
   const { login: setAuth } = useAuthStore();
-  const [isServiceProvider, setIsServiceProvider] = useState(false);
+  const { login: setProvider, setToken: setProviderToken } = useProviderStore();
+  const [isResponder, setIsResponder] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const {
     control,
@@ -58,10 +76,10 @@ const SigninScreen: React.FC = () => {
     useLoginUser();
   const {
     mutate: loginServiceProviderMutation,
-    isPending: isServiceProviderPending,
+    isPending: isResponderPending,
   } = useLoginServiceProvider();
 
-  const isPending = isUserPending || isServiceProviderPending;
+  const isPending = isUserPending || isResponderPending;
 
   async function loginEntity(
     role: 'user' | 'service_provider',
@@ -73,24 +91,22 @@ const SigninScreen: React.FC = () => {
       await save(TOKEN_KEY, token);
       setAuth(user, token, role);
 
-      // Redirect according to role
+      if (role === 'service_provider') {
+        setProviderToken(token);
+        setProvider(user as any, token);
+      }
+
       role === 'user'
         ? router.replace('/(tabs)')
         : router.replace('/(provider)/dashboard');
     } else {
-      let otpToken = responseData.otpToken,
-        userId = null;
+      const otpToken = responseData.otpToken;
+      let userId = null;
 
       role === 'user'
         ? (userId = responseData.userId)
         : (userId = responseData.serviceProviderId);
 
-      console.log('Redirecting to OTP with:', {
-        otpToken,
-        userId,
-        email: data.email,
-        role,
-      });
       router.replace({
         pathname: '/(auth)/verify-otp',
         params: {
@@ -104,29 +120,43 @@ const SigninScreen: React.FC = () => {
   }
 
   const onSubmit = async (data: TLoginUser) => {
-    if (isServiceProvider) {
-      loginServiceProviderMutation(data, {
+    if (isResponder) {
+      let locationData = null;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          locationData = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+        }
+      } catch (error) {
+        console.log('Error getting location during login:', error);
+      }
+
+      const loginDataWithLocation = {
+        ...data,
+        currentLocation: locationData,
+      };
+
+      loginServiceProviderMutation(loginDataWithLocation, {
         onSuccess: async response => {
-          console.log('User response', response.data);
           const responseData = response.data.data;
           loginEntity('service_provider', responseData, data);
         },
-        onError: (error: any) => {
+        onError: async (error: any) => {
           const errorData = error?.response?.data?.data;
           const code = errorData?.code;
 
-          // Handle document verification states
           if (code === 'DOCUMENTS_REQUIRED') {
-            Alert.alert(
-              'Documents Required',
-              'Please upload your PAN card and citizenship documents to complete verification.',
-              [
-                {
-                  text: 'Upload Documents',
-                  onPress: () => router.replace('/(auth)/upload-documents'),
-                },
-              ]
-            );
+            const token = errorData?.token;
+            if (token) {
+              await save(TOKEN_KEY, token);
+            }
+            router.replace('/(auth)/upload-documents');
           } else if (code === 'VERIFICATION_PENDING') {
             router.replace({
               pathname: '/(auth)/verification-pending',
@@ -142,7 +172,6 @@ const SigninScreen: React.FC = () => {
               },
             });
           } else {
-            // Generic error handling
             Alert.alert(
               'Login Failed',
               error?.response?.data?.message ||
@@ -162,231 +191,371 @@ const SigninScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaContainer
-      style={styles.safeArea}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      {/* Header */}
-      <LinearGradient colors={['#ffffff', '#F9FAFB']} style={styles.header}>
-        <Image
-          source={require('../../assets/resq-connect-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.headerTitle}>Welcome Back</Text>
-        <Text style={styles.headerSubtitle}>Sign in to continue</Text>
-      </LinearGradient>
-
-      {/* Form */}
-      <View style={styles.formContainer}>
-        {/* Toggle User/Service Provider */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              !isServiceProvider && styles.toggleButtonActive,
-            ]}
-            onPress={() => setIsServiceProvider(false)}
-            disabled={isPending}
-          >
-            <Text
-              style={[
-                styles.toggleText,
-                !isServiceProvider && styles.toggleTextActive,
-              ]}
-            >
-              User
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              isServiceProvider && styles.toggleButtonActive,
-            ]}
-            onPress={() => setIsServiceProvider(true)}
-            disabled={isPending}
-          >
-            <Text
-              style={[
-                styles.toggleText,
-                isServiceProvider && styles.toggleTextActive,
-              ]}
-            >
-              Service Provider
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Controller
-          control={control}
-          name="email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Email"
-              icon="envelope"
-              placeholder="Enter your email"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={errors.email?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="password"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Password"
-              icon="lock"
-              placeholder="Enter password"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              secureTextEntry
-              error={errors.password?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <TouchableOpacity
-          style={styles.forgotPassword}
-          onPress={() => router.push('/(auth)/forgot-password')}
-          disabled={isPending}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Pressable style={styles.container} onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+          keyboardVerticalOffset={0}
         >
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: insets.bottom + 20 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Header Section */}
+            <View style={styles.header}>
+              <View style={styles.brandRow}>
+                <Text style={styles.brandMark}>RESQ</Text>
+                <Text style={styles.brandDot}>.</Text>
+              </View>
+              <View style={styles.headerLine} />
+              <Text style={styles.tagline}>EMERGENCY RESPONSE</Text>
+            </View>
 
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            isPending && styles.submitButtonDisabled,
-          ]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+            {/* Title */}
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>SIGN IN</Text>
+              <Text style={styles.subtitle}>Enter your credentials</Text>
+            </View>
 
-        {/* Only show Sign Up for Users */}
-        {!isServiceProvider && (
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don&apos;t have an account? </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/sign-up')}
-              disabled={isPending}
-            >
-              <Text style={styles.footerLink}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    </SafeAreaContainer>
+            {/* Toggle */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  !isResponder && styles.toggleButtonActive,
+                ]}
+                onPress={() => setIsResponder(false)}
+                disabled={isPending}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+                    !isResponder && styles.toggleTextActive,
+                  ]}
+                >
+                  USER
+                </Text>
+              </TouchableOpacity>
+              <View style={styles.toggleDivider} />
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  isResponder && styles.toggleButtonActive,
+                ]}
+                onPress={() => setIsResponder(true)}
+                disabled={isPending}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+                    isResponder && styles.toggleTextActive,
+                  ]}
+                >
+                  RESPONDER
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Form */}
+            <View style={styles.formContainer}>
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>EMAIL</Text>
+                    <View style={styles.inputRow}>
+                      <Ionicons
+                        name="mail-outline"
+                        size={18}
+                        color={MID_GRAY}
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          errors.email && styles.inputError,
+                        ]}
+                        editable={!isPending}
+                        onChangeText={onChange}
+                        onBlur={onBlur}
+                        value={value || ''}
+                        placeholder="name@email.com"
+                        placeholderTextColor={MID_GRAY}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                    {errors.email && (
+                      <Text style={styles.errorText}>
+                        {errors.email.message}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>PASSWORD</Text>
+                    <View style={styles.inputRow}>
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={18}
+                        color={MID_GRAY}
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          errors.password && styles.inputError,
+                        ]}
+                        editable={!isPending}
+                        onChangeText={onChange}
+                        onBlur={onBlur}
+                        value={value || ''}
+                        placeholder="••••••••"
+                        placeholderTextColor={MID_GRAY}
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeButton}
+                      >
+                        <Ionicons
+                          name={
+                            showPassword ? 'eye-off-outline' : 'eye-outline'
+                          }
+                          size={18}
+                          color={MID_GRAY}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {errors.password && (
+                      <Text style={styles.errorText}>
+                        {errors.password.message}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              />
+
+              {/* Forgot Password */}
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => router.push('/(auth)/forgot-password')}
+                disabled={isPending}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotPasswordText}>FORGOT PASSWORD?</Text>
+              </TouchableOpacity>
+
+              {/* Submit */}
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSubmit(onSubmit)}
+                disabled={isPending}
+                activeOpacity={0.8}
+              >
+                {isPending ? (
+                  <ActivityIndicator color={OFF_WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>ENTER</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Sign Up Link */}
+              {!isResponder && (
+                <View style={styles.footer}>
+                  <Text style={styles.footerText}>NO ACCOUNT? </Text>
+                  <TouchableOpacity
+                    onPress={() => router.push('/(auth)/sign-up')}
+                    disabled={isPending}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.footerLink}>REGISTER</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Metadata */}
+            <View style={styles.metadata}>
+              <Text style={styles.metadataText}>SECURE ACCESS</Text>
+              <Text style={styles.metadataDot}>·</Text>
+              <Text style={styles.metadataText}>24/7 RESPONSE</Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: OFF_WHITE,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   header: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    marginBottom: 32,
+    marginTop: 16,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 16,
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    fontFamily: 'ChauPhilomeneOne_400Regular',
+  brandMark: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 8,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+  brandDot: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 50,
+  },
+  headerLine: {
+    width: 48,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 3,
+  },
+  titleSection: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: PRIMARY,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: MID_GRAY,
     marginTop: 4,
-    fontFamily: 'Inter',
-  },
-  formContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
+    letterSpacing: 1,
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
     marginBottom: 24,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: PRIMARY,
   },
   toggleButton: {
     flex: 1,
     paddingVertical: 14,
     alignItems: 'center',
+    backgroundColor: OFF_WHITE,
   },
   toggleButtonActive: {
-    backgroundColor: '#E13333',
+    backgroundColor: PRIMARY,
   },
   toggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
   },
   toggleTextActive: {
-    color: '#ffffff',
+    color: OFF_WHITE,
+  },
+  toggleDivider: {
+    width: 1,
+    backgroundColor: PRIMARY,
+  },
+  formContainer: {
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: PRIMARY,
+    paddingVertical: 12,
+    fontWeight: '500',
+  },
+  inputError: {
+    borderBottomColor: SIGNAL_RED,
+  },
+  eyeButton: {
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 10,
+    color: SIGNAL_RED,
+    marginTop: 6,
+    letterSpacing: 1,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginTop: -8,
     marginBottom: 24,
   },
   forgotPasswordText: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#E13333',
-    fontFamily: 'Inter',
+    color: MID_GRAY,
+    letterSpacing: 1,
   },
   submitButton: {
-    height: 52,
-    backgroundColor: '#E13333',
-    borderRadius: 12,
+    height: 56,
+    backgroundColor: SIGNAL_RED,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E13333',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
   },
   submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
   },
   footer: {
     flexDirection: 'row',
@@ -395,15 +564,34 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   footerText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 1,
   },
   footerLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E13333',
-    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1,
+    textDecorationLine: 'underline',
+  },
+  metadata: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+  },
+  metadataText: {
+    fontSize: 9,
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  metadataDot: {
+    fontSize: 9,
+    color: SIGNAL_RED,
+    marginHorizontal: 8,
   },
 });
 

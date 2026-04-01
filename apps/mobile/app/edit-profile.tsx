@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -16,26 +19,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  UpdateProfileData,
-  UserProfile,
-  userApi,
-} from '@/services/user/user.api';
+import { uploadApi } from '@/services/upload/upload.api';
+import { UpdateProfileData, userApi } from '@/services/user/user.api';
 import { useAuthStore } from '@/store/authStore';
 
-interface FormField {
-  key: keyof UpdateProfileData;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  placeholder: string;
-  keyboardType?: 'default' | 'numeric' | 'phone-pad';
-  value: string;
-}
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { setUser, user: authUser } = useAuthStore();
+  const { setUser, user: authUser, updateProfilePicture } = useAuthStore();
 
   const [formData, setFormData] = useState<{
     name: string;
@@ -49,7 +47,13 @@ export default function EditProfileScreen() {
     primaryAddress: '',
   });
 
-  const { data: profile, isLoading } = useQuery({
+  const [isUploading, setIsUploading] = useState(false);
+
+  const {
+    data: profile,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['userProfile'],
     queryFn: userApi.getProfile,
   });
@@ -65,11 +69,113 @@ export default function EditProfileScreen() {
     }
   }, [profile]);
 
+  const handlePickImage = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Permission Required',
+        'Please allow access to your photo library to upload a profile picture.'
+      );
+      return;
+    }
+
+    Alert.alert('Change Profile Picture', 'Choose an option', [
+      {
+        text: 'Take Photo',
+        onPress: () => pickImage('camera'),
+      },
+      {
+        text: 'Choose from Gallery',
+        onPress: () => pickImage('gallery'),
+      },
+      ...(profile?.profilePicture
+        ? [
+            {
+              text: 'Remove Photo',
+              style: 'destructive' as const,
+              onPress: async () => {
+                setIsUploading(true);
+                try {
+                  await uploadApi.deleteProfilePicture();
+                  updateProfilePicture(null);
+                  await refetch();
+                  Alert.alert('Success', 'Profile picture removed');
+                } catch {
+                  Alert.alert('Error', 'Failed to remove profile picture');
+                } finally {
+                  setIsUploading(false);
+                }
+              },
+            },
+          ]
+        : []),
+      {
+        text: 'Cancel',
+        style: 'cancel' as const,
+      },
+    ]);
+  };
+
+  const pickImage = async (source: 'camera' | 'gallery') => {
+    try {
+      let result;
+
+      if (source === 'camera') {
+        const cameraPermission =
+          await ImagePicker.requestCameraPermissionsAsync();
+        if (!cameraPermission.granted) {
+          Alert.alert(
+            'Permission Required',
+            'Please allow access to your camera to take a profile picture.'
+          );
+          return;
+        }
+
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploading(true);
+        try {
+          const newUrl = await uploadApi.uploadProfilePicture(
+            result.assets[0].uri
+          );
+          updateProfilePicture(newUrl);
+          await refetch();
+          Alert.alert('Success', 'Profile picture updated successfully!');
+        } catch {
+          Alert.alert(
+            'Upload Failed',
+            'Failed to upload profile picture. Please try again.'
+          );
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+    }
+  };
+
   const updateMutation = useMutation({
     mutationFn: (data: UpdateProfileData) => userApi.updateProfile(data),
     onSuccess: updatedProfile => {
       queryClient.invalidateQueries({ queryKey: ['userProfile'] });
-      // Sync with authStore
       if (authUser) {
         setUser({
           ...authUser,
@@ -79,13 +185,13 @@ export default function EditProfileScreen() {
           primaryAddress: updatedProfile.primaryAddress,
         });
       }
-      Alert.alert('Success', 'Profile updated successfully', [
+      Alert.alert('SUCCESS', 'Profile updated successfully', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     },
     onError: (error: any) => {
       Alert.alert(
-        'Error',
+        'ERROR',
         error?.response?.data?.message || 'Failed to update profile'
       );
     },
@@ -101,7 +207,7 @@ export default function EditProfileScreen() {
     if (formData.age && parseInt(formData.age) !== profile?.age) {
       const age = parseInt(formData.age);
       if (isNaN(age) || age < 1 || age > 150) {
-        Alert.alert('Error', 'Please enter a valid age');
+        Alert.alert('ERROR', 'Please enter a valid age');
         return;
       }
       updateData.age = age;
@@ -113,7 +219,7 @@ export default function EditProfileScreen() {
     ) {
       const phone = parseInt(formData.phoneNumber);
       if (isNaN(phone) || formData.phoneNumber.length < 10) {
-        Alert.alert('Error', 'Please enter a valid phone number');
+        Alert.alert('ERROR', 'Please enter a valid phone number');
         return;
       }
       updateData.phoneNumber = phone;
@@ -127,180 +233,229 @@ export default function EditProfileScreen() {
     }
 
     if (Object.keys(updateData).length === 0) {
-      Alert.alert('No Changes', 'No changes were made to your profile');
+      Alert.alert('NO CHANGES', 'No changes were made to your profile');
       return;
     }
 
     updateMutation.mutate(updateData);
   };
 
-  const fields: FormField[] = [
-    {
-      key: 'name',
-      label: 'Full Name',
-      icon: 'person-outline',
-      placeholder: 'Enter your name',
-      value: formData.name,
-    },
-    {
-      key: 'age',
-      label: 'Age',
-      icon: 'calendar-outline',
-      placeholder: 'Enter your age',
-      keyboardType: 'numeric',
-      value: formData.age,
-    },
-    {
-      key: 'phoneNumber',
-      label: 'Phone Number',
-      icon: 'call-outline',
-      placeholder: 'Enter your phone number',
-      keyboardType: 'phone-pad',
-      value: formData.phoneNumber,
-    },
-    {
-      key: 'primaryAddress',
-      label: 'Primary Address',
-      icon: 'location-outline',
-      placeholder: 'Enter your address',
-      value: formData.primaryAddress,
-    },
-  ];
-
-  if (isLoading) {
+  if (isLoading && !profile) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator size="large" color="#E13333" />
-        <Text className="mt-4 text-gray-600" style={{ fontFamily: 'Inter' }}>
-          Loading profile...
-        </Text>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={SIGNAL_RED} />
+        <Text style={styles.loadingText}>LOADING PROFILE...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={styles.keyboardView}
       >
-        {/* Header */}
-        <View className="bg-primary px-5 py-4">
-          <View className="flex-row items-center justify-between">
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text
-              className="text-xl text-white"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              Edit Profile
-            </Text>
-            <View className="w-6" />
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={OFF_WHITE} />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandMark}>RESQ</Text>
+              <Text style={styles.brandDot}>.</Text>
+            </View>
+            <View style={styles.headerLine} />
+            <Text style={styles.tagline}>EDIT PROFILE</Text>
           </View>
         </View>
 
         <ScrollView
-          className="flex-1 px-5 pt-6"
+          style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={styles.scrollContent}
         >
-          {/* Avatar Section */}
-          <View className="items-center mb-6">
-            <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
-              <Text
-                className="text-4xl text-white"
-                style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-              >
-                {formData.name?.charAt(0)?.toUpperCase() || 'U'}
-              </Text>
-            </View>
-            <Text
-              className="mt-3 text-lg text-gray-800 font-semibold"
-              style={{ fontFamily: 'Inter' }}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity
+              onPress={handlePickImage}
+              disabled={isUploading}
+              style={styles.avatarContainer}
+              activeOpacity={0.8}
             >
-              {profile?.email}
-            </Text>
+              {profile?.profilePicture ? (
+                <Image
+                  source={{ uri: profile.profilePicture }}
+                  style={styles.avatar}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {formData.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cameraOverlay}>
+                {isUploading ? (
+                  <ActivityIndicator size="small" color={OFF_WHITE} />
+                ) : (
+                  <Ionicons name="camera" size={14} color={OFF_WHITE} />
+                )}
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.emailText}>{profile?.email}</Text>
+            <Text style={styles.tapToChangeText}>TAP TO CHANGE PHOTO</Text>
           </View>
 
-          {/* Form Fields */}
-          <View
-            className="bg-white rounded-2xl p-4 shadow-sm"
-            style={{ elevation: 2 }}
-          >
-            {fields.map((field, index) => (
-              <View
-                key={field.key}
-                className={`${index < fields.length - 1 ? 'mb-4 pb-4 border-b border-gray-100' : ''}`}
-              >
-                <Text
-                  className="text-sm font-medium text-gray-700 mb-2"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  {field.label}
-                </Text>
-                <View className="flex-row items-center bg-gray-50 rounded-xl px-4">
-                  <Ionicons name={field.icon} size={20} color="#9CA3AF" />
+          <View style={styles.formSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>PERSONAL INFORMATION</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            <View style={styles.formCard}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>FULL NAME</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="person-outline" size={20} color={MID_GRAY} />
                   <TextInput
-                    value={field.value}
+                    value={formData.name}
                     onChangeText={text =>
-                      setFormData({ ...formData, [field.key]: text })
+                      setFormData({ ...formData, name: text })
                     }
-                    placeholder={field.placeholder}
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType={field.keyboardType || 'default'}
-                    className="flex-1 ml-3 py-3 text-gray-800"
-                    style={{ fontFamily: 'Inter' }}
+                    placeholder="Enter your name"
+                    placeholderTextColor={MID_GRAY}
+                    style={styles.input}
                     editable={!updateMutation.isPending}
                   />
                 </View>
               </View>
-            ))}
+
+              <View style={styles.fieldDivider} />
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>AGE</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={MID_GRAY}
+                  />
+                  <TextInput
+                    value={formData.age}
+                    onChangeText={text =>
+                      setFormData({ ...formData, age: text })
+                    }
+                    placeholder="Enter your age"
+                    placeholderTextColor={MID_GRAY}
+                    keyboardType="numeric"
+                    style={styles.input}
+                    editable={!updateMutation.isPending}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.fieldDivider} />
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>PHONE NUMBER</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="call-outline" size={20} color={MID_GRAY} />
+                  <TextInput
+                    value={formData.phoneNumber}
+                    onChangeText={text =>
+                      setFormData({ ...formData, phoneNumber: text })
+                    }
+                    placeholder="Enter your phone number"
+                    placeholderTextColor={MID_GRAY}
+                    keyboardType="phone-pad"
+                    style={styles.input}
+                    editable={!updateMutation.isPending}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.fieldDivider} />
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>PRIMARY ADDRESS</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={20}
+                    color={MID_GRAY}
+                  />
+                  <TextInput
+                    value={formData.primaryAddress}
+                    onChangeText={text =>
+                      setFormData({ ...formData, primaryAddress: text })
+                    }
+                    placeholder="Enter your address"
+                    placeholderTextColor={MID_GRAY}
+                    style={styles.input}
+                    editable={!updateMutation.isPending}
+                  />
+                </View>
+              </View>
+            </View>
           </View>
 
-          {/* Email (Read-only) */}
-          <View className="mt-4 bg-gray-100 rounded-2xl p-4">
-            <View className="flex-row items-center">
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
-              <View className="ml-3">
-                <Text
-                  className="text-xs text-gray-500"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Email (cannot be changed)
-                </Text>
-                <Text
-                  className="text-sm text-gray-600"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  {profile?.email}
-                </Text>
+          <View style={styles.emailSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>ACCOUNT DETAILS</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            <View style={styles.readOnlyCard}>
+              <View style={styles.readOnlyItem}>
+                <View style={styles.readOnlyIcon}>
+                  <Ionicons name="mail-outline" size={18} color={MID_GRAY} />
+                </View>
+                <View style={styles.readOnlyContent}>
+                  <Text style={styles.readOnlyLabel}>
+                    EMAIL (CANNOT BE CHANGED)
+                  </Text>
+                  <Text style={styles.readOnlyValue}>{profile?.email}</Text>
+                </View>
               </View>
+              {profile?.phoneNumber && !formData.phoneNumber && (
+                <View style={styles.readOnlyItem}>
+                  <View style={styles.readOnlyIcon}>
+                    <Ionicons name="call-outline" size={18} color={MID_GRAY} />
+                  </View>
+                  <View style={styles.readOnlyContent}>
+                    <Text style={styles.readOnlyLabel}>
+                      PHONE (CONTACT ADMIN)
+                    </Text>
+                    <Text style={styles.readOnlyValue}>
+                      {profile.phoneNumber}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
           </View>
         </ScrollView>
 
-        {/* Save Button */}
-        <View className="px-5 pb-6 pt-3 bg-white border-t border-gray-100">
+        <View style={styles.footer}>
           <TouchableOpacity
             onPress={handleSave}
             disabled={updateMutation.isPending}
-            className={`rounded-2xl py-4 flex-row items-center justify-center ${
-              updateMutation.isPending ? 'bg-gray-300' : 'bg-primary'
-            }`}
+            style={[
+              styles.saveButton,
+              updateMutation.isPending && styles.saveButtonDisabled,
+            ]}
             activeOpacity={0.8}
           >
             {updateMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={OFF_WHITE} />
             ) : (
               <>
-                <Ionicons name="checkmark" size={20} color="#fff" />
-                <Text
-                  className="ml-2 text-white font-bold text-lg"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Save Changes
-                </Text>
+                <Ionicons name="checkmark" size={20} color={OFF_WHITE} />
+                <Text style={styles.saveButtonText}>SAVE CHANGES</Text>
               </>
             )}
           </TouchableOpacity>
@@ -309,3 +464,236 @@ export default function EditProfileScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  backButton: {
+    padding: 10,
+    marginRight: 16,
+    backgroundColor: SIGNAL_RED,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: OFF_WHITE,
+  },
+  cameraOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: SIGNAL_RED,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: OFF_WHITE,
+  },
+  emailText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: BLACK,
+    marginBottom: 8,
+  },
+  tapToChangeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  formSection: {
+    paddingHorizontal: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  formCard: {
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  field: {
+    paddingVertical: 4,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  fieldDivider: {
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginVertical: 12,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: BLACK,
+    marginLeft: 12,
+    padding: 0,
+  },
+  emailSection: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+  readOnlyCard: {
+    backgroundColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  readOnlyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  readOnlyIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: OFF_WHITE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  readOnlyContent: {
+    flex: 1,
+  },
+  readOnlyLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  readOnlyValue: {
+    fontSize: 12,
+    color: BLACK,
+    letterSpacing: 0.5,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PRIMARY,
+    paddingVertical: 16,
+  },
+  saveButtonDisabled: {
+    backgroundColor: MID_GRAY,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+});

@@ -43,21 +43,19 @@ class SocketManager {
     this.isInitialized = true;
 
     if (DEBUG_SOCKET) {
-      this.socket.onAny((event, ...args) => {
-        console.log(
-          `%c⬇️ SOCKET EVENT`,
-          'color:#4CAF50;font-weight:bold;',
-          event,
-          args.length === 1 ? args[0] : args
-        );
-      });
+      // this.socket.onAny((event, ...args) => {
+      //   console.log(
+      //     `[🏴‍☠️ ANY] SOCKET EVENT`,
+      //     event,
+      //     args.length === 1 ? args[0] : args
+      //   );
+      // });
 
       // Wrap emit to log outgoing events
       const originalEmit = this.socket.emit.bind(this.socket);
       this.socket.emit = ((event: string, ...args: any[]) => {
         console.log(
-          `%c⬆️ SOCKET EMIT`,
-          'color:#2196F3;font-weight:bold;',
+          `[⬆️ EMIT] SOCKET EMIT`,
           event,
           args.length === 1 ? args[0] : args
         );
