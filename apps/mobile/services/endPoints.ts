@@ -41,6 +41,8 @@ export const emergencyRequestEndpoints = {
   cancel: (id: string) => `/emergency-request/${id}/cancel`,
   status: (id: string) => `/emergency-request/${id}/status`,
   confirmArrival: (id: string) => `/emergency-request/${id}/confirm-arrival`,
+  providerConfirmArrival: (id: string) =>
+    `/emergency-request/${id}/confirm-arrived`,
   complete: (id: string) => `/emergency-request/${id}/complete`,
   // History endpoints
   userHistory: `/emergency-request/user/history`,

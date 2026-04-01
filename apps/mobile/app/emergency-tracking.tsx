@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,6 +29,7 @@ import {
   useConfirmProviderArrival,
   useGetEmergencyRequest,
   useGetNearbyProviders,
+  useProviderConfirmArrival,
 } from '@/services/emergency/emergency.api';
 import { fetchRoute } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
@@ -40,6 +42,13 @@ import {
   mapboxToLatLng,
 } from '@/utils/location.utils';
 
+const SIGNAL_RED = '#E63329';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
+
 interface LocationCoords {
   latitude: number;
   longitude: number;
@@ -49,22 +58,29 @@ const EMERGENCY_ICONS: Record<
   string,
   { icon: string; color: string; label: string }
 > = {
-  ambulance: { icon: 'ambulance', color: '#EF4444', label: 'Medical' },
+  ambulance: { icon: 'ambulance', color: SIGNAL_RED, label: 'Medical' },
   police: { icon: 'shield-account', color: '#3B82F6', label: 'Police' },
   fire_truck: { icon: 'fire-truck', color: '#F97316', label: 'Fire' },
   rescue_team: { icon: 'lifebuoy', color: '#10B981', label: 'Rescue' },
 };
 
-const STATUS_MESSAGES: Record<string, { message: string; color: string }> = {
-  pending: { message: 'Finding nearby providers...', color: '#F59E0B' },
-  accepted: { message: 'Provider is on the way!', color: '#10B981' },
-  in_progress: { message: 'Help is arriving', color: '#3B82F6' },
-  completed: { message: 'Emergency resolved', color: '#10B981' },
-  cancelled: { message: 'Request cancelled', color: '#6B7280' },
-  no_providers_available: {
-    message: 'No providers available nearby',
-    color: '#EF4444',
-  },
+const STATUS_MESSAGES = (
+  role: 'user' | 'provider' = 'user'
+): Record<string, { message: string; color: string }> => {
+  return {
+    pending: { message: 'FINDING NEARBY RESPONDERS...', color: '#F59E0B' },
+    accepted: {
+      message: `${role === 'user' ? 'RESPONDER IS' : 'YOU ARE'} ON THE WAY`,
+      color: '#10B981',
+    },
+    in_progress: { message: 'HELP IS ARRIVING', color: '#3B82F6' },
+    completed: { message: 'EMERGENCY RESOLVED', color: '#10B981' },
+    cancelled: { message: 'REQUEST CANCELLED', color: MID_GRAY },
+    no_providers_available: {
+      message: 'NO RESPONDERS AVAILABLE NEARBY',
+      color: SIGNAL_RED,
+    },
+  };
 };
 
 // Route refetch threshold (meters)
@@ -74,7 +90,11 @@ const LOCATION_BROADCAST_INTERVAL = 3000;
 
 export default function EmergencyTrackingScreen() {
   const router = useRouter();
-  const { requestId, emergencyType, role } = useLocalSearchParams<{
+  const {
+    requestId,
+    emergencyType,
+    role = 'user',
+  } = useLocalSearchParams<{
     requestId: string;
     emergencyType: string;
     role?: 'user' | 'provider';
@@ -83,13 +103,13 @@ export default function EmergencyTrackingScreen() {
   const mapRef = useRef<MapView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const lastRouteFetchLocation = useRef<LocationCoords | null>(null);
-  const locationBroadcastTimer = useRef<NodeJS.Timeout | null>(null);
+  const locationBroadcastTimer = useRef<NodeJS.TimeOut | null>(null);
   const isRouteRefetchingRef = useRef(false);
 
   // Determine if current user is provider or user
   const isProvider = role === 'provider';
 
-  // For testing: Both user and provider see user at TEST_CORDS location
+  // FIX: For testing: Both user and provider see user at TEST_CORDS location
   // In production, this would come from the emergency request data
   const initialUserLocation = TEST_CORDS;
 
@@ -107,6 +127,7 @@ export default function EmergencyTrackingScreen() {
   } | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+
   // Provider starts with ACCEPTED status since they've already accepted
   // User starts with PENDING and waits for socket update
   const [localStatus, setLocalStatus] = useState<EmergencyStatus>(
@@ -136,6 +157,9 @@ export default function EmergencyTrackingScreen() {
     useCancelEmergencyRequest();
   const { mutate: confirmArrival, isPending: isConfirmingArrival } =
     useConfirmProviderArrival();
+
+  const { mutate: confirmArrived, isPending: isConfirmingArrived } =
+    useProviderConfirmArrival();
 
   const emergencyRequest = requestData?.data?.data;
   const nearbyProviders = useMemo(
@@ -485,6 +509,22 @@ export default function EmergencyTrackingScreen() {
       }
     };
 
+    // handle confirmation
+    const handleProviderConfirmed = (data: any) => {
+      if (isProvider) return;
+      Alert.alert(
+        'Confirm Arrival',
+        data.message || 'The provider has confimed his arrival',
+        [
+          {
+            text: 'YES',
+            onPress: () =>
+              router.replace(isProvider ? '/(provider)/dashboard' : '/(tabs)'),
+          },
+        ]
+      );
+    };
+
     socketManager.on(
       SocketEvents.PROVIDER_LOCATION_UPDATED,
       handleProviderLocation
@@ -493,6 +533,10 @@ export default function EmergencyTrackingScreen() {
     socketManager.on(SocketEvents.REQUEST_ACCEPTED, handleProviderAccepted);
     socketManager.on(SocketEvents.REQUEST_COMPLETED, handleEmergencyCompleted);
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+    socketManager.on(
+      SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
+      handleProviderConfirmed
+    );
 
     return () => {
       socketManager.off(
@@ -506,6 +550,10 @@ export default function EmergencyTrackingScreen() {
         handleEmergencyCompleted
       );
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+      socketManager.off(
+        SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
+        handleProviderConfirmed
+      );
     };
   }, [requestId, socket?.id, isProvider, router]);
 
@@ -612,27 +660,60 @@ export default function EmergencyTrackingScreen() {
   const handleConfirmArrival = () => {
     Alert.alert(
       'Confirm Arrival',
-      'Has the service provider arrived at your location?',
+      `${role === 'user' ? 'Has the service provider arrived at your location?' : 'Have you arrived to the location ?'}`,
       [
         { text: 'No', style: 'cancel' },
         {
           text: 'Yes, Arrived',
           onPress: () => {
-            confirmArrival(requestId!, {
-              onSuccess: () => {
-                Alert.alert(
-                  'Arrival Confirmed',
-                  'Thank you for confirming. The service provider has arrived.',
-                  [{ text: 'OK' }]
-                );
-              },
-              onError: (error: any) => {
-                Alert.alert(
-                  'Error',
-                  error.response?.data?.message || 'Failed to confirm arrival.'
-                );
-              },
-            });
+            if (!requestId) {
+              Alert.alert(
+                'Sorry Request ID is not found!',
+                'Simply exit the screen. Thank you for your patience.'
+              );
+              return;
+            }
+
+            if (role === 'user') {
+              confirmArrival(requestId, {
+                onSuccess: () => {
+                  Alert.alert(
+                    'Arrival Confirmed',
+                    'Thank you for confirming. The service provider has arrived.',
+                    [{ text: 'OK', onPress: () => router.push('/(tabs)') }]
+                  );
+                },
+                onError: (error: any) => {
+                  Alert.alert(
+                    'Error',
+                    error.response?.data?.message ||
+                      'Failed to confirm arrival.'
+                  );
+                },
+              });
+            } else {
+              confirmArrived(requestId, {
+                onSuccess: () => {
+                  Alert.alert(
+                    'Arrival Confirmed',
+                    'Thank you for confirming. You have arrived.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => router.push('/(provider)/dashboard'),
+                      },
+                    ]
+                  );
+                },
+                onError: (error: any) => {
+                  Alert.alert(
+                    'Error',
+                    error.response?.data?.message ||
+                      'Failed to confirm arrival.'
+                  );
+                },
+              });
+            }
           },
         },
       ]
@@ -671,19 +752,39 @@ export default function EmergencyTrackingScreen() {
   };
 
   const emergencyInfo = EMERGENCY_ICONS[emergencyType || 'ambulance'];
-  const statusInfo = STATUS_MESSAGES[currentStatus] || STATUS_MESSAGES.pending;
+  const statusInfo =
+    STATUS_MESSAGES(role)[currentStatus] || STATUS_MESSAGES(role)['pending'];
 
   if (isLoadingRequest) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#E13333" />
-        <Text style={styles.loadingText}>Loading emergency details...</Text>
+        <ActivityIndicator size="large" color={SIGNAL_RED} />
+        <Text style={styles.loadingText}>LOADING EMERGENCY DETAILS...</Text>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={BLACK} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>EMERGENCY TRACKING</Text>
+        </View>
+      </View>
+
       {/* Map */}
       <MapView
         ref={mapRef}
@@ -953,6 +1054,30 @@ export default function EmergencyTrackingScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Complete button */}
+        {isProvider && currentStatus === EmergencyStatus.ACCEPTED && (
+          <TouchableOpacity
+            style={styles.confirmArrivalButton}
+            onPress={handleConfirmArrival}
+            disabled={isConfirmingArrival}
+          >
+            {isConfirmingArrival ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color="#fff"
+                />
+                <Text style={styles.confirmArrivalButtonText}>
+                  Confirm Arrival
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
         {/* Connection Status */}
         <View style={styles.connectionStatus}>
           <View
@@ -973,19 +1098,64 @@ export default function EmergencyTrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+    backgroundColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
   },
   map: {
     flex: 1,
@@ -994,7 +1164,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1008,7 +1178,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#6B7280',
+    backgroundColor: MID_GRAY,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1031,7 +1201,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1046,7 +1216,7 @@ const styles = StyleSheet.create({
     left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1061,16 +1231,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   routeInfoText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: BLACK,
     marginLeft: 4,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   routeInfoDivider: {
     width: 1,
     height: 16,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: LIGHT_GRAY,
     marginHorizontal: 10,
   },
   statusCard: {
@@ -1078,7 +1248,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -1099,11 +1269,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   typeBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: OFF_WHITE,
+    fontSize: 12,
+    fontWeight: '700',
     marginLeft: 8,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   roleBadge: {
     backgroundColor: 'rgba(255,255,255,0.3)',
@@ -1113,9 +1283,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   roleBadgeText: {
-    color: '#fff',
+    color: OFF_WHITE,
     fontSize: 10,
     fontWeight: '600',
+    letterSpacing: 1,
   },
   statusSection: {
     flexDirection: 'row',
@@ -1123,16 +1294,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statusText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     marginLeft: 12,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
+    color: BLACK,
   },
   providersCount: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 12,
+    color: MID_GRAY,
     marginBottom: 16,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   etaSection: {
     flexDirection: 'row',
@@ -1149,11 +1321,12 @@ const styles = StyleSheet.create({
   etaValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: OFF_WHITE,
   },
   etaLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 1,
   },
   distanceBox: {
     backgroundColor: '#3B82F6',
@@ -1165,14 +1338,15 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: OFF_WHITE,
   },
   distanceLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 1,
   },
   providerInfo: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: LIGHT_GRAY,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -1196,13 +1370,11 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
-    fontFamily: 'Inter',
+    color: BLACK,
   },
   providerVehicle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 12,
+    color: MID_GRAY,
   },
   callButton: {
     flexDirection: 'row',
@@ -1214,11 +1386,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   callButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: OFF_WHITE,
+    fontSize: 14,
+    fontWeight: '700',
     marginLeft: 8,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   cancelButton: {
     flexDirection: 'row',
@@ -1226,16 +1398,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: SIGNAL_RED,
     borderRadius: 12,
     marginBottom: 12,
   },
   cancelButtonText: {
-    color: '#EF4444',
-    fontSize: 16,
-    fontWeight: '500',
+    color: SIGNAL_RED,
+    fontSize: 14,
+    fontWeight: '600',
     marginLeft: 8,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   confirmArrivalButton: {
     flexDirection: 'row',
@@ -1247,11 +1419,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   confirmArrivalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: OFF_WHITE,
+    fontSize: 14,
+    fontWeight: '700',
     marginLeft: 8,
-    fontFamily: 'Inter',
+    letterSpacing: 1,
   },
   connectionStatus: {
     flexDirection: 'row',
@@ -1265,8 +1437,8 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   connectionText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 1,
   },
 });

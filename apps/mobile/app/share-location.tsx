@@ -7,9 +7,12 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  Platform,
   ScrollView,
   Share,
+  StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,6 +21,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/store/authStore';
 import { formatShareMessage, getGoogleMapsLink } from '@/utils/sms.utils';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 interface LocationCoords {
   latitude: number;
@@ -42,7 +52,7 @@ export default function ShareLocationScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Denied',
+          'PERMISSION DENIED',
           'Location permission is required to share your location.'
         );
         setIsLoading(false);
@@ -61,7 +71,6 @@ export default function ShareLocationScreen() {
 
       setLocation(coords);
 
-      // Get address from coordinates
       try {
         const [addressResult] = await Location.reverseGeocodeAsync(coords);
         if (addressResult) {
@@ -78,7 +87,6 @@ export default function ShareLocationScreen() {
         setAddress('');
       }
 
-      // Center map on location
       if (mapRef.current) {
         mapRef.current.animateToRegion({
           ...coords,
@@ -87,7 +95,7 @@ export default function ShareLocationScreen() {
         });
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to get your location. Please try again.');
+      Alert.alert('ERROR', 'Failed to get your location. Please try again.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -100,7 +108,7 @@ export default function ShareLocationScreen() {
 
   const handleShare = async () => {
     if (!location) {
-      Alert.alert('Error', 'Location not available');
+      Alert.alert('ERROR', 'Location not available');
       return;
     }
 
@@ -113,7 +121,7 @@ export default function ShareLocationScreen() {
         title: 'My Location',
       });
     } catch (error) {
-      Alert.alert('Error', 'Failed to share location');
+      Alert.alert('ERROR', 'Failed to share location');
     }
   };
 
@@ -122,7 +130,7 @@ export default function ShareLocationScreen() {
 
     const coords = `${location.latitude}, ${location.longitude}`;
     Clipboard.setString(coords);
-    Alert.alert('Copied!', 'Coordinates copied to clipboard');
+    Alert.alert('COPIED', 'Coordinates copied to clipboard');
   };
 
   const handleCopyLink = () => {
@@ -130,7 +138,7 @@ export default function ShareLocationScreen() {
 
     const link = getGoogleMapsLink(location.latitude, location.longitude);
     Clipboard.setString(link);
-    Alert.alert('Copied!', 'Google Maps link copied to clipboard');
+    Alert.alert('COPIED', 'Google Maps link copied to clipboard');
   };
 
   const handleShareViaApp = (app: string) => {
@@ -157,7 +165,7 @@ export default function ShareLocationScreen() {
     if (url) {
       import('react-native').then(({ Linking }) => {
         Linking.openURL(url).catch(() => {
-          Alert.alert('Error', `Unable to open ${app}`);
+          Alert.alert('ERROR', `Unable to open ${app}`);
         });
       });
     }
@@ -165,53 +173,57 @@ export default function ShareLocationScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#E13333" />
-        <Text className="mt-4 text-gray-600" style={{ fontFamily: 'Inter' }}>
-          Getting your location...
-        </Text>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={SIGNAL_RED} />
+        <Text style={styles.loadingText}>GETTING YOUR LOCATION...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-      {/* Header */}
-      <View className="flex-row items-center justify-between bg-primary px-4 pb-4 pt-2">
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white/20"
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Share Location
-          </Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header - Swiss style */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={BLACK} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>SHARE LOCATION</Text>
         </View>
         <TouchableOpacity
           onPress={() => fetchLocation(false)}
-          className="h-10 w-10 items-center justify-center rounded-full bg-white/20"
+          style={styles.refreshButton}
           disabled={isRefreshing}
+          activeOpacity={0.7}
         >
           {isRefreshing ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={BLACK} />
           ) : (
-            <Ionicons name="refresh" size={20} color="#fff" />
+            <Ionicons name="refresh" size={20} color={BLACK} />
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Map */}
-        <View className="h-64">
+        <View style={styles.mapContainer}>
           {location ? (
             <MapView
               ref={mapRef}
-              style={{ flex: 1 }}
+              style={styles.map}
               provider={PROVIDER_GOOGLE}
               initialRegion={{
                 ...location,
@@ -222,169 +234,365 @@ export default function ShareLocationScreen() {
               showsMyLocationButton={false}
             >
               <Marker coordinate={location}>
-                <View className="items-center">
-                  <View className="h-10 w-10 items-center justify-center rounded-full bg-primary shadow-lg">
-                    <Ionicons name="location" size={24} color="white" />
+                <View style={styles.markerContainer}>
+                  <View style={styles.markerInner}>
+                    <Ionicons name="location" size={24} color={OFF_WHITE} />
                   </View>
-                  <View className="-mt-1.5 h-3 w-3 rotate-45 bg-primary" />
+                  <View style={styles.markerArrow} />
                 </View>
               </Marker>
             </MapView>
           ) : (
-            <View className="flex-1 items-center justify-center bg-gray-100">
-              <Ionicons name="location-outline" size={48} color="#9CA3AF" />
-              <Text
-                className="mt-2 text-gray-500"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Location unavailable
+            <View style={styles.mapPlaceholder}>
+              <Ionicons name="location-outline" size={48} color={MID_GRAY} />
+              <Text style={styles.mapPlaceholderText}>
+                LOCATION UNAVAILABLE
               </Text>
             </View>
           )}
         </View>
 
         {/* Location Info Card */}
-        <View
-          className="mx-4 -mt-6 rounded-2xl bg-white p-4 shadow-lg"
-          style={{ elevation: 4 }}
-        >
-          <View className="flex-row items-center mb-3">
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Ionicons name="location" size={24} color="#E13333" />
+        <View style={styles.locationCard}>
+          <View style={styles.locationHeader}>
+            <View style={styles.locationIcon}>
+              <Ionicons name="location" size={24} color={SIGNAL_RED} />
             </View>
-            <View className="ml-3 flex-1">
-              <Text
-                className="text-xs text-gray-500"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Your Current Location
-              </Text>
-              <Text
-                className="text-sm font-medium text-gray-800"
-                style={{ fontFamily: 'Inter' }}
-                numberOfLines={2}
-              >
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>YOUR CURRENT LOCATION</Text>
+              <Text style={styles.locationAddress} numberOfLines={2}>
                 {address || 'Address unavailable'}
               </Text>
             </View>
           </View>
 
           {location && (
-            <View className="flex-row items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-              <Text
-                className="text-xs text-gray-600"
-                style={{ fontFamily: 'Inter' }}
-              >
+            <View style={styles.coordinatesRow}>
+              <Text style={styles.coordinatesText}>
                 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
               </Text>
               <TouchableOpacity onPress={handleCopyCoordinates}>
-                <Ionicons name="copy-outline" size={18} color="#6B7280" />
+                <Ionicons name="copy-outline" size={18} color={MID_GRAY} />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         {/* Share Options */}
-        <View className="px-4 pt-6">
-          <Text
-            className="mb-4 text-lg text-gray-800"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Share via
-          </Text>
-
-          <View className="flex-row justify-between mb-4">
-            <TouchableOpacity
-              onPress={() => handleShareViaApp('whatsapp')}
-              className="items-center flex-1"
-            >
-              <View className="h-14 w-14 items-center justify-center rounded-full bg-green-500">
-                <Ionicons name="logo-whatsapp" size={28} color="#fff" />
-              </View>
-              <Text
-                className="mt-2 text-xs text-gray-600"
-                style={{ fontFamily: 'Inter' }}
-              >
-                WhatsApp
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleShareViaApp('sms')}
-              className="items-center flex-1"
-            >
-              <View className="h-14 w-14 items-center justify-center rounded-full bg-blue-500">
-                <Ionicons name="chatbubble" size={28} color="#fff" />
-              </View>
-              <Text
-                className="mt-2 text-xs text-gray-600"
-                style={{ fontFamily: 'Inter' }}
-              >
-                SMS
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleShareViaApp('email')}
-              className="items-center flex-1"
-            >
-              <View className="h-14 w-14 items-center justify-center rounded-full bg-red-500">
-                <Ionicons name="mail" size={28} color="#fff" />
-              </View>
-              <Text
-                className="mt-2 text-xs text-gray-600"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Email
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleShare}
-              className="items-center flex-1"
-            >
-              <View className="h-14 w-14 items-center justify-center rounded-full bg-gray-700">
-                <Ionicons name="share-social" size={28} color="#fff" />
-              </View>
-              <Text
-                className="mt-2 text-xs text-gray-600"
-                style={{ fontFamily: 'Inter' }}
-              >
-                More
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>SHARE VIA</Text>
+            <View style={styles.sectionLine} />
           </View>
 
-          {/* Copy Link Button */}
-          <TouchableOpacity
-            onPress={handleCopyLink}
-            className="flex-row items-center justify-center rounded-xl border border-gray-200 bg-white py-4 mb-4"
-          >
-            <Ionicons name="link-outline" size={20} color="#374151" />
-            <Text
-              className="ml-2 text-gray-700 font-medium"
-              style={{ fontFamily: 'Inter' }}
+          <View style={styles.shareGrid}>
+            <TouchableOpacity
+              style={styles.shareOption}
+              onPress={() => handleShareViaApp('whatsapp')}
+              activeOpacity={0.7}
             >
-              Copy Google Maps Link
-            </Text>
-          </TouchableOpacity>
+              <View style={[styles.shareIcon, { backgroundColor: '#25D366' }]}>
+                <Ionicons name="logo-whatsapp" size={28} color={OFF_WHITE} />
+              </View>
+              <Text style={styles.shareLabel}>WHATSAPP</Text>
+            </TouchableOpacity>
 
-          {/* Main Share Button */}
-          <TouchableOpacity
-            onPress={handleShare}
-            className="flex-row items-center justify-center rounded-xl bg-primary py-4 mb-8"
-            disabled={!location}
-          >
-            <Ionicons name="share-outline" size={24} color="#fff" />
-            <Text
-              className="ml-2 text-white font-semibold text-lg"
-              style={{ fontFamily: 'Inter' }}
+            <TouchableOpacity
+              style={styles.shareOption}
+              onPress={() => handleShareViaApp('sms')}
+              activeOpacity={0.7}
             >
-              Share My Location
-            </Text>
+              <View style={[styles.shareIcon, { backgroundColor: '#3B82F6' }]}>
+                <Ionicons name="chatbubble" size={28} color={OFF_WHITE} />
+              </View>
+              <Text style={styles.shareLabel}>SMS</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shareOption}
+              onPress={() => handleShareViaApp('email')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIcon, { backgroundColor: '#6B7280' }]}>
+                <Ionicons name="mail" size={28} color={OFF_WHITE} />
+              </View>
+              <Text style={styles.shareLabel}>EMAIL</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shareOption}
+              onPress={handleShare}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIcon, { backgroundColor: PRIMARY }]}>
+                <Ionicons name="share-social" size={28} color={OFF_WHITE} />
+              </View>
+              <Text style={styles.shareLabel}>MORE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Copy Link Button */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.copyLinkButton}
+            onPress={handleCopyLink}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="link-outline" size={20} color={BLACK} />
+            <Text style={styles.copyLinkText}>COPY GOOGLE MAPS LINK</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Main Share Button */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShare}
+            disabled={!location}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="share-outline" size={24} color={OFF_WHITE} />
+            <Text style={styles.shareButtonText}>SHARE MY LOCATION</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+    backgroundColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    padding: 8,
+    backgroundColor: LIGHT_GRAY,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  mapContainer: {
+    height: 240,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    backgroundColor: LIGHT_GRAY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 8,
+  },
+  markerContainer: {
+    alignItems: 'center',
+  },
+  markerInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerArrow: {
+    width: 12,
+    height: 12,
+    backgroundColor: PRIMARY,
+    transform: [{ rotate: '45deg' }],
+    marginTop: -6,
+  },
+  locationCard: {
+    marginHorizontal: 24,
+    marginTop: -40,
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  locationContent: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  locationAddress: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: BLACK,
+  },
+  coordinatesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: LIGHT_GRAY,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  coordinatesText: {
+    fontSize: 12,
+    color: MID_GRAY,
+  },
+  section: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  shareGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  shareOption: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  shareIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  shareLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 1,
+  },
+  copyLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    paddingVertical: 16,
+  },
+  copyLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BLACK,
+    letterSpacing: 1,
+    marginLeft: 8,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PRIMARY,
+    paddingVertical: 16,
+  },
+  shareButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+});

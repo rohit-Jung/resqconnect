@@ -64,7 +64,25 @@ export const useConfirmProviderArrival = () => {
     string
   >({
     mutationFn: requestId => {
-      return api.post(emergencyRequestEndpoints.confirmArrival(requestId));
+      return api.patch(emergencyRequestEndpoints.confirmArrival(requestId));
+    },
+  });
+};
+
+export const useProviderConfirmArrival = () => {
+  return useMutation<
+    AxiosResponse<ApiResponse<{ message: string }>>,
+    AxiosError,
+    string
+  >({
+    mutationFn: requestId => {
+      console.log(
+        '[API REQUEST]',
+        emergencyRequestEndpoints.providerConfirmArrival(requestId)
+      );
+      return api.patch(
+        emergencyRequestEndpoints.providerConfirmArrival(requestId)
+      );
     },
   });
 };

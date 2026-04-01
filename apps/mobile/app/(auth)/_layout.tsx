@@ -43,6 +43,20 @@ const AuthLayout: React.FC = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="upload-documents"
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="verification-pending"
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
     </Stack>
   );
 };
