@@ -12,9 +12,9 @@
     "db:migrate": "bun drizzle-kit migrate",
     "db:studio": "bun drizzle-kit studio",
     "db:generate": "bun drizzle-kit generate",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "^6.0.0",
@@ -26,7 +26,9 @@
     "@types/morgan": "^1.9.10",
     "@types/nodemailer": "^7.0.4",
     "drizzle-kit": "^0.31.7",
-    "prettier": "^3.7.4"
+    "prettier": "^3.7.4",
+    "vitest": "^4.1.1",
+    "vitest-mock-extended": "^3.1.0"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -36,14 +38,15 @@
     "authenticator": "^1.1.5",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.9.0",
     "cookie": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
     "drizzle-zod": "^0.8.3",
-    "express": "^5.1.0",
     "expo-server-sdk": "^3.10.0",
+    "express": "^5.1.0",
     "h3-js": "^4.4.0",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
@@ -53,6 +56,7 @@
     "nodemailer": "^7.0.10",
     "pg": "^8.16.3",
     "socket.io": "^4.8.3",
+    "twilio": "^5.13.0",
     "winston": "^3.18.3",
     "zod": "^4.1.12"
   }

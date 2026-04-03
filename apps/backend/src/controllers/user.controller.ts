@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HttpStatusCode } from 'axios';
 import bcrypt from 'bcryptjs';
 import { eq, or, sql } from 'drizzle-orm';
@@ -494,7 +493,6 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const resetPassword = asyncHandler(async (req: Request, res: Response) => {
-  // TODO: Need to refactor this
   const { otpToken, userId, password } = req.body;
 
   if (!otpToken) {

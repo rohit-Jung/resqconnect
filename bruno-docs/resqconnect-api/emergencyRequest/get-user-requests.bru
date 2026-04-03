@@ -1,0 +1,49 @@
+meta {
+  name: get-user-requests
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{server}}/emergency-request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{userToken}}
+}
+
+docs {
+  # Get User's Emergency Requests
+  
+  Returns all emergency requests created by the authenticated user.
+  
+  ## Authentication
+  Requires user role authentication (JWT token)
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Emergency requests fetched successfully",
+    "data": [
+      {
+        "id": "uuid",
+        "emergencyType": "police",
+        "emergencyDescription": "Description",
+        "emergencyLocation": {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+        },
+        "status": "pending",
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}

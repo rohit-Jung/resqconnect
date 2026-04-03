@@ -1,0 +1,27 @@
+meta {
+  name: dashboardAnalytics
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{server}}/organization/dashboard-analytics
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{orgToken}}
+}
+
+docs {
+  # Organization Dashboard Analytics
+  
+  Returns comprehensive analytics for the logged-in organization's dashboard.
+  
+  ## Response
+  - organization: { id, name, serviceCategory }
+  - providers: { total, thisMonth, lastMonth, available, availabilityPercentage, recent[] }
+  - emergencyRequests: { total, thisMonth, pending, completed, recent[] }
+  - emergencyResponses: { total, thisMonth, lastMonth, recent[] }
+}

@@ -185,7 +185,6 @@ function VerifyPageContent() {
                     type="button"
                     className="text-blue-600 hover:underline"
                     onClick={() => {
-                      // TODO: Implement resend OTP functionality
                       console.log('Resend OTP');
                     }}
                   >

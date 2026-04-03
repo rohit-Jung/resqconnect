@@ -1,7 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
-// import { SocketEventEnums, SocketRoom } from '@/constants';
 import db from '@/db';
 import {
   emergencyRequest,
@@ -9,13 +8,10 @@ import {
   requestStatusEnum,
   serviceProvider,
 } from '@/models';
-// import { emitSocketEvent } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { getOptimalRoute, reverseGeoCode } from '@/utils/maps/galli-maps';
-
-// import { createNotification } from './notification.controller';
 
 // Helper function to generate a nearby location
 const generateNearbyLocation = (baseLocation: {
@@ -93,28 +89,6 @@ const createEmergencyResponse = asyncHandler(
       )
       .returning();
 
-    // console.log(selectedServiceProvider, "selected provider");
-    // const bestServiceProvider = await getBestServiceProvider(
-    //   emergencyRequestLocation,
-    //   emergencyRequestType
-    // );
-
-    // if (!bestServiceProvider || !bestServiceProvider.id) {
-    //   await db
-    //     .delete(emergencyRequest)
-    //     .where(eq(emergencyRequest.id, emergencyRequestId));
-    //   throw new ApiError(404, "No available service provider found");
-    // }
-
-    // const serviceProviderId = bestServiceProvider.id;
-
-    // if(selectedServiceProvider.length === 0) {
-    //   await db
-    //     .delete(emergencyRequest)
-    //     .where(eq(emergencyRequest.id, emergencyRequestId));
-    //   throw new ApiError(404, "No available service provider found");
-    // }
-
     const serviceProviderId = selectedServiceProvider[0]!.id;
 
     const assignedServiceProvider = await db.query.serviceProvider.findFirst({
@@ -181,63 +155,6 @@ const createEmergencyResponse = asyncHandler(
       emergencyRequestDetails.location.longitude,
       emergencyRequestDetails.location.latitude
     );
-
-    // const providerNotification = await createNotification({
-
-    //   serviceProviderId: assignedServiceProvider.id,
-    //   userId: loggedInUser.id,
-    //   message: `New emergency request assigned to you. Type: ${emergencyRequestType}`,
-    //   type: 'emergency',
-    //   priority: 'high',
-    //   deliveryStatus: 'unread',
-    //   source: 'system',
-    //   metadata: {
-    //     emergencyType: emergencyRequestType,
-    //     location: locationName,
-    //     distance: optimalPath?.distance || 'Calculating...',
-    //     userInfo: {
-    //       name: loggedInUser.name,
-    //       contact: loggedInUser.phoneNumber,
-    //     },
-    //   },
-    // });
-
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.PROVIDER(assignedServiceProvider.id),
-    //   SocketEventEnums.PROVIDER_STATUS_UPDATED,
-    //   {
-    //     status: assignedServiceProvider.serviceStatus,
-    //   }
-    // );
-
-    // Create notification for the user
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.PROVIDER(assignedServiceProvider.id),
-    //   SocketEventEnums.NOTIFICATION_CREATED,
-    //   providerNotification
-    // );
-    //
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.USER(loggedInUser.id),
-    //   SocketEventEnums.EMERGENCY_RESPONSE_CREATED,
-    //   {
-    //     emergencyResponse: newEmergencyResponse[0],
-    //     optimalPath,
-    //   }
-    // );
-    //
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.PROVIDER(assignedServiceProvider.id),
-    //   SocketEventEnums.EMERGENCY_RESPONSE_CREATED,
-    //   {
-    //     emergencyResponse: newEmergencyResponse[0],
-    //     optimalPath,
-    //   }
-    // );
 
     if (!updatedStatus) {
       await db
@@ -387,33 +304,6 @@ const updateEmergencyResponse = asyncHandler(
       console.log('Emergency request not found');
       throw new ApiError(404, 'Emergency request not found');
     }
-
-    // Emit socket events to both user and provider
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.PROVIDER(existingEmergencyResponse.serviceProviderId!),
-    //   SocketEventEnums.EMERGENCY_RESPONSE_STATUS_UPDATED,
-    //   {
-    //     statusUpdate,
-    //     message:
-    //       statusUpdate === 'arrived'
-    //         ? 'You have marked yourself as arrived'
-    //         : 'You have rejected the emergency response',
-    //   }
-    // );
-    //
-    // emitSocketEvent(
-    //   req,
-    //   SocketRoom.USER(emergencyRequestDetails.userId),
-    //   SocketEventEnums.EMERGENCY_RESPONSE_STATUS_UPDATED,
-    //   {
-    //     statusUpdate,
-    //     message:
-    //       statusUpdate === 'arrived'
-    //         ? 'Service provider has arrived at your location'
-    //         : 'Service provider has rejected the emergency response',
-    //   }
-    // );
 
     res
       .status(200)

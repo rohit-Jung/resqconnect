@@ -1,0 +1,24 @@
+meta {
+  name: list
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{server}}/organization/list
+  body: none
+  auth: none
+}
+
+docs {
+  # List Organizations (Public)
+  
+  Public endpoint to list all verified organizations.
+  Used by service providers during registration to select their organization.
+  
+  ## Response
+  Returns an array of verified organizations with:
+  - id: Organization UUID
+  - name: Organization name
+  - serviceCategory: ambulance | police | fire_truck | rescue_team
+}

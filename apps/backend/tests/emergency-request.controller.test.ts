@@ -1,9 +1,5 @@
-/**
- * Emergency Request Controller Tests
- * Tests for emergency request CRUD, acceptance, rejection, cancellation, and completion
- */
 import { HttpStatusCode } from 'axios';
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   acceptEmergencyRequest,
@@ -23,7 +19,6 @@ import {
   createMockNext,
   createMockRequest,
   createMockResponse,
-  getResponseData,
   getStatusCode,
   testEmergencyRequests,
   testLocations,
@@ -42,7 +37,6 @@ describe('Emergency Request Controller Tests', () => {
     mockNext = createMockNext();
   });
 
-  //   Create Emergency Request Tests
   describe('createEmergencyRequest', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
@@ -52,7 +46,11 @@ describe('Emergency Request Controller Tests', () => {
         userLocation: testLocations.kathmandu,
       };
 
-      await createEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await createEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -64,10 +62,13 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.body = {
         emergencyDescription: 'Medical emergency',
         userLocation: testLocations.kathmandu,
-        // Missing emergencyType
       };
 
-      await createEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await createEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -78,10 +79,13 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.body = {
         emergencyType: 'ambulance',
         emergencyDescription: 'Medical emergency',
-        // Missing userLocation
       };
 
-      await createEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await createEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -95,7 +99,11 @@ describe('Emergency Request Controller Tests', () => {
         userLocation: { longitude: 85.324 },
       };
 
-      await createEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await createEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -109,7 +117,11 @@ describe('Emergency Request Controller Tests', () => {
         userLocation: { latitude: 27.7172 },
       };
 
-      await createEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await createEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       const statusCode = getStatusCode(mockRes);
       expect(statusCode).toBe(HttpStatusCode.BadRequest);
@@ -121,12 +133,11 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should publish event to Kafka');
   });
 
-  //   Get Emergency Request Tests
   describe('getEmergencyRequest', () => {
     it('should reject request without ID', async () => {
       mockReq.params = {};
 
-      await getEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await getEmergencyRequest(mockReq as never, mockRes as never, mockNext);
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -141,7 +152,11 @@ describe('Emergency Request Controller Tests', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
 
-      await getUsersEmergencyRequests(mockReq as any, mockRes as any, mockNext);
+      await getUsersEmergencyRequests(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -157,8 +172,8 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.user = null;
 
       await getRecentEmergencyRequests(
-        mockReq as any,
-        mockRes as any,
+        mockReq as never,
+        mockRes as never,
         mockNext
       );
 
@@ -170,13 +185,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should limit results to 10');
   });
 
-  //   Update Emergency Request Tests
   describe('updateEmergencyRequest', () => {
     it('should reject request without ID', async () => {
       mockReq.params = {};
       mockReq.body = { status: 'assigned' };
 
-      await updateEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await updateEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -187,7 +205,11 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
       mockReq.body = {};
 
-      await updateEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await updateEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -199,13 +221,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should return 404 for non-existent request');
   });
 
-  //   Delete Emergency Request Tests
   describe('deleteEmergencyRequest', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
 
-      await deleteEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await deleteEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -216,7 +241,11 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.params = {};
 
-      await deleteEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await deleteEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -224,10 +253,14 @@ describe('Emergency Request Controller Tests', () => {
     });
 
     it('should reject request without user role', async () => {
-      mockReq.user = { id: testUsers.validUser.id } as any; // No role
+      mockReq.user = { id: testUsers.validUser.id } as never;
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
 
-      await deleteEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await deleteEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -238,13 +271,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should return 404 for non-existent request');
   });
 
-  //   Cancel Emergency Request Tests
   describe('cancelEmergencyRequest', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
 
-      await cancelEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await cancelEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -255,7 +291,11 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.params = {};
 
-      await cancelEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await cancelEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -270,13 +310,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should clean up Redis cache');
   });
 
-  //   Accept Emergency Request Tests
   describe('acceptEmergencyRequest', () => {
     it('should reject request from unauthenticated provider', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
 
-      await acceptEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await acceptEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -290,7 +333,11 @@ describe('Emergency Request Controller Tests', () => {
       };
       mockReq.params = {};
 
-      await acceptEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await acceptEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -306,13 +353,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should notify other providers that request is taken');
   });
 
-  //   Reject Emergency Request Tests
   describe('rejectEmergencyRequest', () => {
     it('should reject request from unauthenticated provider', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.pendingRequest.id };
 
-      await rejectEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await rejectEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -326,7 +376,11 @@ describe('Emergency Request Controller Tests', () => {
       };
       mockReq.params = {};
 
-      await rejectEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await rejectEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -338,13 +392,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should emit rejection event for worker');
   });
 
-  //   Complete Emergency Request Tests
   describe('completeEmergencyRequest', () => {
     it('should reject request from unauthenticated provider', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.assignedRequest.id };
 
-      await completeEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await completeEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -358,7 +415,11 @@ describe('Emergency Request Controller Tests', () => {
       };
       mockReq.params = {};
 
-      await completeEmergencyRequest(mockReq as any, mockRes as any, mockNext);
+      await completeEmergencyRequest(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
@@ -372,13 +433,16 @@ describe('Emergency Request Controller Tests', () => {
     it.todo('should notify user of completion');
   });
 
-  //   Confirm Provider Arrival Tests
   describe('confirmProviderArrival', () => {
     it('should reject request from unauthenticated user', async () => {
       mockReq.user = null;
       mockReq.params = { id: testEmergencyRequests.assignedRequest.id };
 
-      await confirmProviderArrival(mockReq as any, mockRes as any, mockNext);
+      await confirmProviderArrival(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
@@ -389,7 +453,11 @@ describe('Emergency Request Controller Tests', () => {
       mockReq.user = { ...testUsers.validUser, id: testUsers.validUser.id };
       mockReq.params = {};
 
-      await confirmProviderArrival(mockReq as any, mockRes as any, mockNext);
+      await confirmProviderArrival(
+        mockReq as never,
+        mockRes as never,
+        mockNext
+      );
 
       expect(
         mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400

@@ -1,0 +1,30 @@
+meta {
+  name: serviceProviders
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{server}}/organization/service-providers
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{orgToken}}
+}
+
+docs {
+  # List Organization Service Providers
+  
+  Get all service providers belonging to the logged-in organization.
+  
+  ## Response
+  Returns array of service providers with:
+  - id, name, email, age, phoneNumber
+  - serviceType, serviceStatus
+  - isVerified, primaryAddress
+  - currentLocation (lat, lng)
+  - vehicleInformation
+  - createdAt, updatedAt
+}

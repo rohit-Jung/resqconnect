@@ -1,14 +1,83 @@
-/**
- * Test Setup and Utilities
- * Provides mock functions, helper utilities, and common test fixtures
- */
-import { mock } from 'bun:test';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { Mock } from 'vitest';
+import { vi } from 'vitest';
+import { type DeepMockProxy, mockDeep, mockReset } from 'vitest-mock-extended';
 
-//  Mock Request/Response Factory
+import type * as models from '@/models';
+
+export type MockDb = DeepMockProxy<NodePgDatabase<typeof models>>;
+
+export const mockDb = mockDeep<NodePgDatabase<typeof models>>();
+
+vi.mock('@/config', () => ({
+  envConfig: {
+    port: 3000,
+    database_url: 'postgresql://test:test@localhost:5432/test',
+    jwt_secret: 'test-jwt-secret',
+    jwt_expiry: 3600,
+    otp_secret: 'test-otp-secret',
+    twilio_account_sid: 'test-twilio-sid',
+    twilio_auth_token: 'test-twilio-token',
+    twilio_from_number: '+1234567890',
+    galli_maps_token: 'test-galli-token',
+    mailtrap_user: 'test-mailtrap-user',
+    mailtrap_pass: 'test-mailtrap-pass',
+    google_mail: 'test@gmail.com',
+    google_pass: 'test-google-pass',
+    mapbox_token: 'test-mapbox-token',
+    to_number: '+1234567890',
+    emergency_phone_number: '112',
+  },
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    http: vi.fn(),
+    debug: vi.fn(),
+    verbose: vi.fn(),
+  },
+  morganMiddleware: vi.fn((_req: unknown, _res: unknown, next: () => void) =>
+    next()
+  ),
+  corsOptions: {
+    origin: '*',
+    credentials: true,
+  },
+}));
+
+vi.mock('@/db', () => ({
+  default: mockDb,
+}));
+
+vi.mock('@/services/redis.service', () => ({
+  acquireLock: vi.fn().mockResolvedValue(true),
+  releaseLock: vi.fn().mockResolvedValue(true),
+  getEmergencyProviders: vi.fn().mockResolvedValue([]),
+  clearEmergencyProviders: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('@/socket', () => ({
+  getIo: vi.fn().mockReturnValue({
+    to: vi.fn().mockReturnThis(),
+    emit: vi.fn(),
+    in: vi.fn().mockReturnValue({
+      socketsJoin: vi.fn(),
+    }),
+  }),
+}));
+
+vi.mock('@/services/kafka/kafka.utils', () => ({
+  publishWithRetry: vi.fn().mockResolvedValue(true),
+}));
+
+export const resetMocks = () => {
+  mockReset(mockDb);
+};
+
 export interface MockRequest {
-  body: Record<string, any>;
-  params: Record<string, any>;
-  query: Record<string, any>;
+  body: Record<string, unknown>;
+  params: Record<string, unknown>;
+  query: Record<string, unknown>;
   user: {
     id: string;
     name?: string;
@@ -17,16 +86,18 @@ export interface MockRequest {
     phoneNumber?: string;
     currentLocation?: { latitude: string; longitude: string };
   } | null;
-  cookies: Record<string, any>;
+  cookies: Record<string, unknown>;
 }
 
 export interface MockResponse {
-  status: ReturnType<typeof mock>;
-  json: ReturnType<typeof mock>;
-  cookie: ReturnType<typeof mock>;
-  clearCookie: ReturnType<typeof mock>;
+  status: Mock<(code: number) => MockResponse>;
+  json: Mock<(data: unknown) => MockResponse>;
+  cookie: Mock<
+    (name: string, value: string, options?: unknown) => MockResponse
+  >;
+  clearCookie: Mock<(name: string) => MockResponse>;
   statusCode?: number;
-  data?: any;
+  data?: unknown;
 }
 
 export const createMockRequest = (
@@ -41,24 +112,24 @@ export const createMockRequest = (
 });
 
 export const createMockResponse = (): MockResponse => {
-  const res: MockResponse = {
-    status: mock((code: number) => {
-      res.statusCode = code;
-      return res;
-    }),
-    json: mock((data: any) => {
-      res.data = data;
-      return res;
-    }),
-    cookie: mock((name: string, value: string) => res),
-    clearCookie: mock((name: string) => res),
-  };
+  const res = {} as MockResponse;
+  res.status = vi.fn((code: number) => {
+    res.statusCode = code;
+    return res;
+  });
+  res.json = vi.fn((data: unknown) => {
+    res.data = data;
+    return res;
+  });
+  res.cookie = vi.fn(
+    (_name: string, _value: string, _options?: unknown) => res
+  );
+  res.clearCookie = vi.fn((_name: string) => res);
   return res;
 };
 
-export const createMockNext = () => mock((error?: any) => {});
+export const createMockNext = () => vi.fn((_error?: unknown) => {});
 
-// Test Fixtures
 export const testUsers = {
   validUser: {
     id: 'test-user-id-123',
@@ -199,31 +270,22 @@ export const testLocations = {
   lalitpur: { latitude: 27.6588, longitude: 85.3247 },
 };
 
-/**
- * Extract response data from mock response
- */
 export const getResponseData = (mockRes: MockResponse) => {
   if (mockRes.json.mock.calls.length > 0) {
-    return mockRes.json?.mock?.calls[0][0] || {};
+    return (mockRes.json.mock.calls[0] as unknown[])?.[0] ?? null;
   }
   return null;
 };
 
-/**
- * Get status code from mock response
- */
 export const getStatusCode = (mockRes: MockResponse) => {
   if (mockRes.status.mock.calls.length > 0) {
-    return mockRes.status.mock.calls[0][0];
+    return (mockRes.status.mock.calls[0] as unknown[])?.[0] ?? null;
   }
   return null;
 };
 
-/**
- * Assert API response structure
- */
 export const assertApiResponse = (
-  response: any,
+  response: { statusCode?: number; message?: string } | null,
   expectedStatus: number,
   expectedMessageContains?: string
 ) => {
@@ -247,9 +309,6 @@ export const assertApiResponse = (
   }
 };
 
-/**
- * Generate random test data
- */
 export const generateRandomEmail = () =>
   `test-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
 
