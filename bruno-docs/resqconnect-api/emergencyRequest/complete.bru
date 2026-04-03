@@ -1,0 +1,48 @@
+meta {
+  name: complete
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{server}}/emergency-request/:id/complete
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{requestId}}
+}
+
+auth:bearer {
+  token: {{providerToken}}
+}
+
+docs {
+  # Complete Emergency Request (Provider)
+  
+  Marks an emergency request as completed by the service provider.
+  
+  ## Authentication
+  Requires service provider authentication (JWT token)
+  
+  ## Path Parameters
+  - `id` - The ID of the emergency request to complete
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Emergency request completed successfully",
+    "data": {
+      "id": "uuid",
+      "status": "completed",
+      "completedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}

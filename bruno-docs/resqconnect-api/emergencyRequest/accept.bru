@@ -1,0 +1,48 @@
+meta {
+  name: accept
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{server}}/emergency-request/:id/accept
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{requestId}}
+}
+
+auth:bearer {
+  token: {{providerToken}}
+}
+
+docs {
+  # Accept Emergency Request (Provider)
+  
+  Allows a service provider to accept an emergency request and start responding.
+  
+  ## Authentication
+  Requires service provider authentication (JWT token)
+  
+  ## Path Parameters
+  - `id` - The ID of the emergency request to accept
+  
+  ## Response
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Emergency request accepted successfully",
+    "data": {
+      "id": "uuid",
+      "status": "accepted",
+      "providerId": "provider-uuid"
+    }
+  }
+  ```
+}
+
+settings {
+  encodeUrl: true
+}
