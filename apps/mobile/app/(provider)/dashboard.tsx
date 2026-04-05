@@ -135,32 +135,48 @@ export default function ProviderDashboardScreen() {
     const handleRequestTaken = (data: any) => {
       if (data.providerId === provider?.id) return;
       removeIncomingRequest(data.requestId);
-      setCurrentRequest(prev =>
-        prev?.requestId === data.requestId ? null : prev
-      );
+      if (currentRequest?.requestId === data.requestId) {
+        setCurrentRequest(null);
+      }
     };
 
     const handleRequestCancelled = (data: any) => {
       removeIncomingRequest(data.requestId);
-      setCurrentRequest(prev =>
-        prev?.requestId === data.requestId ? null : prev
-      );
+      if (currentRequest?.requestId === data.requestId) {
+        setCurrentRequest(null);
+      }
+    };
+
+    const handleRequestCompleted = (data: any) => {
+      console.log('Request completed event received:', data);
+      // Remove from incoming requests
+      removeIncomingRequest(data.requestId);
+      // Clear current request if it's the completed one
+      if (currentRequest?.requestId === data.requestId) {
+        setCurrentRequest(null);
+      }
+      // Update provider status to available
+      setServiceStatus('available');
     };
 
     socketManager.on(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
     socketManager.on(SocketEvents.REQUEST_ACCEPTED, handleRequestTaken);
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+    socketManager.on(SocketEvents.REQUEST_COMPLETED, handleRequestCompleted);
 
     return () => {
       socketManager.off(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
       socketManager.off(SocketEvents.REQUEST_ACCEPTED, handleRequestTaken);
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+      socketManager.off(SocketEvents.REQUEST_COMPLETED, handleRequestCompleted);
     };
   }, [
     addIncomingRequest,
+    currentRequest,
     provider?.id,
     removeIncomingRequest,
     setCurrentRequest,
+    setServiceStatus,
   ]);
 
   useEffect(() => {
