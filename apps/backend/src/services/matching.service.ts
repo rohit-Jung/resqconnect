@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 
 import { envConfig, logger } from '@/config';
@@ -67,14 +67,15 @@ export async function findNearbyProviders({
   const nearbyCells = gridDisk(h3Idx, kRingRadius);
   const cellBigInts = nearbyCells.map(cell => BigInt(`0x${cell}`));
 
+  // Keep as hex strings if h3Index is VARCHAR in DB
+  // If BIGINT, use: nearbyCells.map(cell => sql`${BigInt(`0x${cell}`).toString()}::bigint`)
   const providers = await db
     .select({
       id: serviceProvider.id,
-      // Calculate real geographic distance in meters
       distance: sql<number>`ST_Distance(
-        ${serviceProvider.lastLocation}::geography, 
-        ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
-      )`,
+      ${serviceProvider.lastLocation}::geography, 
+      ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
+    )`,
       name: serviceProvider.name,
       phoneNumber: serviceProvider.phoneNumber,
       serviceType: serviceProvider.serviceType,
@@ -83,22 +84,18 @@ export async function findNearbyProviders({
     })
     .from(serviceProvider)
     .where(
-      // FAST FILTER: Only look in these specific H3 cells
-      sql`${serviceProvider.h3Index} IN (${sql.join(
-        cellBigInts.map(b => sql`${b}`),
-        sql`, `
-      )}) 
-      AND ${serviceProvider.serviceStatus} = 'available' 
-      AND ${serviceProvider.serviceType} = ${type}`
-    )
-    // ACCURATE SORT: Use PostGIS KNN operator for real distance
+      and(
+        inArray(serviceProvider.h3Index, cellBigInts), // cellbigInts = bigInt[]
+        eq(serviceProvider.serviceStatus, 'available'),
+        eq(serviceProvider.serviceType, type)
+      )
+    ) // Cast to geometry for <-> KNN operator
     .orderBy(
-      sql`${serviceProvider.lastLocation} <-> ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)`
+      sql`${serviceProvider.lastLocation}::geometry <-> ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geometry`
     )
-    .limit(1);
+    .limit(10);
 
-  console.log('Found', providers);
-
+  logger.info('Found providers', providers);
   return providers;
 }
 
