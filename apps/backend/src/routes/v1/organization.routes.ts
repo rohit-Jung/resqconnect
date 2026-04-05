@@ -21,6 +21,11 @@ import {
   verifyOrgOTP,
   verifyOrgServiceProvider,
 } from '@/controllers/organization.controller';
+import {
+  getPendingVerifications,
+  getProviderDocuments,
+  verifyProviderDocuments,
+} from '@/controllers/service-provider.controller';
 import { validateOrg, validateRoleAuth } from '@/middlewares/auth.middleware';
 
 const organizationRouter = Router();
@@ -60,9 +65,22 @@ organizationRouter
   .route('/service-providers/:id/verify')
   .post(validateOrg, verifyOrgServiceProvider);
 
+// Document verification routes (organization admin verifies provider docs)
+organizationRouter
+  .route('/verifications/pending')
+  .get(validateOrg, getPendingVerifications);
+
+organizationRouter
+  .route('/verifications/:providerId')
+  .get(validateOrg, getProviderDocuments);
+
+organizationRouter
+  .route('/verifications/:providerId/verify')
+  .post(validateOrg, verifyProviderDocuments);
+
 organizationRouter
   .route('/:id')
-  .get(getOrganizationById)
+  .get(validateAdmin, getOrganizationById)
   .delete(validateAdmin, deleteOrganization)
   .put(validateAdmin, updateOrganization);
 

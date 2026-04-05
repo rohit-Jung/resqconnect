@@ -51,12 +51,22 @@ export async function initInfra() {
     await connectKafkaOnce();
 
     await notificationConsumer.subscribe({
-      topics: [KAFKA_TOPICS.MEDICAL_EVENTS, KAFKA_TOPICS.FIRE_EVENTS],
+      topics: [
+        KAFKA_TOPICS.MEDICAL_EVENTS,
+        KAFKA_TOPICS.FIRE_EVENTS,
+        KAFKA_TOPICS.POLICE_EVENTS,
+        KAFKA_TOPICS.RESCUE_EVENTS,
+      ],
       fromBeginning: false,
     });
 
     await assignResponderConsumer.subscribe({
-      topics: [KAFKA_TOPICS.MEDICAL_EVENTS, KAFKA_TOPICS.FIRE_EVENTS],
+      topics: [
+        KAFKA_TOPICS.MEDICAL_EVENTS,
+        KAFKA_TOPICS.FIRE_EVENTS,
+        KAFKA_TOPICS.POLICE_EVENTS,
+        KAFKA_TOPICS.RESCUE_EVENTS,
+      ],
       fromBeginning: false,
     });
 
