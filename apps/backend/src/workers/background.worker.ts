@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull, lt, sql } from 'drizzle-orm';
 import { gridDisk, latLngToCell } from 'h3-js';
 
+import { logger } from '@/config/logger/winston.config';
 import {
   DISCONNECT_CHECK_INTERVAL,
   MAX_SEARCH_RADIUS,
@@ -37,7 +38,7 @@ function getTopicForEventType(eventType: string): string {
 
 // Runs every 1 second to process pending outbox events
 export function startOutboxPublisher(): NodeJS.Timeout {
-  console.log('Starting Outbox Publisher Worker...');
+  logger.debug('Starting Outbox Publisher Worker...');
 
   return setInterval(async () => {
     try {
@@ -51,7 +52,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
 
       if (pendingEvents.length === 0) return;
 
-      console.log(`Processing ${pendingEvents.length} outbox events...`);
+      logger.debug(`Processing ${pendingEvents.length} outbox events...`);
 
       for (const event of pendingEvents) {
         try {
@@ -76,10 +77,12 @@ export function startOutboxPublisher(): NodeJS.Timeout {
             })
             .where(eq(outbox.id, event.id));
 
-          console.log(`✅ Published outbox event ${event.id} to ${topic}`);
+          logger.debug(
+            `[SUCCESS] Published outbox event ${event.id} to ${topic}`
+          );
         } catch (error) {
-          console.error(
-            `❌ Failed to publish outbox event ${event.id}:`,
+          logger.error(
+            `[ERROR] Failed to publish outbox event ${event.id}:`,
             error
           );
 
@@ -94,7 +97,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
         }
       }
     } catch (error) {
-      console.error('Outbox publisher error:', error);
+      logger.error('Outbox publisher error:', error);
     }
   }, OUTBOX_POLL_INTERVAL);
 }
@@ -104,7 +107,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
  * Runs every 10 seconds to handle timed-out pending requests
  */
 export function startTimeoutHandler(): NodeJS.Timeout {
-  console.log('⏰ Starting Timeout Handler Worker...');
+  logger.debug('⏰ Starting Timeout Handler Worker...');
 
   return setInterval(async () => {
     try {
@@ -123,7 +126,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
 
       if (timedOutRequests.length === 0) return;
 
-      console.log(`⏰ Found ${timedOutRequests.length} timed-out requests`);
+      logger.debug(`⏰ Found ${timedOutRequests.length} timed-out requests`);
 
       const io = getIo();
 
@@ -132,8 +135,8 @@ export function startTimeoutHandler(): NodeJS.Timeout {
 
         // If max radius exceeded, mark as failed
         if (currentRadius > MAX_SEARCH_RADIUS) {
-          console.log(
-            `❌ Request ${req.id} failed after ${currentRadius} escalations`
+          logger.debug(
+            `[ERROR] Request ${req.id} failed after ${currentRadius} escalations`
           );
 
           await db
@@ -162,7 +165,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
 
         // Expand search radius
         const newRadius = currentRadius + 1;
-        console.log(`🔄 Escalating request ${req.id} to radius ${newRadius}`);
+        logger.debug(`🔄 Escalating request ${req.id} to radius ${newRadius}`);
 
         // Get H3 cell and expand search
         const location = req.location as {
@@ -229,7 +232,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
         }
       }
     } catch (error) {
-      console.error('❌ Timeout handler error:', error);
+      logger.error('[ERROR] Timeout handler error:', error);
     }
   }, TIMEOUT_CHECK_INTERVAL);
 }
@@ -239,7 +242,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
  * Runs every 5 seconds to detect providers who accepted but never connected
  */
 export function startDisconnectionHandler(): NodeJS.Timeout {
-  console.log('🔌 Starting Disconnection Handler Worker...');
+  logger.debug('[CONNECTED] Starting Disconnection Handler Worker...');
 
   return setInterval(async () => {
     try {
@@ -259,15 +262,15 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
 
       if (staleRequests.length === 0) return;
 
-      console.log(
-        `🔌 Found ${staleRequests.length} providers who accepted but never connected`
+      logger.debug(
+        `[CONNECTED] Found ${staleRequests.length} providers who accepted but never connected`
       );
 
       const io = getIo();
 
       for (const req of staleRequests) {
-        console.log(
-          `🔌 Provider accepted request ${req.id} but never connected`
+        logger.debug(
+          `[CONNECTED] Provider accepted request ${req.id} but never connected`
         );
 
         // Reset request to pending
@@ -317,7 +320,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
         }
       }
     } catch (error) {
-      console.error('❌ Disconnection handler error:', error);
+      logger.error('[ERROR] Disconnection handler error:', error);
     }
   }, DISCONNECT_CHECK_INTERVAL);
 }
@@ -331,7 +334,7 @@ export function startAllWorkers(): {
   const timeoutInterval = startTimeoutHandler();
   const disconnectInterval = startDisconnectionHandler();
 
-  console.log('All background workers started');
+  logger.debug('All background workers started');
 
   return { outboxInterval, timeoutInterval, disconnectInterval };
 }
@@ -345,5 +348,5 @@ export function stopAllWorkers(intervals: {
   clearInterval(intervals.timeoutInterval);
   clearInterval(intervals.disconnectInterval);
 
-  console.log('All background workers stopped');
+  logger.debug('All background workers stopped');
 }

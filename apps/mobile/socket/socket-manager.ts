@@ -137,6 +137,33 @@ class SocketManager {
     this.socket.emit(event, data);
   }
 
+  // Emit with acknowledgment callback support
+  emitWithAck(
+    event: SocketEvents,
+    data?: any,
+    callback?: (error?: Error | null) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        const error = new Error('Socket not initialized');
+        callback?.(error);
+        reject(error);
+        return;
+      }
+
+      this.socket.emit(event, data, (response: any) => {
+        if (response?.error) {
+          const error = new Error(response.error);
+          callback?.(error);
+          reject(error);
+        } else {
+          callback?.(null);
+          resolve();
+        }
+      });
+    });
+  }
+
   private reattachHandlers() {
     if (!this.socket) return;
 
