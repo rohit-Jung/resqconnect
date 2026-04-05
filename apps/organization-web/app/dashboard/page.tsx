@@ -1,5 +1,7 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
+
 import { DashboardAlerts } from '@/components/dashboard-alerts';
 import { DashboardCharts } from '@/components/dashboard-charts';
 import { DashboardStats } from '@/components/dashboard-stats';
@@ -10,28 +12,56 @@ export default function DashboardPage() {
   const { data: analyticsResponse, isLoading } = useOrgDashboardAnalytics();
   const analytics = analyticsResponse?.data?.data;
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Overview of your organization activity
-        </p>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
+        <Loader2 className="text-primary h-8 w-8 animate-spin dark:text-primary" />
       </div>
-      <DashboardStats data={analytics} isLoading={isLoading} />
-      <DashboardCharts
-        emergencyRequests={analytics?.emergencyRequests}
-        isLoading={isLoading}
-      />
-      <div className="grid gap-6 md:grid-cols-2">
-        <DashboardAlerts
-          emergencyRequests={analytics?.emergencyRequests?.recent}
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background dark:bg-background">
+      {/* Swiss Style Header */}
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+            Overview of your organization activity
+          </p>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="px-6 pb-8 space-y-6">
+        <DashboardStats data={analytics} isLoading={isLoading} />
+        <DashboardCharts
+          emergencyRequests={analytics?.emergencyRequests}
           isLoading={isLoading}
         />
-        <DashboardTeams
-          providers={analytics?.providers?.recent}
-          isLoading={isLoading}
-        />
+        <div className="grid gap-6 md:grid-cols-2">
+          <DashboardAlerts
+            emergencyRequests={analytics?.emergencyRequests?.recent}
+            isLoading={isLoading}
+          />
+          <DashboardTeams
+            providers={analytics?.providers?.recent}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
     </div>
   );
