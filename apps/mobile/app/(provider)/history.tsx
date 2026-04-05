@@ -199,9 +199,12 @@ export default function ProviderHistoryScreen() {
   const { data, isLoading, refetch, isError, error } =
     useGetProviderEmergencyHistory({ status: statusParam }, true);
 
-  const historyData = data?.data;
-  const history = historyData?.history || [];
-  const stats = historyData?.stats;
+  const responseData = data?.data;
+  // Handle both array response and object response formats
+  const history = Array.isArray(responseData)
+    ? responseData
+    : responseData?.history || [];
+  const stats = Array.isArray(responseData) ? undefined : responseData?.stats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

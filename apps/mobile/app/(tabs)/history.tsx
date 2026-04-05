@@ -181,9 +181,14 @@ export default function HistoryScreen() {
     true
   );
 
-  const historyData = data?.data;
-  const history = historyData?.history || [];
-  const stats = historyData?.stats;
+  const responseData = data?.data;
+  // Handle both array response and object response formats
+  const history = Array.isArray(responseData)
+    ? responseData
+    : responseData?.history || [];
+
+  console.log('RESPONSE', history);
+  const stats = Array.isArray(responseData) ? undefined : responseData?.stats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
