@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import healthCheckRouter from '@/routes/healthcheck.routes';
-import userRouter from '@/routes/v1/auth.routes';
+import userRouter from '@/routes/v1/user.routes';
 
 import adminRouter from './admin.routes';
 import emergencyContactsRouter from './emergency-contacts.routes';

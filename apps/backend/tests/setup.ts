@@ -87,6 +87,7 @@ export interface MockRequest {
     currentLocation?: { latitude: string; longitude: string };
   } | null;
   cookies: Record<string, unknown>;
+  files?: Record<string, { path: string }[]>;
 }
 
 export interface MockResponse {
@@ -108,6 +109,7 @@ export const createMockRequest = (
   query: {},
   user: null,
   cookies: {},
+  files: undefined,
   ...overrides,
 });
 
