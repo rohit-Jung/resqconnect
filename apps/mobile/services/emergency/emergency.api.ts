@@ -151,14 +151,17 @@ export const useGetUserEmergencyHistory = (
       params.limit,
       params.status,
     ],
-    queryFn: () =>
-      api.get(emergencyRequestEndpoints.userHistory, {
+    queryFn: async () => {
+      const response = await api.get(emergencyRequestEndpoints.userHistory, {
         params: {
           page: params.page || 1,
           limit: params.limit || 10,
           ...(params.status && { status: params.status }),
         },
-      }),
+      });
+
+      return response?.data || {};
+    },
     enabled,
   });
 };
@@ -174,14 +177,20 @@ export const useGetProviderEmergencyHistory = (
       params.limit,
       params.status,
     ],
-    queryFn: () =>
-      api.get(emergencyRequestEndpoints.providerHistory, {
-        params: {
-          page: params.page || 1,
-          limit: params.limit || 10,
-          ...(params.status && { status: params.status }),
-        },
-      }),
+    queryFn: async () => {
+      const response = await api.get(
+        emergencyRequestEndpoints.providerHistory,
+        {
+          params: {
+            page: params.page || 1,
+            limit: params.limit || 10,
+            ...(params.status && { status: params.status }),
+          },
+        }
+      );
+
+      return response?.data || {};
+    },
     enabled,
   });
 };
