@@ -18,7 +18,7 @@ function startServer() {
     const httpServer = createServer(app);
     initializeSocketServer(httpServer);
 
-    httpServer.listen(port, () => {
+    httpServer.listen(port, envConfig.dev_ip, () => {
       console.log(`Server is listening on: ${port}`);
     });
 

@@ -15,6 +15,7 @@ import ApiError from '@/utils/api/ApiError';
 import { verifyAndDecodeToken } from '@/utils/tokens/jwtTokens';
 
 import { registerEmergencyHandlers } from './emergency.handlers';
+import { setupLocationHandlers } from './location.handler';
 
 let io: Server | null = null;
 
@@ -88,6 +89,9 @@ function initializeSocketServer(
 
     // Register emergency-related handlers
     registerEmergencyHandlers(io!, socket, socket.user.role);
+
+    // Register location handlers
+    setupLocationHandlers(io!, socket);
 
     socket.on(SocketEvents.DISCONNECT, () => {
       console.log('User disconnected from socket', socket.id);

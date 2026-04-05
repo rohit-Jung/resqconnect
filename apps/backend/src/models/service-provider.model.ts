@@ -8,6 +8,7 @@ import {
   json,
   pgEnum,
   pgTable,
+  text,
   timestamp,
   uuid,
   varchar,
@@ -15,7 +16,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
-import { ServiceTypeEnum } from '../constants';
+import { ServiceTypeEnum, serviceTypeEnum } from '../constants';
 import { organization } from './organization.model';
 
 const geometry = customType<{ data: string }>({
@@ -30,12 +31,14 @@ export const statusTypeEnum = pgEnum('service_status', [
   'off_duty',
 ]);
 
-const serviceTypeEnum = pgEnum('service_type', [
-  ServiceTypeEnum.AMBULANCE,
-  ServiceTypeEnum.POLICE,
-  ServiceTypeEnum.RESCUE_TEAM,
-  ServiceTypeEnum.FIRE_TRUCK,
-] as const);
+export const documentStatusEnum = pgEnum('document_status', [
+  'not_submitted',
+  'pending',
+  'approved',
+  'rejected',
+]);
+
+export { ServiceTypeEnum };
 
 export const serviceProvider = pgTable(
   'service_provider',
@@ -64,10 +67,7 @@ export const serviceProvider = pgTable(
         latitude: string;
         longitude: string;
       }>()
-      .default({
-        latitude: '',
-        longitude: '',
-      }),
+      .notNull(),
 
     vehicleInformation: json('vehicle_information')
       .$type<{
@@ -97,6 +97,19 @@ export const serviceProvider = pgTable(
       mode: 'string',
     }),
 
+    // document verification fields
+    panCardUrl: varchar('pan_card_url', { length: 512 }),
+    citizenshipUrl: varchar('citizenship_url', { length: 512 }),
+    documentStatus: documentStatusEnum('document_status')
+      .notNull()
+      .default('not_submitted'),
+    rejectionReason: text('rejection_reason'),
+    verifiedAt: timestamp('verified_at', { mode: 'string' }),
+    verifiedBy: uuid('verified_by').references(() => organization.id),
+
+    // track when status was last updated (for cooldown enforcement)
+    statusUpdatedAt: timestamp('status_updated_at', { mode: 'string' }),
+
     createdAt: timestamp('created_at', { mode: 'string' })
       .notNull()
       .defaultNow(),
@@ -117,7 +130,6 @@ export const serviceProviderRelations = relations(
   })
 );
 
-// Define the serviceProvider schema
 export const serviceProviderSchema = createSelectSchema(serviceProvider);
 export const newServiceProviderSchema = serviceProviderSchema.pick({
   name: true,
@@ -135,7 +147,27 @@ export const loginServiceProviderSchema = createInsertSchema(
 ).pick({
   email: true,
   password: true,
+  currentLocation: true,
+});
+
+// document upload validation schema
+export const uploadDocumentsSchema = z.object({
+  panCardUrl: z.string().url('Invalid PAN card URL'),
+  citizenshipUrl: z.string().url('Invalid citizenship URL'),
+});
+
+// document verification schema (for org admins)
+export const verifyDocumentsSchema = z.object({
+  action: z.enum(['approve', 'reject']),
+  rejectionReason: z.string().optional(),
 });
 
 export type TNewServiceProvider = z.infer<typeof newServiceProviderSchema>;
 export type TServiceProvider = z.infer<typeof serviceProviderSchema>;
+export type TUploadDocuments = z.infer<typeof uploadDocumentsSchema>;
+export type TVerifyDocuments = z.infer<typeof verifyDocumentsSchema>;
+export type TDocumentStatus =
+  | 'not_submitted'
+  | 'pending'
+  | 'approved'
+  | 'rejected';
