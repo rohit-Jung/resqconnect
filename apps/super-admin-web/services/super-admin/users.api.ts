@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import { IUser } from '@/types/auth.types';
+import type { ApiResponse, IUser } from '@/types/auth.types';
 
 import api from '../axiosInstance';
 import { userEndpoints } from '../endPoints';
