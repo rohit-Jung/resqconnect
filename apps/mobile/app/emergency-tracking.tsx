@@ -33,6 +33,7 @@ import {
 } from '@/services/emergency/emergency.api';
 import { fetchRoute } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
+import { useProviderStore } from '@/store/providerStore';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
 import {
@@ -133,6 +134,10 @@ export default function EmergencyTrackingScreen() {
   const [localStatus, setLocalStatus] = useState<EmergencyStatus>(
     isProvider ? EmergencyStatus.ACCEPTED : EmergencyStatus.PENDING
   );
+
+  // Track if confirmation is in progress (prevent accidental navigation)
+  const [isProcessingConfirmation, setIsProcessingConfirmation] =
+    useState(false);
 
   const { socket, isConnected } = useSocketStore();
 
@@ -476,6 +481,14 @@ export default function EmergencyTrackingScreen() {
 
     // Listen for emergency completion
     const handleEmergencyCompleted = () => {
+      // Clear confirmation processing flag
+      setIsProcessingConfirmation(false);
+
+      // Remove request from incoming requests state (only for provider)
+      if (isProvider && requestId) {
+        useProviderStore.getState().removeIncomingRequest(requestId);
+      }
+
       Alert.alert(
         'Emergency Resolved',
         'The emergency has been marked as completed.',
@@ -492,6 +505,14 @@ export default function EmergencyTrackingScreen() {
     // Listen for request cancellation (for provider when user cancels)
     const handleRequestCancelled = (data: any) => {
       console.log('Request cancelled:', data);
+      // Clear confirmation processing flag
+      setIsProcessingConfirmation(false);
+
+      // Remove request from incoming requests state (only for provider)
+      if (isProvider && data.requestId) {
+        useProviderStore.getState().removeIncomingRequest(data.requestId);
+      }
+
       if (data.requestId === requestId) {
         Alert.alert(
           'Request Cancelled',
@@ -534,6 +555,10 @@ export default function EmergencyTrackingScreen() {
     socketManager.on(SocketEvents.REQUEST_COMPLETED, handleEmergencyCompleted);
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
     socketManager.on(
+      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+      handleRequestCancelled
+    );
+    socketManager.on(
       SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
       handleProviderConfirmed
     );
@@ -548,6 +573,11 @@ export default function EmergencyTrackingScreen() {
       socketManager.off(
         SocketEvents.REQUEST_COMPLETED,
         handleEmergencyCompleted
+      );
+      socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+      socketManager.off(
+        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+        handleRequestCancelled
       );
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
       socketManager.off(
@@ -635,22 +665,52 @@ export default function EmergencyTrackingScreen() {
         {
           text: 'Yes, Cancel',
           style: 'destructive',
-          onPress: () => {
-            cancelRequest(requestId!, {
-              onSuccess: () => {
-                Alert.alert(
-                  'Cancelled',
-                  'Your emergency request has been cancelled.',
-                  [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-                );
-              },
-              onError: (error: any) => {
+          onPress: async () => {
+            try {
+              // Get raw socket for emit with callback support
+              const socketInstance = socketManager.getSocket();
+              if (!socketInstance) {
                 Alert.alert(
                   'Error',
-                  error.response?.data?.message || 'Failed to cancel request.'
+                  'Socket connection lost. Please check your connection.'
                 );
-              },
-            });
+                return;
+              }
+
+              // TODO: Re-enable retry logic after testing
+              // For now, single attempt with simple timeout
+              await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  console.log(`CANCEL_REQUEST_SOCKET timeout`);
+                  reject(new Error('Timeout'));
+                }, 5000);
+
+                socketInstance.emit(
+                  SocketEvents.CANCEL_REQUEST_SOCKET,
+                  {
+                    requestId,
+                    role: role as 'user' | 'provider',
+                  },
+                  (ack?: any) => {
+                    clearTimeout(timeout);
+                    if (ack?.error) {
+                      reject(new Error(ack.error));
+                    } else {
+                      resolve();
+                    }
+                  }
+                );
+              });
+
+              console.log(`CANCEL_REQUEST_SOCKET succeeded`);
+              // If success, the socket listener will handle the redirect
+            } catch (error) {
+              console.error('Error cancelling request:', error);
+              Alert.alert(
+                'Error',
+                'Failed to cancel request. Please check your connection and try again.'
+              );
+            }
           },
         },
       ]
@@ -665,7 +725,7 @@ export default function EmergencyTrackingScreen() {
         { text: 'No', style: 'cancel' },
         {
           text: 'Yes, Arrived',
-          onPress: () => {
+          onPress: async () => {
             if (!requestId) {
               Alert.alert(
                 'Sorry Request ID is not found!',
@@ -674,45 +734,56 @@ export default function EmergencyTrackingScreen() {
               return;
             }
 
-            if (role === 'user') {
-              confirmArrival(requestId, {
-                onSuccess: () => {
-                  Alert.alert(
-                    'Arrival Confirmed',
-                    'Thank you for confirming. The service provider has arrived.',
-                    [{ text: 'OK', onPress: () => router.push('/(tabs)') }]
-                  );
-                },
-                onError: (error: any) => {
-                  Alert.alert(
-                    'Error',
-                    error.response?.data?.message ||
-                      'Failed to confirm arrival.'
-                  );
-                },
+            // Mark confirmation as in progress to prevent accidental navigation
+            setIsProcessingConfirmation(true);
+
+            try {
+              // Get raw socket for emit with callback support
+              const socketInstance = socketManager.getSocket();
+              if (!socketInstance) {
+                Alert.alert(
+                  'Error',
+                  'Socket connection lost. Please check your connection.'
+                );
+                setIsProcessingConfirmation(false);
+                return;
+              }
+
+              // TODO: Re-enable retry logic after testing
+              // For now, single attempt with simple timeout
+              await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  console.log(`CONFIRM_ARRIVAL timeout`);
+                  reject(new Error('Timeout'));
+                }, 5000);
+
+                socketInstance.emit(
+                  SocketEvents.CONFIRM_ARRIVAL,
+                  {
+                    requestId,
+                    role: role as 'user' | 'provider',
+                  },
+                  (ack?: any) => {
+                    clearTimeout(timeout);
+                    if (ack?.error) {
+                      reject(new Error(ack.error));
+                    } else {
+                      resolve();
+                    }
+                  }
+                );
               });
-            } else {
-              confirmArrived(requestId, {
-                onSuccess: () => {
-                  Alert.alert(
-                    'Arrival Confirmed',
-                    'Thank you for confirming. You have arrived.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: () => router.push('/(provider)/dashboard'),
-                      },
-                    ]
-                  );
-                },
-                onError: (error: any) => {
-                  Alert.alert(
-                    'Error',
-                    error.response?.data?.message ||
-                      'Failed to confirm arrival.'
-                  );
-                },
-              });
+
+              console.log(`CONFIRM_ARRIVAL succeeded`);
+              // If success, the socket listener will handle the redirect
+              // and will clear isProcessingConfirmation
+            } catch (error) {
+              console.error('Error confirming arrival:', error);
+              Alert.alert(
+                'Error',
+                'Failed to confirm arrival. Please check your connection and try again.'
+              );
+              setIsProcessingConfirmation(false);
             }
           },
         },
