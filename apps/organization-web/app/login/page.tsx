@@ -22,6 +22,8 @@ import {
 } from '@/types/auth.types';
 import { TLoginUser, loginUserSchema } from '@/validations/auth.schema';
 
+export const dynamic = 'force-dynamic';
+
 function parseApiError(err: unknown): string {
   const axiosErr = err as {
     response?: {
