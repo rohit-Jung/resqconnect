@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
+  DEV_IP: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
@@ -39,6 +40,7 @@ function createEnvConfig() {
 
   return {
     port: parsedEnv.data.PORT,
+    dev_ip: parsedEnv.data.DEV_IP,
     database_url: parsedEnv.data.DATABASE_URL,
     jwt_secret: parsedEnv.data.JWT_SECRET,
     jwt_expiry: parsedEnv.data.JWT_EXPIRY,
