@@ -2,8 +2,8 @@
 
 import {
   Activity,
-  Clock,
   Flame,
+  Loader2,
   MapPin,
   Navigation,
   Shield,
@@ -59,9 +59,9 @@ function getStatusInfo(status: ServiceStatus): {
         color: 'text-orange-600 dark:text-orange-400',
       };
     case 'off_duty':
-      return { label: 'Off Duty', color: 'text-muted-foreground' };
+      return { label: 'Off Duty', color: 'text-[#888888] dark:text-gray-400' };
     default:
-      return { label: status, color: 'text-muted-foreground' };
+      return { label: status, color: 'text-[#888888] dark:text-gray-400' };
   }
 }
 
@@ -123,219 +123,235 @@ export default function LiveTrackingPage() {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
+        <Loader2 className="text-primary h-8 w-8 animate-spin dark:text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Live Tracking</h1>
-        <p className="text-muted-foreground mt-2">
-          Monitor real-time locations of emergency response teams
-        </p>
+    <div className="min-h-screen bg-background dark:bg-background">
+      {/* Swiss Style Header */}
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+            Live Tracking
+          </h1>
+          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+            Monitor real-time locations of emergency response teams
+          </p>
+        </div>
       </div>
 
-      {/* Stats */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-      ) : (
+      {/* Content */}
+      <div className="px-6 pb-8 space-y-6">
+        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           {stats.map(stat => (
-            <Card key={stat.label}>
+            <Card key={stat.label} className="bg-card dark:bg-card">
               <CardContent className="p-4">
-                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground dark:text-muted-foreground">
                   {stat.label}
                 </span>
-                <p className="mt-1 text-3xl font-bold tracking-tight">
+                <p className="mt-1 text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
                   {stat.value}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                   {stat.detail}
                 </p>
               </CardContent>
             </Card>
           ))}
         </div>
-      )}
 
-      {/* Map */}
-      <Card>
-        <CardHeader className="border-b border-border pb-3">
-          <CardTitle className="text-base font-semibold">
-            Provider Locations
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ProviderMap
-            providers={providers}
-            selectedProviderId={selectedProviderId}
-            onSelectProvider={setSelectedProviderId}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Active Units List */}
-      <Card>
-        <CardHeader className="border-b border-border pb-3">
-          <CardTitle className="text-base font-semibold">
-            Active Response Teams
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-px">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 p-4">
-                  <Skeleton className="h-8 w-8" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : activeUnits.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Navigation className="text-muted-foreground mb-4 h-10 w-10" />
-              <p className="font-medium">No active response teams</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                All providers are currently off duty
-              </p>
-            </div>
-          ) : (
-            <div>
-              {activeUnits.map((provider: IServiceProvider) => {
-                const statusInfo = getStatusInfo(provider.serviceStatus);
-                const hasLocation =
-                  provider.currentLocation?.latitude &&
-                  provider.currentLocation?.longitude;
-                const isSelected = selectedProviderId === provider.id;
-
-                return (
-                  <div
-                    key={provider.id}
-                    onClick={() =>
-                      setSelectedProviderId(isSelected ? null : provider.id)
-                    }
-                    className={`flex cursor-pointer items-center gap-4 border-b border-border p-4 transition-colors last:border-0 ${
-                      isSelected ? 'bg-primary/5' : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
-                        provider.serviceStatus === 'available'
-                          ? 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-950'
-                          : provider.serviceStatus === 'assigned'
-                            ? 'border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-800 dark:bg-orange-950'
-                            : 'border-border bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {getServiceTypeIcon(provider.serviceType)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{provider.name}</p>
-                      <p className="text-muted-foreground flex items-center gap-1 text-sm truncate">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {provider.serviceArea || provider.primaryAddress}
-                      </p>
-                      {provider.vehicleInformation &&
-                        provider.vehicleInformation.number !== 'Not filled' && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {provider.vehicleInformation.type} —{' '}
-                            {provider.vehicleInformation.number}
-                          </p>
-                        )}
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                        {getServiceTypeName(provider.serviceType)}
-                      </span>
-                      <div className="mt-1 flex items-center justify-end gap-1">
-                        {hasLocation ? (
-                          <span className="flex items-center gap-1 text-xs text-primary">
-                            <Navigation className="h-3 w-3" />
-                            Tracked
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Navigation className="h-3 w-3" />
-                            No data
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
-                      >
-                        <Activity className="h-3 w-3" />
-                        {statusInfo.label}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* All Providers */}
-      {!isLoading && providers.length > 0 && (
-        <Card>
+        {/* Map */}
+        <Card className="bg-card dark:bg-card">
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="text-base font-semibold">
-              All Service Providers
+            <CardTitle className="text-base font-semibold text-foreground dark:text-foreground">
+              Provider Locations
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div>
-              {providers.map((provider: IServiceProvider) => {
-                const statusInfo = getStatusInfo(provider.serviceStatus);
-                return (
-                  <div
-                    key={provider.id}
-                    className="flex items-center gap-4 border-b border-border p-4 last:border-0"
-                  >
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
-                        provider.isVerified
-                          ? 'border-primary/30 bg-primary/5 text-primary'
-                          : 'border-yellow-200 bg-yellow-50 text-yellow-600'
-                      }`}
-                    >
-                      {getServiceTypeIcon(provider.serviceType)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium truncate">{provider.name}</p>
-                        {!provider.isVerified && (
-                          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-yellow-600">
-                            Unverified
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground text-sm truncate">
-                        {provider.email}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                        {getServiceTypeName(provider.serviceType)}
-                      </span>
-                      <div
-                        className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
-                      >
-                        <Activity className="h-3 w-3" />
-                        {statusInfo.label}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ProviderMap
+              providers={providers}
+              selectedProviderId={selectedProviderId}
+              onSelectProvider={setSelectedProviderId}
+            />
           </CardContent>
         </Card>
-      )}
+
+        {/* Active Units List */}
+        <Card className="bg-card dark:bg-card">
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-base font-semibold text-foreground dark:text-foreground">
+              Active Response Teams
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {activeUnits.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Navigation className="text-muted-foreground mb-4 h-10 w-10 dark:text-muted-foreground" />
+                <p className="font-medium text-foreground dark:text-foreground">
+                  No active response teams
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
+                  All providers are currently off duty
+                </p>
+              </div>
+            ) : (
+              <div>
+                {activeUnits.map((provider: IServiceProvider) => {
+                  const statusInfo = getStatusInfo(provider.serviceStatus);
+                  const hasLocation =
+                    provider.currentLocation?.latitude &&
+                    provider.currentLocation?.longitude;
+                  const isSelected = selectedProviderId === provider.id;
+
+                  return (
+                    <div
+                      key={provider.id}
+                      onClick={() =>
+                        setSelectedProviderId(isSelected ? null : provider.id)
+                      }
+                      className={`flex cursor-pointer items-center gap-4 border-b border-border p-4 transition-colors last:border-0 ${
+                        isSelected
+                          ? 'bg-primary/5 dark:bg-primary/10'
+                          : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
+                          provider.serviceStatus === 'available'
+                            ? 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-950 dark:text-green-400'
+                            : provider.serviceStatus === 'assigned'
+                              ? 'border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400'
+                              : 'border-border bg-muted text-muted-foreground dark:text-muted-foreground'
+                        }`}
+                      >
+                        {getServiceTypeIcon(provider.serviceType)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-foreground dark:text-foreground">
+                          {provider.name}
+                        </p>
+                        <p className="text-muted-foreground dark:text-muted-foreground flex items-center gap-1 text-sm truncate">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          {provider.serviceArea || provider.primaryAddress}
+                        </p>
+                        {provider.vehicleInformation &&
+                          provider.vehicleInformation.number !==
+                            'Not filled' && (
+                            <p className="mt-0.5 text-xs text-muted-foreground dark:text-muted-foreground">
+                              {provider.vehicleInformation.type} —{' '}
+                              {provider.vehicleInformation.number}
+                            </p>
+                          )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground dark:text-muted-foreground">
+                          {getServiceTypeName(provider.serviceType)}
+                        </span>
+                        <div className="mt-1 flex items-center justify-end gap-1">
+                          {hasLocation ? (
+                            <span className="flex items-center gap-1 text-xs text-primary dark:text-primary">
+                              <Navigation className="h-3 w-3" />
+                              Tracked
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                              <Navigation className="h-3 w-3" />
+                              No data
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
+                        >
+                          <Activity className="h-3 w-3" />
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* All Providers */}
+        {providers.length > 0 && (
+          <Card className="bg-card dark:bg-card">
+            <CardHeader className="border-b border-border pb-3">
+              <CardTitle className="text-base font-semibold text-foreground dark:text-foreground">
+                All Service Providers
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div>
+                {providers.map((provider: IServiceProvider) => {
+                  const statusInfo = getStatusInfo(provider.serviceStatus);
+                  return (
+                    <div
+                      key={provider.id}
+                      className="flex items-center gap-4 border-b border-border p-4 last:border-0"
+                    >
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
+                          provider.isVerified
+                            ? 'border-primary/30 bg-primary/5 text-primary dark:border-primary/50 dark:bg-primary/10'
+                            : 'border-yellow-200 bg-yellow-50 text-yellow-600 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400'
+                        }`}
+                      >
+                        {getServiceTypeIcon(provider.serviceType)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate text-foreground dark:text-foreground">
+                            {provider.name}
+                          </p>
+                          {!provider.isVerified && (
+                            <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-yellow-600 dark:text-yellow-400">
+                              Unverified
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-muted-foreground dark:text-muted-foreground text-sm truncate">
+                          {provider.email}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground dark:text-muted-foreground">
+                          {getServiceTypeName(provider.serviceType)}
+                        </span>
+                        <div
+                          className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
+                        >
+                          <Activity className="h-3 w-3" />
+                          {statusInfo.label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
