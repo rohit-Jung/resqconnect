@@ -24,11 +24,26 @@ const colors = {
   verbose: 'cyan',
 };
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const transports = [
+  // Console transport - always for dev, only for errors in prod
   new winston.transports.Console({
-    level: 'debug',
-    forceConsole: process.env.NODE_ENV === 'development',
+    level: isDevelopment ? 'debug' : 'error',
+    format: isDevelopment
+      ? winston.format.combine(
+          winston.format.colorize({ all: true }),
+          winston.format.printf(
+            ({ timestamp, level, message }) =>
+              `${timestamp} [${level.toUpperCase()}] ${message}`
+          )
+        )
+      : winston.format.printf(
+          ({ timestamp, level, message }) =>
+            `${timestamp} [${level.toUpperCase()}] ${message}`
+        ),
   }),
+  // File transports - always log to files
   new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
   new winston.transports.File({ filename: 'logs/combined.log' }),
   new winston.transports.File({ filename: 'logs/info.log', level: 'info' }),
@@ -40,7 +55,7 @@ const format = winston.format.combine(
   winston.format.colorize({ all: true }),
   winston.format.printf(
     ({ timestamp, level, message }) =>
-      `${timestamp} [${level.toUpperCase()}]: ${message}`
+      `${timestamp} [${level.toUpperCase()}] ${message}`
   )
 );
 

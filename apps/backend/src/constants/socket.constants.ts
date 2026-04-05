@@ -58,6 +58,9 @@ export enum SocketEvents {
 
   // Arrival events
   PROVIDER_ARRIVAL_CONFIRMED = 'provider-arrival-confirmed',
+  CONFIRM_ARRIVAL = 'confirm-arrival',
+  CANCEL_REQUEST_SOCKET = 'cancel-request-socket',
+  REQUEST_CANCELLED_NOTIFICATION = 'request-cancelled-notification',
 
   UDPATE_STATUS = 'status-update',
 }
