@@ -25,9 +25,7 @@ export const createOrganizationSchema = z
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(1, 'Confirm password is required'),
     generalNumber: z.string().min(3, 'Phone number must be at least 7 digits'),
-    serviceCategory: z.enum(serviceCategoryValues, {
-      required_error: 'Please select a service category',
-    }),
+    serviceCategory: z.string().min(1, 'Please select a service category'),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: "Passwords don't match",
