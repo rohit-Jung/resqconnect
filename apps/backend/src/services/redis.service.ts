@@ -70,6 +70,7 @@ export async function cacheEmergencyProviders(
   providerIds: string[]
 ): Promise<void> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
+  console.log('caching providers', requestId);
   await redis.set(
     key,
     JSON.stringify(providerIds),
@@ -93,6 +94,7 @@ export async function clearEmergencyProviders(
   requestId: string
 ): Promise<void> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
+  console.log('clearing', key);
   await redis.del(key);
 }
 

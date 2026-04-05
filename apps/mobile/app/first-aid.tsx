@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Linking,
+  Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,6 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Accordion, AccordionItem } from '@/components/ui/Accordion';
 import { EMERGENCY_PHONE_NUMBER } from '@/constants';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 interface FirstAidGuide {
   id: string;
@@ -32,7 +41,7 @@ const FIRST_AID_GUIDES: FirstAidGuide[] = [
     title: 'CPR (Cardiopulmonary Resuscitation)',
     icon: 'heart-outline',
     iconType: 'ionicons',
-    color: '#EF4444',
+    color: SIGNAL_RED,
     warning:
       'Only perform CPR if the person is unresponsive and not breathing normally.',
     steps: [
@@ -76,7 +85,7 @@ const FIRST_AID_GUIDES: FirstAidGuide[] = [
     title: 'Severe Bleeding',
     icon: 'water-outline',
     iconType: 'ionicons',
-    color: '#DC2626',
+    color: SIGNAL_RED,
     steps: [
       'Call emergency services if bleeding is severe.',
       'Apply direct pressure to the wound with a clean cloth or bandage.',
@@ -139,7 +148,7 @@ const FIRST_AID_GUIDES: FirstAidGuide[] = [
     title: 'Heart Attack Signs',
     icon: 'fitness-outline',
     iconType: 'ionicons',
-    color: '#EF4444',
+    color: SIGNAL_RED,
     warning:
       'Call emergency services immediately if you suspect a heart attack!',
     steps: [
@@ -195,7 +204,7 @@ const FIRST_AID_GUIDES: FirstAidGuide[] = [
     title: 'Poisoning',
     icon: 'skull-outline',
     iconType: 'ionicons',
-    color: '#6B7280',
+    color: MID_GRAY,
     steps: [
       'Call Poison Control or emergency services immediately.',
       'Try to identify what was ingested and how much.',
@@ -232,198 +241,393 @@ export default function FirstAidScreen() {
   const renderIcon = (guide: FirstAidGuide) => {
     if (guide.iconType === 'ionicons') {
       return (
-        <Ionicons name={guide.icon as any} size={20} color={guide.color} />
+        <Ionicons name={guide.icon as any} size={24} color={guide.color} />
       );
     }
     return (
       <MaterialCommunityIcons
         name={guide.icon as any}
-        size={20}
+        size={24}
         color={guide.color}
       />
     );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-      {/* Header */}
-      <View className="bg-primary px-4 pb-4 pt-2">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white/20"
-            >
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text
-              className="text-2xl text-white"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              First Aid Guide
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header - Swiss style */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={BLACK} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>FIRST AID GUIDE</Text>
+        </View>
+        <TouchableOpacity
+          onPress={handleEmergencyCall}
+          style={styles.callButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="call" size={20} color={OFF_WHITE} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color={MID_GRAY} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search first aid guides..."
+              placeholderTextColor={MID_GRAY}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={MID_GRAY} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Warning Banner */}
+        <View style={styles.warningBanner}>
+          <Ionicons name="warning" size={20} color="#F59E0B" />
+          <View style={styles.warningContent}>
+            <Text style={styles.warningTitle}>IMPORTANT NOTICE</Text>
+            <Text style={styles.warningText}>
+              These guides are for educational purposes only. Always call
+              emergency services for serious medical emergencies. When in doubt,
+              seek professional help.
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={handleEmergencyCall}
-            className="flex-row items-center rounded-full bg-white px-3 py-2"
-          >
-            <Ionicons name="call" size={16} color="#E13333" />
-            <Text
-              className="ml-1 text-sm font-semibold text-primary"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {EMERGENCY_PHONE_NUMBER}
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
-        <View className="mt-4 flex-row items-center rounded-xl bg-white/20 px-4 py-2">
-          <Ionicons name="search" size={20} color="#fff" />
-          <TextInput
-            className="ml-2 flex-1 text-white"
-            placeholder="Search first aid guides..."
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={{ fontFamily: 'Inter' }}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Warning Banner */}
-      <View className="mx-4 mt-4 flex-row items-start rounded-xl bg-red-50 p-4">
-        <Ionicons name="warning" size={24} color="#DC2626" />
-        <View className="ml-3 flex-1">
-          <Text
-            className="text-sm font-semibold text-red-800"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Important Notice
-          </Text>
-          <Text
-            className="mt-1 text-xs text-red-600"
-            style={{ fontFamily: 'Inter' }}
-          >
-            These guides are for educational purposes only. Always call
-            emergency services for serious medical emergencies. When in doubt,
-            seek professional help.
-          </Text>
-        </View>
-      </View>
-
-      {/* First Aid Guides */}
-      <ScrollView
-        className="flex-1 px-4 pt-4"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
-      >
+        {/* First Aid Guides */}
         {filteredGuides.length > 0 ? (
-          <Accordion>
-            {filteredGuides.map(guide => (
-              <AccordionItem
-                key={guide.id}
-                title={guide.title}
-                icon={guide.icon as any}
-                iconColor={guide.color}
-              >
-                {/* Warning if present */}
-                {guide.warning && (
-                  <View className="mb-4 flex-row items-start rounded-lg bg-amber-50 p-3">
-                    <Ionicons name="alert-circle" size={18} color="#F59E0B" />
-                    <Text
-                      className="ml-2 flex-1 text-sm text-amber-800"
-                      style={{ fontFamily: 'Inter' }}
-                    >
-                      {guide.warning}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Steps */}
-                <Text
-                  className="mb-2 text-sm font-semibold text-gray-700"
-                  style={{ fontFamily: 'Inter' }}
+          <View style={styles.guidesContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>GUIDES</Text>
+              <View style={styles.sectionLine} />
+            </View>
+            <Accordion>
+              {filteredGuides.map(guide => (
+                <AccordionItem
+                  key={guide.id}
+                  title={guide.title}
+                  icon={guide.icon as any}
+                  iconColor={guide.color}
                 >
-                  Steps to Follow:
-                </Text>
-                {guide.steps.map((step, index) => (
-                  <View key={index} className="mb-2 flex-row">
-                    <View
-                      className="mr-3 h-6 w-6 items-center justify-center rounded-full"
-                      style={{ backgroundColor: `${guide.color}20` }}
-                    >
-                      <Text
-                        className="text-xs font-bold"
-                        style={{ color: guide.color, fontFamily: 'Inter' }}
-                      >
-                        {index + 1}
+                  {guide.warning && (
+                    <View style={styles.guideWarning}>
+                      <Ionicons name="alert-circle" size={18} color="#F59E0B" />
+                      <Text style={styles.guideWarningText}>
+                        {guide.warning}
                       </Text>
                     </View>
-                    <Text
-                      className="flex-1 text-sm text-gray-600"
-                      style={{ fontFamily: 'Inter' }}
-                    >
-                      {step}
-                    </Text>
-                  </View>
-                ))}
+                  )}
 
-                {/* Do Not */}
-                {guide.doNot && guide.doNot.length > 0 && (
-                  <View className="mt-4">
-                    <Text
-                      className="mb-2 text-sm font-semibold text-red-600"
-                      style={{ fontFamily: 'Inter' }}
-                    >
-                      Do NOT:
-                    </Text>
-                    {guide.doNot.map((item, index) => (
-                      <View key={index} className="mb-1 flex-row items-start">
-                        <Ionicons
-                          name="close-circle"
-                          size={16}
-                          color="#DC2626"
-                        />
+                  <Text style={styles.guideStepsTitle}>STEPS TO FOLLOW:</Text>
+                  {guide.steps.map((step, index) => (
+                    <View key={index} style={styles.guideStep}>
+                      <View
+                        style={[
+                          styles.stepNumber,
+                          { backgroundColor: `${guide.color}20` },
+                        ]}
+                      >
                         <Text
-                          className="ml-2 flex-1 text-sm text-gray-600"
-                          style={{ fontFamily: 'Inter' }}
+                          style={[
+                            styles.stepNumberText,
+                            { color: guide.color },
+                          ]}
                         >
-                          {item}
+                          {index + 1}
                         </Text>
                       </View>
-                    ))}
-                  </View>
-                )}
-              </AccordionItem>
-            ))}
-          </Accordion>
+                      <Text style={styles.stepText}>{step}</Text>
+                    </View>
+                  ))}
+
+                  {guide.doNot && guide.doNot.length > 0 && (
+                    <View style={styles.doNotSection}>
+                      <Text style={styles.doNotTitle}>DO NOT:</Text>
+                      {guide.doNot.map((item, index) => (
+                        <View key={index} style={styles.doNotItem}>
+                          <Ionicons
+                            name="close-circle"
+                            size={16}
+                            color={SIGNAL_RED}
+                          />
+                          <Text style={styles.doNotText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </View>
         ) : (
-          <View className="items-center justify-center py-12">
-            <Ionicons name="search-outline" size={48} color="#d1d5db" />
-            <Text
-              className="mt-4 text-center text-gray-500"
-              style={{ fontFamily: 'Inter' }}
-            >
+          <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={48} color={LIGHT_GRAY} />
+            <Text style={styles.emptyText}>
               No guides found for "{searchQuery}"
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Emergency Call Floating Button */}
-      <TouchableOpacity
-        onPress={handleEmergencyCall}
-        className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
-        style={{ elevation: 8 }}
-      >
-        <Ionicons name="call" size={28} color="#fff" />
-      </TouchableOpacity>
+      {/* Emergency Call Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          onPress={handleEmergencyCall}
+          style={styles.emergencyButton}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="call" size={24} color={OFF_WHITE} />
+          <Text style={styles.emergencyButtonText}>CALL EMERGENCY</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+    backgroundColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  callButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    padding: 10,
+    backgroundColor: SIGNAL_RED,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  searchContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: BLACK,
+    marginLeft: 12,
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 24,
+    padding: 16,
+    backgroundColor: '#FEF3C7',
+    marginBottom: 24,
+  },
+  warningContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  warningTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#92400E',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 18,
+  },
+  guidesContainer: {
+    paddingHorizontal: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  guideWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    marginBottom: 16,
+  },
+  guideWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+    marginLeft: 8,
+    lineHeight: 18,
+  },
+  guideStepsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  guideStep: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  stepNumberText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 13,
+    color: BLACK,
+    lineHeight: 20,
+  },
+  doNotSection: {
+    marginTop: 16,
+  },
+  doNotTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: SIGNAL_RED,
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  doNotItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  doNotText: {
+    flex: 1,
+    fontSize: 13,
+    color: MID_GRAY,
+    marginLeft: 8,
+    lineHeight: 20,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: MID_GRAY,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  emergencyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SIGNAL_RED,
+    paddingVertical: 16,
+  },
+  emergencyButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+});

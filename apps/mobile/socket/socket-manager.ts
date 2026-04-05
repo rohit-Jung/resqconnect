@@ -43,21 +43,19 @@ class SocketManager {
     this.isInitialized = true;
 
     if (DEBUG_SOCKET) {
-      this.socket.onAny((event, ...args) => {
-        console.log(
-          `%c⬇️ SOCKET EVENT`,
-          'color:#4CAF50;font-weight:bold;',
-          event,
-          args.length === 1 ? args[0] : args
-        );
-      });
+      // this.socket.onAny((event, ...args) => {
+      //   console.log(
+      //     `[🏴‍☠️ ANY] SOCKET EVENT`,
+      //     event,
+      //     args.length === 1 ? args[0] : args
+      //   );
+      // });
 
       // Wrap emit to log outgoing events
       const originalEmit = this.socket.emit.bind(this.socket);
       this.socket.emit = ((event: string, ...args: any[]) => {
         console.log(
-          `%c⬆️ SOCKET EMIT`,
-          'color:#2196F3;font-weight:bold;',
+          `[⬆️ EMIT] SOCKET EMIT`,
           event,
           args.length === 1 ? args[0] : args
         );
@@ -137,6 +135,33 @@ class SocketManager {
     }
 
     this.socket.emit(event, data);
+  }
+
+  // Emit with acknowledgment callback support
+  emitWithAck(
+    event: SocketEvents,
+    data?: any,
+    callback?: (error?: Error | null) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        const error = new Error('Socket not initialized');
+        callback?.(error);
+        reject(error);
+        return;
+      }
+
+      this.socket.emit(event, data, (response: any) => {
+        if (response?.error) {
+          const error = new Error(response.error);
+          callback?.(error);
+          reject(error);
+        } else {
+          callback?.(null);
+          resolve();
+        }
+      });
+    });
   }
 
   private reattachHandlers() {

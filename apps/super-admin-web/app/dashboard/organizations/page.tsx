@@ -61,12 +61,6 @@ export default function OrganizationsPage() {
   const ambulanceOrgs = organizations.filter(
     (o: IOrganization) => o.serviceCategory === 'ambulance'
   ).length;
-  const policeOrgs = organizations.filter(
-    (o: IOrganization) => o.serviceCategory === 'police'
-  ).length;
-  const fireOrgs = organizations.filter(
-    (o: IOrganization) => o.serviceCategory === 'fire_brigade'
-  ).length;
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this organization?')) {
@@ -94,26 +88,19 @@ export default function OrganizationsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">
-            Loading organizations...
-          </p>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="max-w-md border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950">
-          <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-red-600 dark:text-red-400" />
-          <h3 className="mb-2 font-semibold text-red-800 dark:text-red-200">
-            Failed to load
-          </h3>
-          <p className="text-sm text-red-600 dark:text-red-400">
+      <div className="min-h-screen bg-background px-6 py-12">
+        <div className="max-w-md border border-primary bg-card p-6 text-center rounded-xl">
+          <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-primary" />
+          <h3 className="mb-2 font-semibold text-foreground">Failed to load</h3>
+          <p className="text-sm text-muted-foreground">
             {error?.message || 'An error occurred'}
           </p>
         </div>
@@ -122,186 +109,208 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
-          <p className="text-muted-foreground mt-2">
+    <div className="min-h-screen bg-background">
+      {/* Swiss Style Header */}
+      <div className="bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary">.</span>
+          </div>
+          <Link href="/dashboard/organizations/new">
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
+              <Plus className="h-4 w-4" />
+              Create Organization
+            </Button>
+          </Link>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Organizations
+          </h1>
+          <p className="text-muted-foreground mt-1">
             {organizations.length} total organizations
           </p>
         </div>
-        <Link href="/dashboard/organizations/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Organization
-          </Button>
-        </Link>
       </div>
 
-      {/* Stats */}
-      {!isLoading && (
-        <div className="grid gap-4 md:grid-cols-4">
-          {[
-            { label: 'TOTAL ORGS', value: totalOrgs },
-            { label: 'VERIFIED', value: verifiedOrgs },
-            { label: 'PENDING', value: pendingOrgs },
-            { label: 'AMBULANCE', value: ambulanceOrgs },
-          ].map(stat => (
-            <Card key={stat.label}>
-              <CardContent className="p-4">
-                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                  {stat.label}
-                </span>
-                <p className="mt-1 text-3xl font-bold tracking-tight">
-                  {stat.value}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Content */}
+      <div className="px-6 pb-8 space-y-6">
+        {/* Stats */}
+        {!isLoading && (
+          <div className="grid gap-4 md:grid-cols-4">
+            {[
+              { label: 'TOTAL ORGS', value: totalOrgs },
+              { label: 'VERIFIED', value: verifiedOrgs },
+              { label: 'PENDING', value: pendingOrgs },
+              { label: 'AMBULANCE', value: ambulanceOrgs },
+            ].map(stat => (
+              <Card key={stat.label} className="rounded-xl">
+                <CardContent className="p-4">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    {stat.label}
+                  </span>
+                  <p className="mt-1 text-3xl font-bold tracking-tight text-foreground">
+                    {stat.value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <Input
+            placeholder="Search organizations..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-10 border-border focus:border-primary rounded-none"
+          />
         </div>
-      )}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-        <Input
-          placeholder="Search organizations..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
-      {/* Table */}
-      <Card>
-        <CardHeader className="border-b border-border pb-3">
-          <CardTitle className="text-base font-semibold">
-            All Organizations
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {filteredOrganizations.length === 0 ? (
-            <p className="text-muted-foreground py-12 text-center text-sm">
-              {searchQuery
-                ? 'No organizations match your search'
-                : 'No organizations found'}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border text-left">
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Organization
-                    </th>
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Email
-                    </th>
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Category
-                    </th>
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Status
-                    </th>
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Joined
-                    </th>
-                    <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOrganizations.map((org: IOrganization) => (
-                    <tr
-                      key={org.id}
-                      className="border-b border-border last:border-0"
-                    >
-                      <td className="px-6 py-4 font-medium">{org.name}</td>
-                      <td className="text-muted-foreground px-6 py-4 text-sm">
-                        {org.email}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
-                          {serviceCategoryLabels[org.serviceCategory] ||
-                            org.serviceCategory}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] ${
-                            org.isVerified
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-yellow-600 dark:text-yellow-400'
-                          }`}
-                        >
-                          {org.isVerified ? (
-                            <>
-                              <CheckCircle className="h-3 w-3" /> Verified
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="h-3 w-3" /> Pending
-                            </>
-                          )}
-                        </span>
-                      </td>
-                      <td className="text-muted-foreground px-6 py-4 text-sm">
-                        {new Date(org.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={deletingId === org.id}
-                            >
-                              {deletingId === org.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/organizations/${org.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleToggleVerification(org)}
-                            >
-                              {org.isVerified ? (
-                                <>
-                                  <XCircle className="mr-2 h-4 w-4" /> Revoke
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="mr-2 h-4 w-4" />{' '}
-                                  Verify
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => handleDelete(org.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
+        {/* Table */}
+        <Card className="rounded-xl">
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">
+              All Organizations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {filteredOrganizations.length === 0 ? (
+              <p className="text-muted-foreground py-12 text-center text-sm">
+                {searchQuery
+                  ? 'No organizations match your search'
+                  : 'No organizations found'}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Organization
+                      </th>
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Email
+                      </th>
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Category
+                      </th>
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Status
+                      </th>
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Joined
+                      </th>
+                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody>
+                    {filteredOrganizations.map((org: IOrganization) => (
+                      <tr
+                        key={org.id}
+                        className="border-b border-border last:border-0 hover:bg-muted/50"
+                      >
+                        <td className="px-6 py-4 font-medium text-foreground">
+                          {org.name}
+                        </td>
+                        <td className="text-muted-foreground px-6 py-4 text-sm">
+                          {org.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+                            {serviceCategoryLabels[org.serviceCategory] ||
+                              org.serviceCategory}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] ${
+                              org.isVerified
+                                ? 'text-green-600 dark:text-green-500'
+                                : 'text-yellow-600 dark:text-yellow-500'
+                            }`}
+                          >
+                            {org.isVerified ? (
+                              <>
+                                <CheckCircle className="h-3 w-3" /> Verified
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3 w-3" /> Pending
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td className="text-muted-foreground px-6 py-4 text-sm">
+                          {new Date(org.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-none"
+                                disabled={deletingId === org.id}
+                              >
+                                {deletingId === org.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <MoreHorizontal className="h-4 w-4 text-foreground" />
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/dashboard/organizations/${org.id}`}
+                                  className="text-foreground"
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleToggleVerification(org)}
+                                className="text-foreground"
+                              >
+                                {org.isVerified ? (
+                                  <>
+                                    <XCircle className="mr-2 h-4 w-4" /> Revoke
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="mr-2 h-4 w-4" />{' '}
+                                    Verify
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-primary"
+                                onClick={() => handleDelete(org.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

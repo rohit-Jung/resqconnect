@@ -3,55 +3,63 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useGetProviderEmergencyHistory } from '@/services/emergency/emergency.api';
 import {
   EmergencyStatus,
   IEmergencyHistoryItem,
 } from '@/types/emergency.types';
 
-const STATUS_COLORS: Record<
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const BLACK = '#000000';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const SUCCESS_GREEN = '#10B981';
+
+const STATUS_STYLES: Record<
   string,
   { bg: string; text: string; label: string }
 > = {
   [EmergencyStatus.COMPLETED]: {
-    bg: 'bg-green-100',
-    text: 'text-green-700',
-    label: 'Completed',
+    bg: SUCCESS_GREEN,
+    text: '#FFFFFF',
+    label: 'COMPLETED',
   },
   [EmergencyStatus.CANCELLED]: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-700',
-    label: 'Cancelled',
+    bg: MID_GRAY,
+    text: '#FFFFFF',
+    label: 'CANCELLED',
   },
   [EmergencyStatus.PENDING]: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-700',
-    label: 'Pending',
+    bg: '#F59E0B',
+    text: '#FFFFFF',
+    label: 'PENDING',
   },
   [EmergencyStatus.ACCEPTED]: {
-    bg: 'bg-blue-100',
-    text: 'text-blue-700',
-    label: 'Accepted',
+    bg: '#3B82F6',
+    text: '#FFFFFF',
+    label: 'ACCEPTED',
   },
   [EmergencyStatus.IN_PROGRESS]: {
-    bg: 'bg-blue-100',
-    text: 'text-blue-700',
-    label: 'In Progress',
+    bg: '#3B82F6',
+    text: '#FFFFFF',
+    label: 'IN PROGRESS',
   },
   [EmergencyStatus.NO_PROVIDERS]: {
-    bg: 'bg-red-100',
-    text: 'text-red-700',
-    label: 'No Providers',
+    bg: SIGNAL_RED,
+    text: '#FFFFFF',
+    label: 'NO PROVIDERS',
   },
 };
 
@@ -92,106 +100,73 @@ const HistoryItemCard: React.FC<{ item: IEmergencyHistoryItem }> = ({
   item,
 }) => {
   const statusStyle =
-    STATUS_COLORS[item.status] || STATUS_COLORS[EmergencyStatus.PENDING];
+    STATUS_STYLES[item.status] || STATUS_STYLES[EmergencyStatus.PENDING];
   const icon = EMERGENCY_TYPE_ICONS[item.emergencyType] || 'alert-circle';
 
   return (
-    <View
-      className="bg-white rounded-2xl p-4 mb-3 shadow-sm"
-      style={{ elevation: 2 }}
-    >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-row items-center flex-1">
-          <View className="h-12 w-12 rounded-full bg-red-50 items-center justify-center mr-3">
-            <Ionicons name={icon} size={24} color="#E13333" />
+    <View style={styles.historyCard}>
+      <View style={styles.historyCardHeader}>
+        <View style={styles.historyCardLeft}>
+          <View style={styles.historyIconContainer}>
+            <Ionicons name={icon} size={24} color={SIGNAL_RED} />
           </View>
-          <View className="flex-1">
-            <Text
-              className="text-base font-semibold text-gray-800 capitalize"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {item.emergencyType.replace('_', ' ')}
+          <View style={styles.historyCardInfo}>
+            <Text style={styles.historyCardTitle}>
+              {item.emergencyType.replace('_', ' ').toUpperCase()}
             </Text>
-            <Text
-              className="text-sm text-gray-500 mt-0.5"
-              style={{ fontFamily: 'Inter' }}
-              numberOfLines={1}
-            >
+            <Text style={styles.historyCardDesc} numberOfLines={1}>
               {item.emergencyDescription || 'No description'}
             </Text>
           </View>
         </View>
-        <View className={`px-2.5 py-1 rounded-full ${statusStyle.bg}`}>
-          <Text
-            className={`text-xs font-medium ${statusStyle.text}`}
-            style={{ fontFamily: 'Inter' }}
-          >
+        <View
+          style={[
+            styles.historyStatusBadge,
+            { backgroundColor: statusStyle.bg },
+          ]}
+        >
+          <Text style={[styles.historyStatusText, { color: statusStyle.text }]}>
             {statusStyle.label}
           </Text>
         </View>
       </View>
 
-      <View className="mt-3 pt-3 border-t border-gray-100">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-            <Text
-              className="text-xs text-gray-500 ml-1"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {formatDate(item.createdAt)}
-            </Text>
-          </View>
-          <View className="flex-row items-center space-x-3">
-            {item.responseTime && (
-              <View className="flex-row items-center mr-3">
-                <Ionicons
-                  name="speedometer-outline"
-                  size={14}
-                  color="#9CA3AF"
-                />
-                <Text
-                  className="text-xs text-gray-500 ml-1"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  {formatResponseTime(item.responseTime)}
-                </Text>
-              </View>
-            )}
-            {item.distanceTraveled && (
-              <View className="flex-row items-center">
-                <Ionicons name="car-outline" size={14} color="#9CA3AF" />
-                <Text
-                  className="text-xs text-gray-500 ml-1"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  {formatDistance(item.distanceTraveled)}
-                </Text>
-              </View>
-            )}
-          </View>
+      <View style={styles.historyCardFooter}>
+        <View style={styles.historyCardMeta}>
+          <Ionicons name="time-outline" size={14} color={MID_GRAY} />
+          <Text style={styles.historyCardMetaText}>
+            {formatDate(item.createdAt)}
+          </Text>
         </View>
-
-        {item.user && (
-          <View className="mt-2 flex-row items-center bg-gray-50 rounded-lg p-2">
-            <Ionicons name="person-circle-outline" size={20} color="#6B7280" />
-            <Text
-              className="text-sm text-gray-600 ml-2"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {item.user.name}
-            </Text>
-            {item.user.phoneNumber && (
-              <Text
-                className="text-xs text-gray-400 ml-2"
-                style={{ fontFamily: 'Inter' }}
-              >
-                {item.user.phoneNumber}
+        <View style={styles.historyCardStats}>
+          {item.responseTime && (
+            <View style={styles.historyCardMeta}>
+              <Ionicons name="speedometer-outline" size={14} color={MID_GRAY} />
+              <Text style={styles.historyCardMetaText}>
+                {formatResponseTime(item.responseTime)}
               </Text>
-            )}
-          </View>
-        )}
+            </View>
+          )}
+          {item.distanceTraveled && (
+            <View style={[styles.historyCardMeta, { marginLeft: 12 }]}>
+              <Ionicons name="car-outline" size={14} color={MID_GRAY} />
+              <Text style={styles.historyCardMetaText}>
+                {formatDistance(item.distanceTraveled)}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
+
+      {item.user && (
+        <View style={styles.historyUserCard}>
+          <Ionicons name="person-circle-outline" size={20} color={MID_GRAY} />
+          <Text style={styles.historyUserName}>{item.user.name}</Text>
+          {item.user.phoneNumber && (
+            <Text style={styles.historyUserPhone}>{item.user.phoneNumber}</Text>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -205,16 +180,13 @@ const FilterChip: React.FC<{
 }> = ({ label, active, onPress }) => (
   <TouchableOpacity
     onPress={onPress}
-    className={`px-4 py-2 rounded-full mr-2 ${
-      active ? 'bg-primary' : 'bg-gray-100'
-    }`}
+    style={[styles.filterChip, active && styles.filterChipActive]}
     activeOpacity={0.7}
   >
     <Text
-      className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-600'}`}
-      style={{ fontFamily: 'Inter' }}
+      style={[styles.filterChipText, active && styles.filterChipTextActive]}
     >
-      {label}
+      {label.toUpperCase()}
     </Text>
   </TouchableOpacity>
 );
@@ -224,14 +196,15 @@ export default function ProviderHistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const statusParam = filter === 'all' ? undefined : filter;
-  const { data, isLoading, refetch, isError } = useGetProviderEmergencyHistory(
-    { status: statusParam },
-    true
-  );
+  const { data, isLoading, refetch, isError, error } =
+    useGetProviderEmergencyHistory({ status: statusParam }, true);
 
-  const historyData = data?.data;
-  const history = historyData?.history || [];
-  const stats = historyData?.stats;
+  const responseData = data?.data;
+  // Handle both array response and object response formats
+  const history = Array.isArray(responseData)
+    ? responseData
+    : responseData?.history || [];
+  const stats = Array.isArray(responseData) ? undefined : responseData?.stats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -240,79 +213,68 @@ export default function ProviderHistoryScreen() {
   }, [refetch]);
 
   return (
-    <SafeAreaContainer>
-      <View className="flex-1 bg-gray-50">
-        {/* Header */}
-        <View className="bg-primary px-6 pb-4 pt-2">
-          <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Response History
-          </Text>
-          <Text
-            className="text-sm text-white/80 mt-1"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Your emergency response records
-          </Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
         </View>
+        <View style={styles.headerLine} />
+        <Text style={styles.tagline}>RESPONSE HISTORY</Text>
+      </View>
 
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#E13333']}
-              tintColor="#E13333"
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Stats Section */}
-          {stats && (
-            <View className="mt-4 mb-4">
-              <StatGrid columns={2}>
-                <StatCard
-                  title="Total Responses"
-                  value={stats.total}
-                  icon="document-text"
-                  iconColor="#E13333"
-                  iconBgColor="#FEE2E2"
-                />
-                <StatCard
-                  title="Completed"
-                  value={stats.completed}
-                  icon="checkmark-circle"
-                  iconColor="#10B981"
-                  iconBgColor="#D1FAE5"
-                />
-              </StatGrid>
-              <View className="mt-3">
-                <StatGrid columns={2}>
-                  <StatCard
-                    title="Cancelled"
-                    value={stats.cancelled}
-                    icon="close-circle"
-                    iconColor="#6B7280"
-                    iconBgColor="#F3F4F6"
-                  />
-                  <StatCard
-                    title="Avg Response"
-                    value={formatResponseTime(stats.avgResponseTime)}
-                    icon="timer"
-                    iconColor="#3B82F6"
-                    iconBgColor="#DBEAFE"
-                  />
-                </StatGrid>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[SIGNAL_RED]}
+            tintColor={SIGNAL_RED}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {stats && (
+          <View style={styles.statsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>SUMMARY</Text>
+              <View style={styles.sectionLine} />
+            </View>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.total}</Text>
+                <Text style={styles.statLabel}>TOTAL</Text>
+              </View>
+              <View style={[styles.statCard, { borderColor: SUCCESS_GREEN }]}>
+                <Text style={[styles.statValue, { color: SUCCESS_GREEN }]}>
+                  {stats.completed}
+                </Text>
+                <Text style={styles.statLabel}>COMPLETED</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.cancelled}</Text>
+                <Text style={styles.statLabel}>CANCELLED</Text>
+              </View>
+              <View style={[styles.statCard, { borderColor: '#3B82F6' }]}>
+                <Text style={[styles.statValue, { color: '#3B82F6' }]}>
+                  {formatResponseTime(stats.avgResponseTime)}
+                </Text>
+                <Text style={styles.statLabel}>AVG RESPONSE</Text>
               </View>
             </View>
-          )}
+          </View>
+        )}
 
-          {/* Filters */}
-          <View className="flex-row mt-2 mb-4">
+        <View style={styles.filtersSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>FILTER</Text>
+            <View style={styles.sectionLine} />
+          </View>
+          <View style={styles.filtersRow}>
             <FilterChip
               label="All"
               active={filter === 'all'}
@@ -329,52 +291,285 @@ export default function ProviderHistoryScreen() {
               onPress={() => setFilter('cancelled')}
             />
           </View>
+        </View>
 
-          {/* Content */}
-          {isLoading && !refreshing ? (
-            <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#E13333" />
-              <Text
-                className="text-gray-500 mt-4"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Loading history...
-              </Text>
-            </View>
-          ) : isError ? (
-            <EmptyState
-              icon="alert-circle"
-              title="Failed to load history"
-              description="There was an error loading your response history. Please try again."
-              actionLabel="Retry"
-              onAction={onRefresh}
-              iconColor="#EF4444"
-            />
-          ) : history.length === 0 ? (
-            <EmptyState
-              icon="time-outline"
-              title="No response history"
-              description={
-                filter === 'all'
-                  ? "You haven't responded to any emergencies yet. Your history will appear here."
-                  : `No ${filter} responses found.`
-              }
-            />
-          ) : (
-            <View>
-              <Text
-                className="text-sm text-gray-500 mb-3"
-                style={{ fontFamily: 'Inter' }}
-              >
-                {history.length} response{history.length !== 1 ? 's' : ''}
-              </Text>
-              {history.map(item => (
-                <HistoryItemCard key={item.id} item={item} />
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    </SafeAreaContainer>
+        {isLoading && !refreshing ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={SIGNAL_RED} />
+            <Text style={styles.loadingText}>LOADING HISTORY...</Text>
+          </View>
+        ) : isError ? (
+          <EmptyState
+            icon="alert-circle"
+            title="Failed to load history"
+            description="There was an error loading your response history. Please try again."
+            actionLabel="RETRY"
+            onAction={onRefresh}
+            iconColor={SIGNAL_RED}
+          />
+        ) : history.length === 0 ? (
+          <EmptyState
+            icon="time-outline"
+            title="No response history"
+            description={
+              filter === 'all'
+                ? "You haven't responded to any emergencies yet. Your history will appear here."
+                : `No ${filter} responses found.`
+            }
+            iconColor={LIGHT_GRAY}
+          />
+        ) : (
+          <View>
+            <Text style={styles.historyCount}>
+              {history.length} RESPONSE{history.length !== 1 ? 'S' : ''}
+            </Text>
+            {history.map(item => (
+              <HistoryItemCard key={item.id} item={item} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 34,
+  },
+  headerLine: {
+    width: 36,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 24,
+    paddingBottom: 100,
+  },
+  statsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+    marginHorizontal: '1%',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: PRIMARY,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  filtersSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  filterChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  filterChipTextActive: {
+    color: OFF_WHITE,
+  },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  historyCount: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 16,
+    paddingHorizontal: 24,
+  },
+  historyCard: {
+    marginHorizontal: 24,
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  historyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  historyCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  historyIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  historyCardInfo: {
+    flex: 1,
+  },
+  historyCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  historyCardDesc: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 0.5,
+  },
+  historyStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  historyStatusText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  historyCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+  },
+  historyCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyCardStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyCardMetaText: {
+    fontSize: 11,
+    color: MID_GRAY,
+    marginLeft: 4,
+    letterSpacing: 0.5,
+  },
+  historyUserCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+    padding: 8,
+    marginTop: 12,
+  },
+  historyUserName: {
+    fontSize: 12,
+    color: BLACK,
+    marginLeft: 8,
+  },
+  historyUserPhone: {
+    fontSize: 11,
+    color: MID_GRAY,
+    marginLeft: 8,
+  },
+});

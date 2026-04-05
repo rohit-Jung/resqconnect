@@ -33,7 +33,12 @@ async function startEmergencyRequestService() {
   logger.info(`Kafka connected in ${Date.now() - startTime}ms`);
 
   await assignResponderConsumer.subscribe({
-    topics: [KAFKA_TOPICS.MEDICAL_EVENTS, KAFKA_TOPICS.FIRE_EVENTS],
+    topics: [
+      KAFKA_TOPICS.MEDICAL_EVENTS,
+      KAFKA_TOPICS.FIRE_EVENTS,
+      KAFKA_TOPICS.POLICE_EVENTS,
+      KAFKA_TOPICS.RESCUE_EVENTS,
+    ],
     fromBeginning: false, // Don't process old messages on restart
   });
 
@@ -45,6 +50,8 @@ async function startEmergencyRequestService() {
 
       const data = JSON.parse(message.value!.toString());
       const parsedData = EmergencyRequestPayload.safeParse(data);
+
+      console.log('[CONSUMER] assignResponderConsumer', parsedData.data);
 
       if (!parsedData.success) {
         logger.error('Invalid message format:', {
@@ -170,6 +177,7 @@ async function startEmergencyRequestService() {
         userEmail: userInfo?.email?.toString() ?? '',
       };
 
+      console.log('top 10 providers-found', top10Providers);
       for (const provider of top10Providers) {
         const roomName = SocketRoom.PROVIDER(provider.id);
         io.to(roomName).emit(SocketEvents.NEW_EMERGENCY, payload);

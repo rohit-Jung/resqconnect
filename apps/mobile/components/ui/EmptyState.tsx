@@ -1,7 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const BLACK = '#000000';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
 
 interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -19,44 +26,73 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   actionLabel,
   onAction,
-  iconColor = '#d1d5db',
+  iconColor = LIGHT_GRAY,
   iconSize = 64,
 }) => {
   return (
-    <View className="items-center justify-center py-12 px-6">
-      <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-gray-100">
+    <View style={styles.container}>
+      <View style={styles.iconContainer}>
         <Ionicons name={icon} size={iconSize} color={iconColor} />
       </View>
-      <Text
-        className="text-center text-lg text-gray-600 font-medium"
-        style={{ fontFamily: 'Inter' }}
-      >
-        {title}
-      </Text>
-      {description && (
-        <Text
-          className="mt-2 text-center text-sm text-gray-400 max-w-xs"
-          style={{ fontFamily: 'Inter' }}
-        >
-          {description}
-        </Text>
-      )}
+      <Text style={styles.title}>{title}</Text>
+      {description && <Text style={styles.description}>{description}</Text>}
       {actionLabel && onAction && (
         <TouchableOpacity
           onPress={onAction}
-          className="mt-6 rounded-xl bg-primary px-6 py-3"
+          style={styles.button}
           activeOpacity={0.8}
         >
-          <Text
-            className="text-white font-semibold"
-            style={{ fontFamily: 'Inter' }}
-          >
-            {actionLabel}
-          </Text>
+          <Text style={styles.buttonText}>{actionLabel.toUpperCase()}</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: LIGHT_GRAY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BLACK,
+    letterSpacing: 1,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 280,
+  },
+  button: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: PRIMARY,
+  },
+  buttonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+  },
+});
 
 export default EmptyState;

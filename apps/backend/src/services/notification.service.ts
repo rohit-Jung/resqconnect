@@ -5,6 +5,7 @@ import {
   type ExpoPushTicket,
 } from 'expo-server-sdk';
 
+import { logger } from '@/config/logger/winston.config';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import {
@@ -55,7 +56,7 @@ export async function sendPushNotification(
 
   for (const pushToken of pushTokens) {
     if (!Expo.isExpoPushToken(pushToken)) {
-      console.error(`Push token ${pushToken} is not a valid Expo push token`);
+      logger.error(`Push token ${pushToken} is not a valid Expo push token`);
       continue;
     }
 
@@ -81,7 +82,7 @@ export async function sendPushNotification(
       const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
       tickets.push(...ticketChunk);
     } catch (error) {
-      console.error('Error sending push notification chunk:', error);
+      logger.error('Error sending push notification chunk:', error);
     }
   }
 
@@ -93,7 +94,7 @@ export async function sendPushNotification(
  * Currently a placeholder that logs the SMS - integrate with Twilio when ready
  */
 export async function sendSMS(payload: SMSPayload): Promise<boolean> {
-  console.log(`📱 SMS to ${payload.to}: ${payload.message}`);
+  logger.debug(`[SMS] SMS to ${payload.to}: ${payload.message}`);
   return true;
 }
 
@@ -116,7 +117,7 @@ export async function notifyUser(
     });
 
     if (!userRecord) {
-      console.error(`User ${userId} not found`);
+      logger.error(`User ${userId} not found`);
       return;
     }
 
@@ -147,7 +148,7 @@ export async function notifyUser(
       await sendPushNotification([userRecord.pushToken], notification);
     }
   } catch (error) {
-    console.error('Error notifying user:', error);
+    logger.error('Error notifying user:', error);
   }
 }
 
@@ -169,7 +170,7 @@ export async function notifyServiceProvider(
     });
 
     if (!providerRecord) {
-      console.error(`Service provider ${providerId} not found`);
+      logger.error(`Service provider ${providerId} not found`);
       return;
     }
 
@@ -198,7 +199,7 @@ export async function notifyServiceProvider(
       );
     }
   } catch (error) {
-    console.error('Error notifying service provider:', error);
+    logger.error('Error notifying service provider:', error);
   }
 }
 
@@ -221,7 +222,7 @@ export async function notifyEmergencyContacts(
     });
 
     if (!userRecord || !userRecord.notifyEmergencyContacts) {
-      console.log(
+      logger.debug(
         'Emergency contact notification disabled for user:',
         data.userId
       );
@@ -234,7 +235,7 @@ export async function notifyEmergencyContacts(
     });
 
     if (contacts.length === 0) {
-      console.log('No emergency contacts found for user:', data.userId);
+      logger.debug('No emergency contacts found for user:', data.userId);
       return;
     }
 
@@ -280,11 +281,11 @@ export async function notifyEmergencyContacts(
       }
     }
 
-    console.log(
-      `✅ Notified ${contacts.length} emergency contacts for user ${data.userId}`
+    logger.debug(
+      `[SUCCESS] Notified ${contacts.length} emergency contacts for user ${data.userId}`
     );
   } catch (error) {
-    console.error('Error notifying emergency contacts:', error);
+    logger.error('Error notifying emergency contacts:', error);
   }
 }
 
@@ -333,19 +334,19 @@ export async function sendRequestStatusNotification(
 ): Promise<void> {
   const statusMessages: Record<string, { title: string; body: string }> = {
     accepted: {
-      title: '✅ Help is on the way!',
+      title: '[SUCCESS] Help is on the way!',
       body: `${details.providerName || 'A responder'} has accepted your request${details.eta ? ` and will arrive in ~${details.eta} min` : ''}.`,
     },
     provider_assigned: {
-      title: '👤 Responder Assigned',
+      title: '[USER] Responder Assigned',
       body: `${details.providerName || 'A responder'} has been assigned to your emergency.`,
     },
     cancelled: {
-      title: '❌ Request Cancelled',
+      title: '[ERROR] Request Cancelled',
       body: details.message || 'Your emergency request has been cancelled.',
     },
     completed: {
-      title: '✅ Request Completed',
+      title: '[SUCCESS] Request Completed',
       body: 'Your emergency request has been marked as complete. Stay safe!',
     },
   };

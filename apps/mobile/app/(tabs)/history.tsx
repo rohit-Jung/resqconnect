@@ -3,55 +3,64 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/ui/EmptyState';
-import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useGetUserEmergencyHistory } from '@/services/emergency/emergency.api';
 import {
   EmergencyStatus,
   IEmergencyHistoryItem,
 } from '@/types/emergency.types';
 
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
+const SUCCESS_GREEN = '#10B981';
+const WARNING_AMBER = '#F59E0B';
+
 const STATUS_COLORS: Record<
   string,
   { bg: string; text: string; label: string }
 > = {
   [EmergencyStatus.COMPLETED]: {
-    bg: 'bg-green-100',
-    text: 'text-green-700',
-    label: 'Completed',
+    bg: '#D1FAE5',
+    text: '#059669',
+    label: 'COMPLETED',
   },
   [EmergencyStatus.CANCELLED]: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-700',
-    label: 'Cancelled',
+    bg: LIGHT_GRAY,
+    text: MID_GRAY,
+    label: 'CANCELLED',
   },
   [EmergencyStatus.PENDING]: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-700',
-    label: 'Pending',
+    bg: '#FEF3C7',
+    text: '#D97706',
+    label: 'PENDING',
   },
   [EmergencyStatus.ACCEPTED]: {
-    bg: 'bg-blue-100',
-    text: 'text-blue-700',
-    label: 'Accepted',
+    bg: '#DBEAFE',
+    text: '#2563EB',
+    label: 'ACCEPTED',
   },
   [EmergencyStatus.IN_PROGRESS]: {
-    bg: 'bg-blue-100',
-    text: 'text-blue-700',
-    label: 'In Progress',
+    bg: '#DBEAFE',
+    text: '#2563EB',
+    label: 'IN PROGRESS',
   },
   [EmergencyStatus.NO_PROVIDERS]: {
-    bg: 'bg-red-100',
-    text: 'text-red-700',
-    label: 'No Providers',
+    bg: '#FEE2E2',
+    text: '#DC2626',
+    label: 'NO RESPONDERS',
   },
 };
 
@@ -90,85 +99,56 @@ const HistoryItemCard: React.FC<{ item: IEmergencyHistoryItem }> = ({
   const icon = EMERGENCY_TYPE_ICONS[item.emergencyType] || 'alert-circle';
 
   return (
-    <View
-      className="bg-white rounded-2xl p-4 mb-3 shadow-sm"
-      style={{ elevation: 2 }}
-    >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-row items-center flex-1">
-          <View className="h-12 w-12 rounded-full bg-red-50 items-center justify-center mr-3">
-            <Ionicons name={icon} size={24} color="#E13333" />
+    <View style={styles.historyCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.emergencyType}>
+          <View style={styles.iconContainer}>
+            <Ionicons name={icon} size={20} color={SIGNAL_RED} />
           </View>
-          <View className="flex-1">
-            <Text
-              className="text-base font-semibold text-gray-800 capitalize"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {item.emergencyType.replace('_', ' ')}
+          <View style={styles.typeInfo}>
+            <Text style={styles.emergencyTypeText}>
+              {item.emergencyType.replace('_', ' ').toUpperCase()}
             </Text>
-            <Text
-              className="text-sm text-gray-500 mt-0.5"
-              style={{ fontFamily: 'Inter' }}
-              numberOfLines={1}
-            >
+            <Text style={styles.emergencyDescription} numberOfLines={1}>
               {item.emergencyDescription || 'No description'}
             </Text>
           </View>
         </View>
-        <View className={`px-2.5 py-1 rounded-full ${statusStyle.bg}`}>
-          <Text
-            className={`text-xs font-medium ${statusStyle.text}`}
-            style={{ fontFamily: 'Inter' }}
-          >
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+          <Text style={[styles.statusText, { color: statusStyle.text }]}>
             {statusStyle.label}
           </Text>
         </View>
       </View>
 
-      <View className="mt-3 pt-3 border-t border-gray-100">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-            <Text
-              className="text-xs text-gray-500 ml-1"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {formatDate(item.createdAt)}
-            </Text>
-          </View>
-          {item.responseTime && (
-            <View className="flex-row items-center">
-              <Ionicons name="speedometer-outline" size={14} color="#9CA3AF" />
-              <Text
-                className="text-xs text-gray-500 ml-1"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Response: {formatResponseTime(item.responseTime)}
-              </Text>
-            </View>
-          )}
-        </View>
+      <View style={styles.cardDivider} />
 
-        {item.provider && (
-          <View className="mt-2 flex-row items-center bg-gray-50 rounded-lg p-2">
-            <Ionicons name="person-circle-outline" size={20} color="#6B7280" />
-            <Text
-              className="text-sm text-gray-600 ml-2"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {item.provider.name}
+      <View style={styles.cardMeta}>
+        <View style={styles.metaItem}>
+          <Ionicons name="time-outline" size={14} color={MID_GRAY} />
+          <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
+        </View>
+        {item.responseTime && (
+          <View style={styles.metaItem}>
+            <Ionicons name="speedometer-outline" size={14} color={MID_GRAY} />
+            <Text style={styles.metaText}>
+              Response: {formatResponseTime(item.responseTime)}
             </Text>
-            {item.provider.vehicleNumber && (
-              <Text
-                className="text-xs text-gray-400 ml-2"
-                style={{ fontFamily: 'Inter' }}
-              >
-                ({item.provider.vehicleNumber})
-              </Text>
-            )}
           </View>
         )}
       </View>
+
+      {item.provider && (
+        <View style={styles.providerRow}>
+          <Ionicons name="person-circle-outline" size={18} color={MID_GRAY} />
+          <Text style={styles.providerName}>{item.provider.name}</Text>
+          {item.provider.vehicleNumber && (
+            <Text style={styles.vehicleNumber}>
+              ({item.provider.vehicleNumber})
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -181,17 +161,12 @@ const FilterChip: React.FC<{
   onPress: () => void;
 }> = ({ label, active, onPress }) => (
   <TouchableOpacity
+    style={[styles.filterChip, active && styles.filterChipActive]}
     onPress={onPress}
-    className={`px-4 py-2 rounded-full mr-2 ${
-      active ? 'bg-primary' : 'bg-gray-100'
-    }`}
     activeOpacity={0.7}
   >
-    <Text
-      className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-600'}`}
-      style={{ fontFamily: 'Inter' }}
-    >
-      {label}
+    <Text style={[styles.filterText, active && styles.filterTextActive]}>
+      {label.toUpperCase()}
     </Text>
   </TouchableOpacity>
 );
@@ -206,9 +181,14 @@ export default function HistoryScreen() {
     true
   );
 
-  const historyData = data?.data;
-  const history = historyData?.history || [];
-  const stats = historyData?.stats;
+  const responseData = data?.data;
+  // Handle both array response and object response formats
+  const history = Array.isArray(responseData)
+    ? responseData
+    : responseData?.history || [];
+
+  console.log('RESPONSE', history);
+  const stats = Array.isArray(responseData) ? undefined : responseData?.stats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -217,105 +197,96 @@ export default function HistoryScreen() {
   }, [refetch]);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-      {/* Header */}
-      <View className="px-5 pt-4 pb-2">
-        <Text
-          className="text-2xl text-gray-800"
-          style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-        >
-          Emergency History
-        </Text>
-        <Text
-          className="text-sm text-gray-500 mt-1"
-          style={{ fontFamily: 'Inter' }}
-        >
-          Your past emergency requests
-        </Text>
+    <View style={styles.container}>
+      {/* Header - Swiss style */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>EMERGENCY HISTORY</Text>
+        </View>
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#E13333']}
-            tintColor="#E13333"
+            colors={[SIGNAL_RED]}
+            tintColor={SIGNAL_RED}
           />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* Stats Section */}
         {stats && (
-          <View className="mt-4 mb-4">
-            <StatGrid columns={2}>
-              <StatCard
-                title="Total Requests"
-                value={stats.total}
-                icon="document-text"
-                iconColor="#E13333"
-                iconBgColor="#FEE2E2"
-              />
-              <StatCard
-                title="Completed"
-                value={stats.completed}
-                icon="checkmark-circle"
-                iconColor="#10B981"
-                iconBgColor="#D1FAE5"
-              />
-            </StatGrid>
-            <View className="mt-3">
-              <StatGrid columns={2}>
-                <StatCard
-                  title="Cancelled"
-                  value={stats.cancelled}
-                  icon="close-circle"
-                  iconColor="#6B7280"
-                  iconBgColor="#F3F4F6"
-                />
-                <StatCard
-                  title="Avg Response"
-                  value={formatResponseTime(stats.avgResponseTime)}
-                  icon="timer"
-                  iconColor="#3B82F6"
-                  iconBgColor="#DBEAFE"
-                />
-              </StatGrid>
+          <View style={styles.statsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>SUMMARY</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.total}</Text>
+                <Text style={styles.statLabel}>TOTAL</Text>
+              </View>
+              <View style={[styles.statCard, { borderColor: SUCCESS_GREEN }]}>
+                <Text style={[styles.statValue, { color: SUCCESS_GREEN }]}>
+                  {stats.completed}
+                </Text>
+                <Text style={styles.statLabel}>COMPLETED</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.cancelled}</Text>
+                <Text style={styles.statLabel}>CANCELLED</Text>
+              </View>
+              <View style={[styles.statCard, { borderColor: '#3B82F6' }]}>
+                <Text style={[styles.statValue, { color: '#3B82F6' }]}>
+                  {formatResponseTime(stats.avgResponseTime)}
+                </Text>
+                <Text style={styles.statLabel}>AVG RESPONSE</Text>
+              </View>
             </View>
           </View>
         )}
 
         {/* Filters */}
-        <View className="flex-row mt-2 mb-4">
-          <FilterChip
-            label="All"
-            active={filter === 'all'}
-            onPress={() => setFilter('all')}
-          />
-          <FilterChip
-            label="Completed"
-            active={filter === 'completed'}
-            onPress={() => setFilter('completed')}
-          />
-          <FilterChip
-            label="Cancelled"
-            active={filter === 'cancelled'}
-            onPress={() => setFilter('cancelled')}
-          />
+        <View style={styles.filtersSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>FILTER</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <View style={styles.filtersRow}>
+            <FilterChip
+              label="All"
+              active={filter === 'all'}
+              onPress={() => setFilter('all')}
+            />
+            <FilterChip
+              label="Completed"
+              active={filter === 'completed'}
+              onPress={() => setFilter('completed')}
+            />
+            <FilterChip
+              label="Cancelled"
+              active={filter === 'cancelled'}
+              onPress={() => setFilter('cancelled')}
+            />
+          </View>
         </View>
 
         {/* Content */}
         {isLoading && !refreshing ? (
-          <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#E13333" />
-            <Text
-              className="text-gray-500 mt-4"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Loading history...
-            </Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+            <Text style={styles.loadingText}>LOADING HISTORY...</Text>
           </View>
         ) : isError ? (
           <EmptyState
@@ -324,7 +295,7 @@ export default function HistoryScreen() {
             description="There was an error loading your emergency history. Please try again."
             actionLabel="Retry"
             onAction={onRefresh}
-            iconColor="#EF4444"
+            iconColor={SIGNAL_RED}
           />
         ) : history.length === 0 ? (
           <EmptyState
@@ -338,18 +309,251 @@ export default function HistoryScreen() {
           />
         ) : (
           <View>
-            <Text
-              className="text-sm text-gray-500 mb-3"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {history.length} request{history.length !== 1 ? 's' : ''}
-            </Text>
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsCount}>
+                {history.length} REQUEST{history.length !== 1 ? 'S' : ''}
+              </Text>
+            </View>
             {history.map(item => (
               <HistoryItemCard key={item.id} item={item} />
             ))}
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 34,
+  },
+  headerLine: {
+    width: 48,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 24,
+    paddingBottom: 40,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  statsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+    marginHorizontal: '1%',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: PRIMARY,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  filtersSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  filterText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  filterTextActive: {
+    color: OFF_WHITE,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  resultsHeader: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  resultsCount: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  historyCard: {
+    marginHorizontal: 24,
+    marginBottom: 12,
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  emergencyType: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  typeInfo: {
+    flex: 1,
+  },
+  emergencyTypeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  emergencyDescription: {
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 0.5,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginVertical: 12,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    fontSize: 10,
+    color: MID_GRAY,
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  providerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+    padding: 10,
+  },
+  providerName: {
+    fontSize: 11,
+    color: PRIMARY,
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  vehicleNumber: {
+    fontSize: 10,
+    color: MID_GRAY,
+    marginLeft: 4,
+  },
+});

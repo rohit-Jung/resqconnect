@@ -162,265 +162,283 @@ export default function PlansManagementPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div className="min-h-screen bg-background dark:bg-background">
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
           <div className="flex items-center gap-2">
             <Link
               href="/dashboard/payments"
-              className="text-muted-foreground text-sm hover:underline"
+              className="text-muted-foreground text-sm hover:underline dark:text-muted-foreground"
             >
               Payments
             </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm font-medium">Plans</span>
+            <span className="text-muted-foreground dark:text-muted-foreground">
+              /
+            </span>
+            <span className="text-sm font-medium text-foreground dark:text-foreground">
+              Plans
+            </span>
           </div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
             Manage Subscription Plans
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
             Create, edit, and manage subscription plans for organizations
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Plan
-        </Button>
+        <div className="mt-4">
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Plan
+          </Button>
+        </div>
       </div>
-
-      {/* Plan Form Modal */}
-      {showForm && (
-        <Card className="border-primary/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
-                {editingPlan ? 'Edit Plan' : 'Create New Plan'}
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingPlan(null);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="planName">Plan Name</Label>
-                <Input
-                  id="planName"
-                  placeholder="e.g., Basic, Pro, Enterprise"
-                  value={formData.name}
-                  onChange={e =>
-                    setFormData(prev => ({ ...prev, name: e.target.value }))
-                  }
-                />
+      <div className="px-6 pb-8 space-y-6">
+        {/* Plan Form Modal */}
+        {showForm && (
+          <Card className="border-primary/30">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  {editingPlan ? 'Edit Plan' : 'Create New Plan'}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingPlan(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="planPrice">Price (NPR)</Label>
-                <Input
-                  id="planPrice"
-                  type="number"
-                  placeholder="e.g., 999"
-                  value={formData.price}
-                  onChange={e =>
-                    setFormData(prev => ({ ...prev, price: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="planDuration">Duration (Months)</Label>
-                <Input
-                  id="planDuration"
-                  type="number"
-                  placeholder="e.g., 1, 3, 12"
-                  value={formData.durationMonths}
-                  onChange={e =>
-                    setFormData(prev => ({
-                      ...prev,
-                      durationMonths: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Features</Label>
-              {formData.features.map((feature, index) => (
-                <div key={index} className="flex gap-2">
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="planName">Plan Name</Label>
                   <Input
-                    placeholder={`Feature ${index + 1}`}
-                    value={feature}
-                    onChange={e => handleFeatureChange(index, e.target.value)}
+                    id="planName"
+                    placeholder="e.g., Basic, Pro, Enterprise"
+                    value={formData.name}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, name: e.target.value }))
+                    }
                   />
-                  {formData.features.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveFeature(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
-              ))}
-              <Button variant="outline" size="sm" onClick={handleAddFeature}>
-                <Plus className="mr-2 h-3 w-3" />
-                Add Feature
-              </Button>
-            </div>
-
-            {(createPlan.isError ||
-              updatePlan.isError ||
-              deletePlan.isError) && (
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {createPlan.error?.message ||
-                  updatePlan.error?.message ||
-                  deletePlan.error?.message}
-              </p>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingPlan(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  !formData.name ||
-                  !formData.price ||
-                  !formData.durationMonths ||
-                  createPlan.isPending ||
-                  updatePlan.isPending
-                }
-              >
-                {(createPlan.isPending || updatePlan.isPending) && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {editingPlan ? 'Update Plan' : 'Create Plan'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Plans List */}
-      {plans.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Plus className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-            <h3 className="mb-2 text-lg font-semibold">
-              No subscription plans yet
-            </h3>
-            <p className="text-muted-foreground mx-auto mb-4 max-w-md text-sm">
-              Create your first subscription plan to allow organizations to
-              subscribe and pay via Khalti.
-            </p>
-            <Button onClick={handleOpenCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create First Plan
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {plans.map((plan: ISubscriptionPlan) => (
-            <Card key={plan.id} className="relative overflow-hidden">
-              {!plan.isActive && (
-                <div className="absolute inset-x-0 top-0 bg-gray-500 px-3 py-1 text-center text-xs font-medium text-white">
-                  Inactive
+                <div className="space-y-2">
+                  <Label htmlFor="planPrice">Price (NPR)</Label>
+                  <Input
+                    id="planPrice"
+                    type="number"
+                    placeholder="e.g., 999"
+                    value={formData.price}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, price: e.target.value }))
+                    }
+                  />
                 </div>
-              )}
-              <CardHeader className={plan.isActive ? '' : 'pt-8'}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{plan.name}</CardTitle>
-                    <CardDescription>
-                      {plan.durationMonths} month
-                      {plan.durationMonths > 1 ? 's' : ''} duration
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenEdit(plan)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    {deleteConfirmId === plan.id ? (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600"
-                          onClick={() => handleDelete(plan.id)}
-                          disabled={deletePlan.isPending}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteConfirmId(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="planDuration">Duration (Months)</Label>
+                  <Input
+                    id="planDuration"
+                    type="number"
+                    placeholder="e.g., 1, 3, 12"
+                    value={formData.durationMonths}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        durationMonths: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Features</Label>
+                {formData.features.map((feature, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder={`Feature ${index + 1}`}
+                      value={feature}
+                      onChange={e => handleFeatureChange(index, e.target.value)}
+                    />
+                    {formData.features.length > 1 && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-red-600"
-                        onClick={() => setDeleteConfirmId(plan.id)}
+                        onClick={() => handleRemoveFeature(index)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <span className="text-3xl font-bold">
-                    {formatAmount(plan.price)}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    /{plan.durationMonths} mo
-                  </span>
-                </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={handleAddFeature}>
+                  <Plus className="mr-2 h-3 w-3" />
+                  Add Feature
+                </Button>
+              </div>
 
-                {plan.features?.length > 0 && (
-                  <ul className="space-y-2">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 shrink-0 text-green-500" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <p className="text-muted-foreground text-xs">
-                  Created: {new Date(plan.createdAt).toLocaleDateString()}
+              {(createPlan.isError ||
+                updatePlan.isError ||
+                deletePlan.isError) && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {createPlan.error?.message ||
+                    updatePlan.error?.message ||
+                    deletePlan.error?.message}
                 </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingPlan(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={
+                    !formData.name ||
+                    !formData.price ||
+                    !formData.durationMonths ||
+                    createPlan.isPending ||
+                    updatePlan.isPending
+                  }
+                >
+                  {(createPlan.isPending || updatePlan.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {editingPlan ? 'Update Plan' : 'Create Plan'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Plans List */}
+        {plans.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Plus className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+              <h3 className="mb-2 text-lg font-semibold">
+                No subscription plans yet
+              </h3>
+              <p className="text-muted-foreground mx-auto mb-4 max-w-md text-sm">
+                Create your first subscription plan to allow organizations to
+                subscribe and pay via Khalti.
+              </p>
+              <Button onClick={handleOpenCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create First Plan
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {plans.map((plan: ISubscriptionPlan) => (
+              <Card key={plan.id} className="relative overflow-hidden">
+                {!plan.isActive && (
+                  <div className="absolute inset-x-0 top-0 bg-gray-500 px-3 py-1 text-center text-xs font-medium text-white">
+                    Inactive
+                  </div>
+                )}
+                <CardHeader className={plan.isActive ? '' : 'pt-8'}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{plan.name}</CardTitle>
+                      <CardDescription>
+                        {plan.durationMonths} month
+                        {plan.durationMonths > 1 ? 's' : ''} duration
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(plan)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      {deleteConfirmId === plan.id ? (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600"
+                            onClick={() => handleDelete(plan.id)}
+                            disabled={deletePlan.isPending}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteConfirmId(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-red-600"
+                          onClick={() => setDeleteConfirmId(plan.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <span className="text-3xl font-bold">
+                      {formatAmount(plan.price)}
+                    </span>
+                    <span className="text-muted-foreground text-sm">
+                      /{plan.durationMonths} mo
+                    </span>
+                  </div>
+
+                  {plan.features?.length > 0 && (
+                    <ul className="space-y-2">
+                      {plan.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <p className="text-muted-foreground text-xs">
+                    Created: {new Date(plan.createdAt).toLocaleDateString()}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

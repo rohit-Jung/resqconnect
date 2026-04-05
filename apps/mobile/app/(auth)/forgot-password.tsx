@@ -1,4 +1,4 @@
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useRouter } from 'expo-router';
@@ -6,19 +6,29 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
-import InputBox from '@/components/ui/InputBox';
+import Header from '@/components/Header';
 import { useForgotPassword } from '@/services/user/auth.api';
 import {
   TForgotPassword,
   forgotPasswordSchema,
 } from '@/validations/auth.schema';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 const ForgotPasswordScreen: React.FC = () => {
   const router = useRouter();
@@ -41,18 +51,23 @@ const ForgotPasswordScreen: React.FC = () => {
       onSuccess: response => {
         const userId = response.data?.data.userId;
         Alert.alert(
-          'Success',
+          'SUCCESS',
           'Password reset instructions have been sent to your email address.',
-          [{ text: 'OK' }]
+          [
+            {
+              text: 'OK',
+              onPress: () =>
+                router.push({
+                  pathname: '/(auth)/reset-password',
+                  params: { userId, email: data.email },
+                }),
+            },
+          ]
         );
-        router.push({
-          pathname: '/(auth)/reset-password',
-          params: { userId, email: data.email },
-        });
       },
       onError: (error: any) => {
         Alert.alert(
-          'Error',
+          'ERROR',
           error.response?.data?.message ||
             'Failed to send OTP. Please try again.'
         );
@@ -61,141 +76,173 @@ const ForgotPasswordScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaContainer style={styles.safeArea} scrollable={false}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Forgot Password</Text>
-          <Text style={styles.subtitle}>
-            Enter your linked email to reset your password
-          </Text>
-        </View>
+    <View style={styles.container}>
+      <Header title="PASSWORD RECOVERY" showBackButton />
 
-        {/* Form */}
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <InputBox
-                icon="envelope"
-                placeholder="Email"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                error={errors.email?.message}
-                editable={!isPending}
-              />
-            )}
-          />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>FORGOT PASSWORD</Text>
+            <Text style={styles.subtitle}>
+              Enter your linked email to reset your password
+            </Text>
+          </View>
 
-          {errors.email && (
-            <View style={styles.errorContainer}>
-              <FontAwesome
-                name="exclamation-circle"
-                size={16}
-                color="#EF4444"
-              />
-              <Text style={styles.errorText}>{errors.email.message}</Text>
+          {/* Form */}
+          <View style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>EMAIL</Text>
+              <View style={styles.inputRow}>
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color={MID_GRAY}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="name@email.com"
+                  placeholderTextColor={MID_GRAY}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!isPending}
+                  {...control.register('email')}
+                />
+              </View>
+              {errors.email && (
+                <Text style={styles.errorText}>{errors.email.message}</Text>
+              )}
             </View>
-          )}
 
-          <TouchableOpacity
-            style={[styles.button, isPending && styles.buttonDisabled]}
-            onPress={handleSubmit(onSubmit)}
-            disabled={isPending}
-          >
-            {isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.button, isPending && styles.buttonDisabled]}
+              onPress={handleSubmit(onSubmit)}
+              disabled={isPending}
+              activeOpacity={0.8}
+            >
+              {isPending ? (
+                <ActivityIndicator color={OFF_WHITE} />
+              ) : (
+                <Text style={styles.buttonText}>SEND OTP</Text>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>Back to Login</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaContainer>
+            {/* Back to Login */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backButtonText}>BACK TO LOGIN</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
   },
-  content: {
+  keyboardView: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
   },
-  header: {
-    marginBottom: 40,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+  },
+  titleSection: {
+    marginBottom: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#1F2937',
-    fontFamily: 'ChauPhilomeneOne_400Regular',
+    fontSize: 24,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 2,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 12,
+    color: MID_GRAY,
+    marginTop: 8,
+    letterSpacing: 1,
   },
-  form: {
-    gap: 16,
+  formContainer: {},
+  inputGroup: {
+    marginBottom: 24,
   },
-  errorContainer: {
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: BLACK,
+    paddingVertical: 12,
+    fontWeight: '500',
   },
   errorText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#EF4444',
-    fontFamily: 'Inter',
+    fontSize: 10,
+    color: SIGNAL_RED,
+    marginTop: 6,
+    letterSpacing: 1,
   },
   button: {
-    padding: 16,
-    borderRadius: 12,
+    height: 56,
+    backgroundColor: SIGNAL_RED,
     alignItems: 'center',
-    backgroundColor: '#E13333',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    backgroundColor: LIGHT_GRAY,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
   },
   backButton: {
+    height: 56,
     alignItems: 'center',
-    marginTop: 16,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BLACK,
   },
   backButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#E13333',
-    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 2,
   },
 });
 

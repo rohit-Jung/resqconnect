@@ -17,10 +17,9 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function ProviderProfileScreen() {
-  const { provider, isAuthenticated, logout, isLoading, updateProfilePicture } =
+  const { provider, isLoading, logout, updateProfilePicture } =
     useProviderStore();
 
-  // Show loading while checking auth
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -29,7 +28,7 @@ export default function ProviderProfileScreen() {
     );
   }
 
-  if (!isAuthenticated || !provider) {
+  if (!provider) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

@@ -1,7 +1,6 @@
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,16 +8,22 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
-  Image,
-  StatusBar,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
-import InputBox from '@/components/ui/InputBox';
 import { useRegisterUser } from '@/services/user/auth.api';
 import {
   TRegisterUserForm,
@@ -26,8 +31,19 @@ import {
   userRegisterFormSchema,
 } from '@/validations/auth.schema';
 
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
+const SUCCESS_GREEN = '#10B981';
+
 const SignupScreen: React.FC = () => {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const insets = useSafeAreaInsets();
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -35,14 +51,12 @@ const SignupScreen: React.FC = () => {
   const [locationLoading, setLocationLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Fetch user's current location on component mount
   useEffect(() => {
     const getLocation = async () => {
       try {
         setLocationLoading(true);
         setLocationError(null);
 
-        // Request location permissions
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setLocationError('Location permission denied');
@@ -50,7 +64,6 @@ const SignupScreen: React.FC = () => {
           return;
         }
 
-        // Get current position
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
@@ -91,8 +104,6 @@ const SignupScreen: React.FC = () => {
   const { mutate: register, isPending } = useRegisterUser();
 
   const onSubmit = (data: TRegisterUserForm) => {
-    console.log('data sending', data);
-    console.log('user location', userLocation);
     register(
       {
         name: data.name,
@@ -113,9 +124,6 @@ const SignupScreen: React.FC = () => {
           router.push('/(auth)/completing-registration');
         },
         onError: (error: any) => {
-          console.log('Registration error:', error);
-
-          // Handle network errors (server unreachable)
           if (!error.response) {
             Alert.alert(
               'Connection Error',
@@ -134,358 +142,447 @@ const SignupScreen: React.FC = () => {
     );
   };
 
+  const InputField = ({
+    label,
+    name,
+    placeholder,
+    keyboardType = 'default',
+    secureTextEntry = false,
+    autoCapitalize = 'sentences',
+    maxLength,
+    showPasswordToggle,
+  }: {
+    label: string;
+    name: string;
+    placeholder: string;
+    keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric';
+    secureTextEntry?: boolean;
+    autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+    maxLength?: number;
+    showPasswordToggle?: boolean;
+    onTogglePassword?: () => void;
+  }) => (
+    <Controller
+      control={control}
+      name={name as keyof TRegisterUserForm}
+      render={({ field: { onChange, onBlur, value } }) => (
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{label}</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.textInput}
+              editable={!isPending}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              value={value ? String(value) : ''}
+              placeholder={placeholder}
+              placeholderTextColor={MID_GRAY}
+              keyboardType={keyboardType}
+              secureTextEntry={secureTextEntry && !showPasswordToggle}
+              autoCapitalize={autoCapitalize}
+              maxLength={maxLength}
+            />
+            {showPasswordToggle && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (name === 'password') {
+                    setShowPassword(!showPassword);
+                  } else {
+                    setShowConfirmPassword(!showConfirmPassword);
+                  }
+                }}
+                style={styles.eyeButton}
+              >
+                <Ionicons
+                  name={
+                    (name === 'password' ? showPassword : showConfirmPassword)
+                      ? 'eye-off-outline'
+                      : 'eye-outline'
+                  }
+                  size={18}
+                  color={MID_GRAY}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          {errors[name as keyof typeof errors] && (
+            <Text style={styles.errorText}>
+              {errors[name as keyof typeof errors]?.message as string}
+            </Text>
+          )}
+        </View>
+      )}
+    />
+  );
+
   return (
-    <SafeAreaContainer
-      style={styles.safeArea}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <FontAwesome name="arrow-left" size={24} color="#1F2937" />
-      </TouchableOpacity>
-
-      <LinearGradient colors={['#ffffff', '#F9FAFB']} style={styles.header}>
-        <Image
-          source={require('../../assets/resq-connect-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.headerText}>Create Account</Text>
-        <Text style={styles.headerSubtext}>Sign up to get started</Text>
-      </LinearGradient>
-
-      <View style={styles.formContainer}>
-        {/* Location Status Indicator */}
-        <View style={styles.locationStatus}>
-          <FontAwesome
-            name={
-              locationLoading
-                ? 'spinner'
-                : locationError
-                  ? 'exclamation-circle'
-                  : 'check-circle'
-            }
-            size={16}
-            color={
-              locationLoading
-                ? '#6B7280'
-                : locationError
-                  ? '#EF4444'
-                  : '#10B981'
-            }
-          />
-          <Text
-            style={[
-              styles.locationStatusText,
-              locationError && styles.locationErrorText,
-              userLocation && styles.locationSuccessText,
-            ]}
-          >
-            {locationLoading
-              ? 'Getting your location...'
-              : locationError
-                ? locationError
-                : `Location captured (${userLocation?.latitude.toFixed(4)}, ${userLocation?.longitude.toFixed(4)})`}
-          </Text>
-        </View>
-
-        <Controller
-          control={control}
-          name="name"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Full Name"
-              icon="user"
-              placeholder="Enter your full name"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.name?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="username"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Username"
-              icon="id-badge"
-              placeholder="Enter your full name"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.name?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="age"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Age"
-              icon="calendar"
-              placeholder="Enter your age"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              keyboardType="numeric"
-              error={errors.age?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Email"
-              icon="envelope"
-              placeholder="Enter your email"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={errors.email?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="phoneNumber"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Phone Number"
-              icon="phone"
-              placeholder="Enter phone number"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              keyboardType="phone-pad"
-              maxLength={10}
-              error={errors.phoneNumber?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="primaryAddress"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Primary Address"
-              icon="map-marker"
-              placeholder="Enter your primary address"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.primaryAddress?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="password"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Password"
-              icon="lock"
-              placeholder="Enter password"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              secureTextEntry
-              error={errors.password?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="confirmPassword"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <InputBox
-              label="Confirm Password"
-              icon="lock"
-              placeholder="Confirm password"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              secureTextEntry
-              error={errors.confirmPassword?.message}
-              editable={!isPending}
-            />
-          )}
-        />
-
-        <TouchableOpacity
-          style={[styles.submitButton, isPending && styles.buttonDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isPending}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Pressable style={styles.container} onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          {isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Sign Up</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/sign-in')}
-            disabled={isPending}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: insets.bottom + 20 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.footerLink}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaContainer>
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={24} color={OFF_WHITE} />
+              </TouchableOpacity>
+              <View style={styles.headerCenter}>
+                <View style={styles.brandRow}>
+                  <Text style={styles.brandMark}>RESQ</Text>
+                  <Text style={styles.brandDot}>.</Text>
+                </View>
+                <View style={styles.headerLine} />
+                <Text style={styles.tagline}>EMERGENCY RESPONSE</Text>
+              </View>
+            </View>
+
+            {/* Title */}
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>REGISTER</Text>
+              <Text style={styles.subtitle}>Create your account</Text>
+            </View>
+
+            {/* Location Status */}
+            <View style={styles.locationStatus}>
+              <Ionicons
+                name={
+                  locationLoading
+                    ? 'hourglass-outline'
+                    : locationError
+                      ? 'warning-outline'
+                      : 'location-outline'
+                }
+                size={16}
+                color={
+                  locationLoading
+                    ? MID_GRAY
+                    : locationError
+                      ? SIGNAL_RED
+                      : SUCCESS_GREEN
+                }
+              />
+              <Text
+                style={[
+                  styles.locationText,
+                  locationError && styles.locationError,
+                  userLocation && styles.locationSuccess,
+                ]}
+              >
+                {locationLoading
+                  ? 'CAPTURING LOCATION...'
+                  : locationError
+                    ? 'LOCATION: UNAVAILABLE'
+                    : `LOCATION: ${userLocation?.latitude.toFixed(4)}°N ${userLocation?.longitude.toFixed(4)}°E`}
+              </Text>
+            </View>
+
+            {/* Form */}
+            <View style={styles.formContainer}>
+              <InputField
+                label="FULL NAME"
+                name="name"
+                placeholder="Enter your full name"
+                autoCapitalize="words"
+              />
+
+              <InputField
+                label="USERNAME"
+                name="username"
+                placeholder="Choose a username"
+                autoCapitalize="none"
+              />
+
+              <InputField
+                label="AGE"
+                name="age"
+                placeholder="Your age"
+                keyboardType="numeric"
+                maxLength={3}
+              />
+
+              <InputField
+                label="EMAIL"
+                name="email"
+                placeholder="name@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <InputField
+                label="PHONE NUMBER"
+                name="phoneNumber"
+                placeholder="98XXXXXXXX"
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+
+              <InputField
+                label="PRIMARY ADDRESS"
+                name="primaryAddress"
+                placeholder="Your address"
+              />
+
+              <InputField
+                label="PASSWORD"
+                name="password"
+                placeholder="Create password"
+                secureTextEntry
+                autoCapitalize="none"
+                showPasswordToggle={true}
+              />
+
+              <InputField
+                label="CONFIRM PASSWORD"
+                name="confirmPassword"
+                placeholder="Confirm password"
+                secureTextEntry
+                autoCapitalize="none"
+                showPasswordToggle={true}
+              />
+
+              {/* Submit */}
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSubmit(onSubmit)}
+                disabled={isPending}
+                activeOpacity={0.8}
+              >
+                {isPending ? (
+                  <ActivityIndicator color={OFF_WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>CREATE ACCOUNT</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>HAVE AN ACCOUNT? </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(auth)/sign-in')}
+                  disabled={isPending}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.footerLink}>SIGN IN</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Metadata */}
+            <View style={styles.metadata}>
+              <Text style={styles.metadataText}>SECURE REGISTRATION</Text>
+              <Text style={styles.metadataDot}>·</Text>
+              <Text style={styles.metadataText}>24/7 RESPONSE</Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: OFF_WHITE,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 10,
-    left: 20,
-    zIndex: 1,
-    padding: 10,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   header: {
-    padding: 15,
-    paddingTop: 15,
-    paddingBottom: 15,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    marginBottom: 32,
+    marginTop: 16,
   },
-  logo: {
-    width: 60,
-    height: 60,
-    marginBottom: 8,
+  backButton: {
+    padding: 10,
+    backgroundColor: SIGNAL_RED,
+    marginRight: 16,
   },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#1F2937',
-    fontFamily: 'ChauPhilomeneOne_400Regular',
+  headerCenter: {
+    flex: 1,
   },
-  headerSubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 5,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
-  formContainer: {
-    padding: 20,
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 36,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  titleSection: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: PRIMARY,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: MID_GRAY,
+    marginTop: 4,
+    letterSpacing: 1,
   },
   locationStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: LIGHT_GRAY,
+    marginBottom: 24,
   },
-  locationStatusText: {
-    marginLeft: 8,
-    fontSize: 13,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+  locationText: {
+    fontSize: 10,
+    color: MID_GRAY,
+    marginLeft: 10,
+    letterSpacing: 1,
+    flex: 1,
   },
-  locationErrorText: {
-    color: '#EF4444',
+  locationError: {
+    color: SIGNAL_RED,
   },
-  locationSuccessText: {
-    color: '#10B981',
+  locationSuccess: {
+    color: SUCCESS_GREEN,
   },
-  passwordRequirements: {
-    marginTop: -8,
-    marginBottom: 16,
-    paddingHorizontal: 4,
+  formContainer: {
+    marginBottom: 24,
   },
-  requirementText: {
-    fontSize: 12,
-    marginBottom: 4,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+  inputGroup: {
+    marginBottom: 20,
   },
-  requirementItem: {
-    fontSize: 12,
-    marginLeft: 8,
-    marginBottom: 2,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  inputWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  inputLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: MID_GRAY,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: PRIMARY,
+    paddingVertical: 10,
+    fontWeight: '500',
+  },
+  eyeButton: {
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 10,
+    color: SIGNAL_RED,
+    marginTop: 6,
+    letterSpacing: 1,
   },
   submitButton: {
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
+    height: 56,
+    backgroundColor: SIGNAL_RED,
     alignItems: 'center',
-    marginTop: 20,
-    backgroundColor: '#E13333',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
+    justifyContent: 'center',
+    marginTop: 24,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter',
+    fontSize: 13,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 24,
   },
   footerText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 1,
   },
   footerLink: {
-    fontSize: 14,
-    color: '#E13333',
-    fontWeight: '600',
-    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1,
+    textDecorationLine: 'underline',
+  },
+  metadata: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+  },
+  metadataText: {
+    fontSize: 9,
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  metadataDot: {
+    fontSize: 9,
+    color: SIGNAL_RED,
+    marginHorizontal: 8,
   },
 });
 

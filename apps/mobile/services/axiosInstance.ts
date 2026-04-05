@@ -12,6 +12,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const apiWithoutAuthLogout = axios.create({
+  baseURL: `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/${routerVersion}`,
+  withCredentials: true,
+});
+
 // JWT/Auth related error messages from backend
 const AUTH_ERROR_MESSAGES = [
   'invalid token',
@@ -46,24 +51,24 @@ const handleLogout = async () => {
 };
 
 // Add auth token to requests
-api.interceptors.request.use(
-  async config => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  error => {
-    return Promise.reject(error);
+const addAuthToken = async (config: any) => {
+  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+};
+
+api.interceptors.request.use(addAuthToken, error => Promise.reject(error));
+
+apiWithoutAuthLogout.interceptors.request.use(addAuthToken, error =>
+  Promise.reject(error)
 );
 
-// Handle response errors
+// Handle response errors for main api
 api.interceptors.response.use(
   response => response,
   async (error: AxiosError<{ message?: string; error?: string }>) => {
-    // Handle network errors (no response from server)
     if (!error.response) {
       console.log(
         '[AxiosInstance] Network error: Server unreachable or no internet connection'
@@ -101,4 +106,11 @@ api.interceptors.response.use(
   }
 );
 
+// Handle response errors for apiWithoutAuthLogout - just reject, don't logout
+apiWithoutAuthLogout.interceptors.response.use(
+  response => response,
+  (error: AxiosError) => Promise.reject(error)
+);
+
 export default api;
+export { apiWithoutAuthLogout };

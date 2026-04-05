@@ -1,13 +1,49 @@
 import { v2 as cloudinary } from 'cloudinary';
+import type { Request } from 'express';
+import multer from 'multer';
+import type { FileFilterCallback } from 'multer';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
 import { envConfig } from './env.config';
 
-// Configure Cloudinary
 cloudinary.config({
   cloud_name: envConfig.cloudinary_cloud_name,
   api_key: envConfig.cloudinary_api_key,
   api_secret: envConfig.cloudinary_api_secret,
 });
+
+const documentStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'document-verification',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
+    public_id: (_req: Request, file: Express.Multer.File) => {
+      const timestamp = Date.now();
+      const fieldName = file.fieldname;
+      return `${fieldName}-${timestamp}`;
+    },
+  } as any,
+});
+
+export const uploadDocuments = multer({
+  storage: documentStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (
+    _req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback
+  ) => {
+    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and PDF files are allowed'));
+    }
+  },
+}).fields([
+  { name: 'panCard', maxCount: 1 },
+  { name: 'citizenship', maxCount: 1 },
+]);
 
 export function isCloudinaryConfigured(): boolean {
   return !!(

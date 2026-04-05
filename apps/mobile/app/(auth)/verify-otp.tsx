@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -12,8 +12,14 @@ import {
   View,
 } from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
 import { useVerify } from '@/services/user/auth.api';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 const VerifyOTPScreen: React.FC = () => {
   const router = useRouter();
@@ -61,32 +67,34 @@ const VerifyOTPScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaContainer style={styles.safeArea} scrollable={false}>
-      <View style={styles.container}>
-        {/* Logo */}
-        <Image
-          source={require('../../assets/resq-connect-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.brandRow}>
+          <Text style={styles.brandMark}>RESQ</Text>
+          <Text style={styles.brandDot}>.</Text>
+        </View>
+        <View style={styles.headerLine} />
+        <Text style={styles.tagline}>VERIFICATION</Text>
+      </View>
 
-        {/* Title */}
-        <Text style={styles.title}>Enter OTP</Text>
-
-        {/* Subtitle */}
+      {/* Title */}
+      <View style={styles.titleSection}>
+        <Text style={styles.title}>ENTER CODE</Text>
         <Text style={styles.subtitle}>
-          An OTP Has Been Sent To your linked email
-          {email ? `\n${email}` : ''}
+          OTP sent to{'\n'}
+          <Text style={styles.email}>{email || 'your email'}</Text>
         </Text>
+      </View>
 
-        {/* OTP Input */}
-        <View style={styles.otpInputContainer}>
-          {Array(6)
-            .fill(0)
-            .map((_, index) => (
+      {/* OTP Input */}
+      <View style={styles.otpContainer}>
+        {Array(6)
+          .fill(0)
+          .map((_, index) => (
+            <View key={index} style={styles.otpInputWrapper}>
               <TextInput
-                key={index}
-                style={styles.otpInput}
+                style={[styles.otpInput, otp[index] && styles.otpInputFilled]}
                 ref={input => {
                   inputRefs.current[index] = input;
                 }}
@@ -116,112 +124,178 @@ const VerifyOTPScreen: React.FC = () => {
                 }}
                 editable={!isPending}
               />
-            ))}
-        </View>
-
-        {/* Resend */}
-        <Text style={styles.resendText}>
-          Didn&apos;t Get The Code?{' '}
-          <Text style={styles.resendLink} onPress={handleRequestAgain}>
-            Request Again
-          </Text>
-        </Text>
-
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.button, isPending && styles.buttonDisabled]}
-          onPress={handleVerify}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Submit</Text>
-          )}
-        </TouchableOpacity>
+              {index < 5 && <View style={styles.otpDivider} />}
+            </View>
+          ))}
       </View>
-    </SafeAreaContainer>
+
+      {/* Resend */}
+      <TouchableOpacity
+        style={styles.resendButton}
+        onPress={handleRequestAgain}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.resendText}>DIDN'T RECEIVE CODE? </Text>
+        <Text style={styles.resendLink}>RESEND</Text>
+      </TouchableOpacity>
+
+      {/* Submit Button */}
+      <TouchableOpacity
+        style={[styles.submitButton, isPending && styles.submitButtonDisabled]}
+        onPress={handleVerify}
+        disabled={isPending}
+        activeOpacity={0.8}
+      >
+        {isPending ? (
+          <ActivityIndicator color={OFF_WHITE} />
+        ) : (
+          <Text style={styles.submitButtonText}>VERIFY</Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Metadata */}
+      <View style={styles.metadata}>
+        <Text style={styles.metadataText}>SECURE VERIFICATION</Text>
+        <Text style={styles.metadataDot}>·</Text>
+        <Text style={styles.metadataText}>10 MIN EXPIRY</Text>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
+  header: {
+    marginBottom: 48,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 6,
+  },
+  brandDot: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 44,
+  },
+  headerLine: {
+    width: 48,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  titleSection: {
+    marginBottom: 48,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#1F2937',
-    fontFamily: 'ChauPhilomeneOne_400Regular',
+    fontSize: 32,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-    textAlign: 'center',
-    fontFamily: 'Inter',
+    color: MID_GRAY,
+    marginTop: 8,
+    letterSpacing: 1,
+    lineHeight: 22,
   },
-  otpInputContainer: {
+  email: {
+    color: SIGNAL_RED,
+    fontWeight: '600',
+  },
+  otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 20,
-    paddingHorizontal: 10,
+    marginBottom: 32,
+  },
+  otpInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   otpInput: {
-    width: 50,
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
+    width: 48,
+    height: 64,
+    borderBottomWidth: 2,
+    borderBottomColor: MID_GRAY,
     textAlign: 'center',
-    fontSize: 18,
-    backgroundColor: '#F9FAFB',
-    color: '#1F2937',
-    fontFamily: 'Inter',
+    fontSize: 28,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  otpInputFilled: {
+    borderBottomColor: SIGNAL_RED,
+  },
+  otpDivider: {
+    width: 16,
+  },
+  resendButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 32,
   },
   resendText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-    fontFamily: 'Inter',
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 1,
   },
   resendLink: {
-    fontWeight: 'bold',
-    color: '#E13333',
+    fontSize: 11,
+    fontWeight: '700',
+    color: SIGNAL_RED,
+    letterSpacing: 1,
   },
-  button: {
-    backgroundColor: '#E13333',
-    paddingVertical: 15,
-    paddingHorizontal: 60,
-    borderRadius: 30,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  submitButton: {
+    height: 56,
+    backgroundColor: SIGNAL_RED,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.7,
+  submitButtonDisabled: {
+    backgroundColor: LIGHT_GRAY,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Inter',
+  submitButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
+  },
+  metadata: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+  },
+  metadataText: {
+    fontSize: 9,
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  metadataDot: {
+    fontSize: 9,
+    color: SIGNAL_RED,
+    marginHorizontal: 8,
   },
 });
 

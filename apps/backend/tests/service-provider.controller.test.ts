@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   changeProviderPassword,
   forgotServiceProviderPassword,
+  getDocumentStatus,
   getNearbyProviders,
+  getPendingVerifications,
+  getProviderDocuments,
   getServiceProvider,
   getServiceProviderProfile,
   loginServiceProvider,
@@ -14,6 +17,8 @@ import {
   updateServiceProvider,
   updateServiceProviderLocation,
   updateServiceProviderStatus,
+  uploadVerificationDocuments,
+  verifyProviderDocuments,
   verifyServiceProvider,
 } from '@/controllers/service-provider.controller';
 
@@ -582,5 +587,204 @@ describe('Service Provider Controller Tests', () => {
 
     it.todo('should return nearby providers sorted by distance');
     it.todo('should only return available providers');
+  });
+
+  // Document Verification Tests
+  describe('uploadVerificationDocuments', () => {
+    it('should reject request from unauthenticated provider', async () => {
+      mockReq.user = null;
+      mockReq.files = {
+        panCard: [{ path: 'test-pan-url' }],
+        citizenship: [{ path: 'test-citizenship-url' }],
+      };
+
+      await uploadVerificationDocuments(
+        mockReq as any,
+        mockRes as any,
+        mockNext
+      );
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
+      ).toBe(true);
+    });
+
+    it('should reject request without PAN card document', async () => {
+      mockReq.user = {
+        ...testServiceProviders.validProvider,
+        id: testServiceProviders.validProvider.id,
+      };
+      mockReq.files = {
+        citizenship: [{ path: 'test-citizenship-url' }],
+      };
+
+      await uploadVerificationDocuments(
+        mockReq as any,
+        mockRes as any,
+        mockNext
+      );
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it('should reject request without citizenship document', async () => {
+      mockReq.user = {
+        ...testServiceProviders.validProvider,
+        id: testServiceProviders.validProvider.id,
+      };
+      mockReq.files = {
+        panCard: [{ path: 'test-pan-url' }],
+      };
+
+      await uploadVerificationDocuments(
+        mockReq as any,
+        mockRes as any,
+        mockNext
+      );
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it.todo('should upload documents and set status to pending');
+    it.todo('should clear previous rejection reason on re-upload');
+  });
+
+  describe('getDocumentStatus', () => {
+    it('should reject request from unauthenticated provider', async () => {
+      mockReq.user = null;
+
+      await getDocumentStatus(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
+      ).toBe(true);
+    });
+
+    it.todo('should return document status for authenticated provider');
+    it.todo('should include rejection reason if documents were rejected');
+    it.todo('should include verifiedAt if documents were approved');
+  });
+
+  describe('getPendingVerifications', () => {
+    it('should reject request from unauthenticated organization', async () => {
+      mockReq.user = null;
+
+      await getPendingVerifications(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
+      ).toBe(true);
+    });
+
+    it.todo('should return providers with pending document status');
+    it.todo('should only return providers belonging to the organization');
+    it.todo('should return provider count');
+  });
+
+  describe('getProviderDocuments', () => {
+    it('should reject request from unauthenticated organization', async () => {
+      mockReq.user = null;
+      mockReq.params = { providerId: 'test-provider-id' };
+
+      await getProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
+      ).toBe(true);
+    });
+
+    it('should reject request without provider ID', async () => {
+      mockReq.user = {
+        ...testOrganizations.validOrg,
+        id: testOrganizations.validOrg.id,
+      };
+      mockReq.params = {};
+
+      await getProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it.todo('should return provider documents for valid provider ID');
+    it.todo('should return 404 for provider not belonging to the organization');
+  });
+
+  describe('verifyProviderDocuments', () => {
+    it('should reject request from unauthenticated organization', async () => {
+      mockReq.user = null;
+      mockReq.params = { providerId: 'test-provider-id' };
+      mockReq.body = { action: 'approve' };
+
+      await verifyProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 401
+      ).toBe(true);
+    });
+
+    it('should reject request without provider ID', async () => {
+      mockReq.user = {
+        ...testOrganizations.validOrg,
+        id: testOrganizations.validOrg.id,
+      };
+      mockReq.params = {};
+      mockReq.body = { action: 'approve' };
+
+      await verifyProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it('should reject request without action', async () => {
+      mockReq.user = {
+        ...testOrganizations.validOrg,
+        id: testOrganizations.validOrg.id,
+      };
+      mockReq.params = { providerId: 'test-provider-id' };
+      mockReq.body = {};
+
+      await verifyProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it('should reject rejection without reason', async () => {
+      mockReq.user = {
+        ...testOrganizations.validOrg,
+        id: testOrganizations.validOrg.id,
+      };
+      mockReq.params = { providerId: 'test-provider-id' };
+      mockReq.body = { action: 'reject' };
+
+      await verifyProviderDocuments(mockReq as any, mockRes as any, mockNext);
+
+      expect(
+        mockNext.mock.calls.length > 0 || getStatusCode(mockRes) === 400
+      ).toBe(true);
+    });
+
+    it.todo('should approve provider documents');
+    it.todo('should reject provider documents with reason');
+    it.todo('should set verifiedAt and verifiedBy on approval');
+    it.todo('should return 400 if documents not pending verification');
+    it.todo('should return 404 for provider not belonging to the organization');
+  });
+
+  // Login with document verification checks
+  describe('loginServiceProvider - Document Verification', () => {
+    it.todo('should return DOCUMENTS_REQUIRED for not_submitted status');
+    it.todo('should return VERIFICATION_PENDING for pending status');
+    it.todo('should return DOCUMENTS_REJECTED for rejected status');
+    it.todo('should allow login for approved status');
   });
 });

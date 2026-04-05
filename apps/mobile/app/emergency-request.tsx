@@ -6,16 +6,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import OfflineFallbackModal from '@/components/OfflineFallbackModal';
 import OfflineIndicator from '@/components/OfflineIndicator';
@@ -23,6 +25,12 @@ import { useEmergencyNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useCreateEmergencyRequest } from '@/services/emergency/emergency.api';
 import { SyncSummary } from '@/services/syncService';
 import { TEmergencyType } from '@/validations/emergency.schema';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
 
 interface LocationCoords {
   latitude: number;
@@ -35,7 +43,7 @@ const EMERGENCY_TYPES: {
   icon: string;
   color: string;
 }[] = [
-  { type: 'ambulance', label: 'Medical', icon: 'ambulance', color: '#EF4444' },
+  { type: 'ambulance', label: 'Medical', icon: 'ambulance', color: SIGNAL_RED },
   { type: 'police', label: 'Police', icon: 'shield-account', color: '#3B82F6' },
   { type: 'fire_truck', label: 'Fire', icon: 'fire-truck', color: '#F97316' },
   { type: 'rescue_team', label: 'Rescue', icon: 'lifebuoy', color: '#10B981' },
@@ -45,17 +53,14 @@ export default function EmergencyRequestScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
 
-  // Offline modal state
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [offlineModalLocation, setOfflineModalLocation] =
     useState<Location.LocationObject | null>(null);
 
-  // Handle offline detection
   const handleOfflineDetected = useCallback(() => {
     console.log('[EmergencyRequest] Offline detected');
   }, []);
 
-  // Handle back online with sync summary
   const handleBackOnline = useCallback((summary: SyncSummary) => {
     if (summary.synced > 0) {
       Alert.alert(
@@ -74,7 +79,6 @@ export default function EmergencyRequestScreen() {
     useState<Location.LocationObject | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [selectedType, setSelectedType] = useState<TEmergencyType | null>(null);
-
   const [description, setDescription] = useState('');
   const [markerLocation, setMarkerLocation] = useState<LocationCoords | null>(
     null
@@ -126,14 +130,10 @@ export default function EmergencyRequestScreen() {
     }
   };
 
-  // Retry function for offline modal
   const handleRetryOnline = useCallback(async (): Promise<boolean> => {
-    // Force a connectivity check
     await refresh();
 
-    // Check if we're back online
     if (isConnected && isInternetReachable) {
-      // Try to submit the request again
       return new Promise(resolve => {
         if (!selectedType || !markerLocation) {
           resolve(false);
@@ -198,9 +198,7 @@ export default function EmergencyRequestScreen() {
       return;
     }
 
-    // Check if offline - show offline fallback modal
     if (isOffline) {
-      // Create a location object for the modal
       if (fullLocationObject) {
         setOfflineModalLocation(fullLocationObject);
       } else {
@@ -230,7 +228,6 @@ export default function EmergencyRequestScreen() {
       {
         onSuccess: response => {
           const requestId = response.data?.data?.emergencyRequest?.id;
-          // Navigate to tracking screen to show nearby providers and status
           router.replace({
             pathname: '/emergency-tracking',
             params: {
@@ -243,9 +240,7 @@ export default function EmergencyRequestScreen() {
           });
         },
         onError: (error: any) => {
-          // Check if it's a network error
           if (!error.response) {
-            // Network error - show offline modal
             if (fullLocationObject) {
               setOfflineModalLocation(fullLocationObject);
             } else {
@@ -277,67 +272,71 @@ export default function EmergencyRequestScreen() {
 
   if (isLoadingLocation) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#E13333" />
-        <Text className="mt-4 text-gray-600" style={{ fontFamily: 'Inter' }}>
-          Getting your location...
-        </Text>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={styles.loadingText}>GETTING YOUR LOCATION...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <Pressable style={styles.container} onPress={Keyboard.dismiss}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={PRIMARY} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
+          </View>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>EMERGENCY REQUEST</Text>
+        </View>
+      </View>
+
+      {/* Offline Indicator */}
+      <OfflineIndicator
+        isOffline={isOffline}
+        onSMSFallback={() =>
+          router.push({
+            pathname: '/sms-emergency',
+            params: selectedType ? { emergencyType: selectedType } : {},
+          })
+        }
+      />
+
+      {/* Offline Fallback Modal */}
+      <OfflineFallbackModal
+        visible={showOfflineModal}
+        onClose={() => setShowOfflineModal(false)}
+        emergencyType={selectedType || 'ambulance'}
+        location={offlineModalLocation}
+        description={description}
+        onRetryOnline={handleRetryOnline}
+        autoSMSAfterTimeout={15}
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={styles.keyboardView}
       >
-        {/* Offline Indicator */}
-        <OfflineIndicator
-          isOffline={isOffline}
-          onSMSFallback={() =>
-            router.push({
-              pathname: '/sms-emergency',
-              params: selectedType ? { emergencyType: selectedType } : {},
-            })
-          }
-        />
-
-        {/* Offline Fallback Modal */}
-        <OfflineFallbackModal
-          visible={showOfflineModal}
-          onClose={() => setShowOfflineModal(false)}
-          emergencyType={selectedType || 'ambulance'}
-          location={offlineModalLocation}
-          description={description}
-          onRetryOnline={handleRetryOnline}
-          autoSMSAfterTimeout={15}
-        />
-
-        {/* Header */}
-        <View className="flex-row items-center justify-between border-b border-gray-100 px-4 py-3">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="h-10 w-10 items-center justify-center rounded-full bg-gray-100"
-          >
-            <Ionicons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          <Text
-            className="text-xl text-gray-800"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Emergency Request
-          </Text>
-          <View className="w-10" />
-        </View>
-
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Map */}
-          <View className="h-64 overflow-hidden">
+          <View style={styles.mapContainer}>
             {location ? (
               <MapView
                 ref={mapRef}
-                style={{ flex: 1 }}
+                style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 initialRegion={{
                   latitude: location.latitude,
@@ -355,52 +354,41 @@ export default function EmergencyRequestScreen() {
                     draggable
                     onDragEnd={e => setMarkerLocation(e.nativeEvent.coordinate)}
                   >
-                    <View className="items-center">
-                      <View className="h-10 w-10 items-center justify-center rounded-full bg-primary shadow-lg">
-                        <Ionicons name="location" size={24} color="white" />
+                    <View style={styles.markerContainer}>
+                      <View style={styles.markerInner}>
+                        <Ionicons name="location" size={24} color={OFF_WHITE} />
                       </View>
-                      <View className="-mt-1.5 h-3 w-3 rotate-45 bg-primary" />
+                      <View style={styles.markerArrow} />
                     </View>
                   </Marker>
                 )}
               </MapView>
             ) : (
-              <View className="flex-1 items-center justify-center bg-gray-100">
-                <Ionicons name="location-outline" size={48} color="#9CA3AF" />
-                <Text
-                  className="mt-2 text-gray-500"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Location unavailable
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="location-outline" size={48} color={MID_GRAY} />
+                <Text style={styles.mapPlaceholderText}>
+                  LOCATION UNAVAILABLE
                 </Text>
               </View>
             )}
 
-            {/* Center Location Button */}
             <TouchableOpacity
+              style={styles.locateButton}
               onPress={centerOnCurrentLocation}
-              className="absolute bottom-4 right-4 h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
+              activeOpacity={0.7}
             >
-              <Ionicons name="locate" size={24} color="#E13333" />
+              <Ionicons name="locate" size={24} color={SIGNAL_RED} />
             </TouchableOpacity>
           </View>
 
           {/* Location Info */}
-          <View className="mx-4 mt-4 flex-row items-center rounded-xl bg-gray-50 p-3">
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <Ionicons name="location" size={20} color="#E13333" />
+          <View style={styles.locationInfo}>
+            <View style={styles.locationIcon}>
+              <Ionicons name="location" size={18} color={SIGNAL_RED} />
             </View>
-            <View className="ml-3 flex-1">
-              <Text
-                className="text-xs text-gray-500"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Emergency Location
-              </Text>
-              <Text
-                className="text-sm font-medium text-gray-800"
-                style={{ fontFamily: 'Inter' }}
-              >
+            <View style={styles.locationText}>
+              <Text style={styles.locationLabel}>EMERGENCY LOCATION</Text>
+              <Text style={styles.locationCoords}>
                 {markerLocation
                   ? `${markerLocation.latitude.toFixed(6)}, ${markerLocation.longitude.toFixed(6)}`
                   : 'Tap on map to set location'}
@@ -409,47 +397,50 @@ export default function EmergencyRequestScreen() {
           </View>
 
           {/* Emergency Type Selection */}
-          <View className="px-4 pt-6">
-            <Text
-              className="mb-3 text-lg text-gray-800"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              Type of Emergency
-            </Text>
-            <View className="flex-row flex-wrap justify-between">
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>TYPE OF EMERGENCY</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
+            <View style={styles.typeGrid}>
               {EMERGENCY_TYPES.map(item => (
                 <TouchableOpacity
                   key={item.type}
+                  style={[
+                    styles.typeCard,
+                    selectedType === item.type && styles.typeCardActive,
+                    {
+                      borderColor:
+                        selectedType === item.type ? item.color : LIGHT_GRAY,
+                    },
+                  ]}
                   onPress={() => {
                     setSelectedType(item.type);
                     setDescription(item.type);
                   }}
-                  className={`mb-3 w-[48%] items-center rounded-xl p-4 ${
-                    selectedType === item.type
-                      ? 'border-2 border-primary bg-primary/5'
-                      : 'bg-gray-50'
-                  }`}
                   disabled={isPending}
+                  activeOpacity={0.7}
                 >
                   <View
-                    className="mb-2 h-14 w-14 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${item.color}20` }}
+                    style={[
+                      styles.typeIcon,
+                      { backgroundColor: `${item.color}20` },
+                    ]}
                   >
                     <MaterialCommunityIcons
                       name={item.icon as any}
-                      size={28}
+                      size={24}
                       color={item.color}
                     />
                   </View>
                   <Text
-                    className={`text-sm ${
-                      selectedType === item.type
-                        ? 'font-semibold text-primary'
-                        : 'text-gray-600'
-                    }`}
-                    style={{ fontFamily: 'Inter' }}
+                    style={[
+                      styles.typeLabel,
+                      selectedType === item.type && { color: item.color },
+                    ]}
                   >
-                    {item.label}
+                    {item.label.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -457,18 +448,16 @@ export default function EmergencyRequestScreen() {
           </View>
 
           {/* Description */}
-          <View className="px-4 pt-4">
-            <Text
-              className="mb-3 text-lg text-gray-800"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              Describe Your Emergency
-            </Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>DESCRIBE EMERGENCY</Text>
+              <View style={styles.sectionLine} />
+            </View>
+
             <TextInput
-              className="h-28 rounded-xl bg-gray-50 p-4 text-base text-gray-800"
-              style={{ fontFamily: 'Inter', textAlignVertical: 'top' }}
+              style={styles.descriptionInput}
               placeholder="Please provide details about your emergency..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={MID_GRAY}
               multiline
               numberOfLines={4}
               value={description}
@@ -478,40 +467,278 @@ export default function EmergencyRequestScreen() {
           </View>
 
           {/* Submit Button */}
-          <View className="p-4 pb-8">
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={isPending || !selectedType || !description.trim()}
-              className={`h-14 flex-row items-center justify-center rounded-xl shadow-lg ${
-                isPending || !selectedType || !description.trim()
-                  ? 'bg-gray-300'
-                  : 'bg-primary'
-              }`}
-            >
-              {isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="alert-circle" size={24} color="white" />
-                  <Text
-                    className="ml-2 text-lg font-semibold text-white"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    Send Emergency Request
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              (!selectedType || !description.trim() || isPending) &&
+                styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!selectedType || !description.trim() || isPending}
+            activeOpacity={0.8}
+          >
+            {isPending ? (
+              <ActivityIndicator color={OFF_WHITE} />
+            ) : (
+              <>
+                <Ionicons name="alert-circle" size={20} color={OFF_WHITE} />
+                <Text style={styles.submitButtonText}>
+                  SEND EMERGENCY REQUEST
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-            <Text
-              className="mt-3 text-center text-xs text-gray-500"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Your location will be shared with emergency responders
-            </Text>
-          </View>
+          <Text style={styles.disclaimer}>
+            Your location will be shared with emergency responders
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+    backgroundColor: LIGHT_GRAY,
+  },
+  headerContent: {},
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 26,
+  },
+  headerLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  mapContainer: {
+    height: 240,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    backgroundColor: LIGHT_GRAY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginTop: 8,
+  },
+  locateButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: OFF_WHITE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  markerContainer: {
+    alignItems: 'center',
+  },
+  markerInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerArrow: {
+    width: 12,
+    height: 12,
+    backgroundColor: PRIMARY,
+    transform: [{ rotate: '45deg' }],
+    marginTop: -6,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: LIGHT_GRAY,
+    marginHorizontal: 24,
+    marginTop: 16,
+  },
+  locationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  locationText: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  locationCoords: {
+    fontSize: 12,
+    color: PRIMARY,
+    fontWeight: '500',
+  },
+  section: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LIGHT_GRAY,
+    marginLeft: 16,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  typeCard: {
+    width: '48%',
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginHorizontal: '1%',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  typeCardActive: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  typeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  typeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  descriptionInput: {
+    backgroundColor: LIGHT_GRAY,
+    padding: 16,
+    fontSize: 14,
+    color: PRIMARY,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SIGNAL_RED,
+    marginHorizontal: 24,
+    marginTop: 24,
+    paddingVertical: 16,
+  },
+  submitButtonDisabled: {
+    backgroundColor: MID_GRAY,
+  },
+  submitButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+  disclaimer: {
+    fontSize: 10,
+    color: MID_GRAY,
+    textAlign: 'center',
+    marginTop: 16,
+    paddingHorizontal: 24,
+    letterSpacing: 1,
+  },
+});

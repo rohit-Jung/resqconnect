@@ -1,21 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
-
-import { useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, View } from 'react-native';
 
-import { APP_NAME, APP_VERSION } from '@/constants';
+import { InfoCard, InfoPage, Notice, SectionCard } from '@/components/InfoPage';
+import { APP_NAME } from '@/constants';
+
+const SIGNAL_RED = '#C44536';
+const MID_GRAY = '#888888';
 
 export default function PrivacyPolicyScreen() {
-  const router = useRouter();
-
   const sections = [
     {
-      title: '1. Information We Collect',
-      content: `We collect the following types of information:
-
-Personal Information:
+      number: '01',
+      title: 'INFORMATION WE COLLECT',
+      content: `Personal Information:
 • Name, email address, and phone number
 • Age and primary address
 • Account credentials
@@ -29,7 +26,8 @@ Device Information:
 • Push notification tokens`,
     },
     {
-      title: '2. How We Use Your Information',
+      number: '02',
+      title: 'HOW WE USE YOUR INFORMATION',
       content: `Your information is used to:
 • Provide emergency response services
 • Connect you with nearby service providers
@@ -39,17 +37,19 @@ Device Information:
 • Maintain account security`,
     },
     {
-      title: '3. Information Sharing',
+      number: '03',
+      title: 'INFORMATION SHARING',
       content: `We may share your information with:
 • Emergency service providers responding to your request
-• Your designated emergency contacts (when enabled)
+• Your designated emergency contacts
 • Law enforcement when required by law
 • Service providers who assist in app operations
 
-We never sell your personal information to third parties.`,
+We never sell your personal information.`,
     },
     {
-      title: '4. Location Data',
+      number: '04',
+      title: 'LOCATION DATA',
       content: `Location data is critical for emergency services:
 • We collect location only when you use the app
 • Location is shared with responders during emergencies
@@ -57,17 +57,19 @@ We never sell your personal information to third parties.`,
 • Location history is retained for safety improvements`,
     },
     {
-      title: '5. Data Security',
+      number: '05',
+      title: 'DATA SECURITY',
       content: `We implement security measures including:
 • Encrypted data transmission (HTTPS/TLS)
 • Secure server infrastructure
 • Regular security audits
 • Access controls and authentication
 
-No method of electronic transmission is 100% secure. We cannot guarantee absolute security.`,
+No method is 100% secure. We cannot guarantee absolute security.`,
     },
     {
-      title: '6. Data Retention',
+      number: '06',
+      title: 'DATA RETENTION',
       content: `We retain your data:
 • Account information: While your account is active
 • Emergency history: Up to 3 years for safety purposes
@@ -75,7 +77,8 @@ No method of electronic transmission is 100% secure. We cannot guarantee absolut
 • Deleted upon account deletion request`,
     },
     {
-      title: '7. Your Rights',
+      number: '07',
+      title: 'YOUR RIGHTS',
       content: `You have the right to:
 • Access your personal data
 • Correct inaccurate information
@@ -86,16 +89,19 @@ No method of electronic transmission is 100% secure. We cannot guarantee absolut
 Contact us through the app to exercise these rights.`,
     },
     {
-      title: "8. Children's Privacy",
+      number: '08',
+      title: "CHILDREN'S PRIVACY",
       content: `${APP_NAME} is not intended for children under 13. We do not knowingly collect information from children under 13. If you believe we have collected such information, please contact us.`,
     },
     {
-      title: '9. Changes to Privacy Policy',
+      number: '09',
+      title: 'CHANGES TO PRIVACY POLICY',
       content: `We may update this policy periodically. We will notify you of significant changes through the app or email. Continued use after changes constitutes acceptance.`,
     },
     {
-      title: '10. Contact Us',
-      content: `For privacy-related questions or concerns:
+      number: '10',
+      title: 'CONTACT US',
+      content: `For privacy-related questions:
 • Use the Help & Support section in the app
 • Email: privacy@resqconnect.app
 
@@ -104,87 +110,57 @@ We respond to all inquiries within 30 days.`,
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-      {/* Header */}
-      <View className="bg-primary px-5 py-4">
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text
-            className="text-xl text-white"
-            style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-          >
-            Privacy Policy
-          </Text>
-        </View>
-      </View>
+    <InfoPage title="PRIVACY POLICY" tagline="PRIVACY POLICY">
+      <InfoCard
+        icon="shield-checkmark"
+        iconBgColor="#DBEAFE"
+        title="YOUR PRIVACY MATTERS"
+        meta="LAST UPDATED: JANUARY 2026"
+      />
 
-      <ScrollView
-        className="flex-1 px-5 pt-4"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* Header Info */}
-        <View
-          className="bg-white rounded-2xl p-4 mb-4 shadow-sm"
-          style={{ elevation: 2 }}
+      <Notice backgroundColor="#DBEAFE" iconColor={SIGNAL_RED}>
+        <Text
+          style={{
+            fontSize: 11,
+            color: '#000000',
+            letterSpacing: 0.5,
+            lineHeight: 18,
+          }}
         >
-          <View className="flex-row items-center">
-            <View className="h-12 w-12 rounded-full bg-blue-100 items-center justify-center">
-              <Ionicons name="shield-checkmark" size={24} color="#3B82F6" />
-            </View>
-            <View className="ml-3 flex-1">
-              <Text
-                className="text-lg text-gray-800 font-semibold"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Your Privacy Matters
-              </Text>
-              <Text
-                className="text-sm text-gray-500"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Last updated: January 2026
-              </Text>
-            </View>
-          </View>
-        </View>
+          This policy explains how {APP_NAME} collects, uses, and protects your
+          personal information.
+        </Text>
+      </Notice>
 
-        {/* Privacy Notice */}
-        <View className="bg-blue-50 rounded-2xl p-4 mb-4 flex-row">
-          <Ionicons name="information-circle" size={20} color="#3B82F6" />
-          <Text
-            className="ml-2 text-sm text-blue-800 flex-1"
-            style={{ fontFamily: 'Inter' }}
-          >
-            This policy explains how {APP_NAME} collects, uses, and protects
-            your personal information.
-          </Text>
-        </View>
+      {sections.map((section, index) => (
+        <SectionCard
+          key={index}
+          number={section.number}
+          title={section.title}
+          content={section.content}
+        />
+      ))}
 
-        {/* Policy Sections */}
-        {sections.map((section, index) => (
-          <View
-            key={index}
-            className="bg-white rounded-2xl p-4 mb-3 shadow-sm"
-            style={{ elevation: 1 }}
-          >
-            <Text
-              className="text-base text-gray-800 font-semibold mb-2"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {section.title}
-            </Text>
-            <Text
-              className="text-sm text-gray-600 leading-6"
-              style={{ fontFamily: 'Inter' }}
-            >
-              {section.content}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          BY USING {APP_NAME}, YOU ACKNOWLEDGE THAT YOU HAVE READ
+        </Text>
+        <Text style={styles.footerText}>AND AGREE TO THIS PRIVACY POLICY.</Text>
+      </View>
+    </InfoPage>
   );
 }
+
+const styles = {
+  footer: {
+    alignItems: 'center' as const,
+    paddingVertical: 24,
+    marginTop: 16,
+  },
+  footerText: {
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    textAlign: 'center' as const,
+  },
+};

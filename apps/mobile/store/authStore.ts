@@ -91,8 +91,37 @@ export const useAuthStore = create<AuthState>()(
         userType: state.userType,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => state => {
-        state?.setLoading(false);
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[AuthStore] Rehydration error:', error);
+        }
+
+        const TIMEOUT_MS = 5000;
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const handleTimeout = async () => {
+          console.warn('[AuthStore] Rehydration timeout - clearing session');
+          await SecureStore.deleteItemAsync(TOKEN_KEY);
+          await AsyncStorage.removeItem('auth-storage');
+          if (state) {
+            state.user = null;
+            state.token = null;
+            state.userType = null;
+            state.isAuthenticated = false;
+            state.isLoading = false;
+          }
+        };
+
+        timeoutId = setTimeout(handleTimeout, TIMEOUT_MS);
+
+        if (state) {
+          const originalSetLoading = state.setLoading.bind(state);
+          state.setLoading = (loading: boolean) => {
+            clearTimeout(timeoutId);
+            originalSetLoading(loading);
+          };
+          state.isLoading = false;
+        }
       },
     }
   )
