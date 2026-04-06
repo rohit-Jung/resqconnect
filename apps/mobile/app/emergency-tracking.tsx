@@ -495,8 +495,13 @@ export default function EmergencyTrackingScreen() {
         [
           {
             text: 'OK',
-            onPress: () =>
-              router.replace(isProvider ? '/(provider)/dashboard' : '/(tabs)'),
+            onPress: async () => {
+              // Wait a tick to ensure cleanup completes and socket listeners
+              // are properly detached before navigation to dashboard
+              await new Promise(resolve => setTimeout(resolve, 50));
+
+              router.replace(isProvider ? '/(provider)/dashboard' : '/(tabs)');
+            },
           },
         ]
       );
