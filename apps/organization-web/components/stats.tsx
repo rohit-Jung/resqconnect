@@ -1,24 +1,21 @@
 export function Stats() {
   const stats = [
-    { label: 'Average Response Time', value: '2.3s' },
-    { label: 'Active Users', value: '50K+' },
-    { label: 'Uptime Reliability', value: '99.9%' },
-    { label: 'Emergency Support', value: '24/7' },
+    { label: 'AVG RESPONSE TIME', value: '2.3s' },
+    { label: 'ACTIVE USERS', value: '50K+' },
+    { label: 'UPTIME RELIABILITY', value: '99.9%' },
+    { label: 'EMERGENCY SUPPORT', value: '24/7' },
   ];
 
   return (
-    <div className="border-y border-border bg-background py-12">
-      <div className="container mx-auto px-8 sm:px-12 md:px-16 lg:px-24 xl:px-32">
+    <div className="border-y border-border bg-secondary py-16">
+      <div className="mx-auto max-w-7xl px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {stats.map((stat, idx) => (
-            <div
-              key={idx}
-              className="flex flex-col items-center gap-2 text-center"
-            >
-              <span className="text-3xl font-bold text-foreground md:text-4xl">
+            <div key={idx} className="flex flex-col gap-1">
+              <span className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
                 {stat.value}
               </span>
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                 {stat.label}
               </span>
             </div>
