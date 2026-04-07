@@ -11,14 +11,10 @@ import {
   Truck,
   Users,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { useState } from 'react';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import {
@@ -27,40 +23,48 @@ import {
 } from '@/services/organization/providers.api';
 import { ServiceStatus, ServiceType } from '@/types/auth.types';
 
-// Get icon based on service type
+const ProviderMap = dynamic(() => import('@/components/provider-map'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[500px] w-full" />,
+});
+
 function getServiceTypeIcon(serviceType: ServiceType) {
   switch (serviceType) {
     case 'ambulance':
-      return <Stethoscope className="h-5 w-5" />;
+      return <Stethoscope className="h-4 w-4" />;
     case 'police':
-      return <Shield className="h-5 w-5" />;
+      return <Shield className="h-4 w-4" />;
     case 'fire_truck':
-      return <Flame className="h-5 w-5" />;
+      return <Flame className="h-4 w-4" />;
     case 'rescue_team':
-      return <Users className="h-5 w-5" />;
+      return <Users className="h-4 w-4" />;
     default:
-      return <Truck className="h-5 w-5" />;
+      return <Truck className="h-4 w-4" />;
   }
 }
 
-// Get status display info
 function getStatusInfo(status: ServiceStatus): {
   label: string;
   color: string;
 } {
   switch (status) {
     case 'available':
-      return { label: 'Available', color: 'text-green-600' };
+      return {
+        label: 'Available',
+        color: 'text-green-600 dark:text-green-400',
+      };
     case 'assigned':
-      return { label: 'On Duty', color: 'text-orange-600' };
+      return {
+        label: 'On Duty',
+        color: 'text-orange-600 dark:text-orange-400',
+      };
     case 'off_duty':
-      return { label: 'Off Duty', color: 'text-gray-500' };
+      return { label: 'Off Duty', color: 'text-muted-foreground' };
     default:
-      return { label: status, color: 'text-gray-500' };
+      return { label: status, color: 'text-muted-foreground' };
   }
 }
 
-// Get human-readable service type name
 function getServiceTypeName(serviceType: ServiceType): string {
   switch (serviceType) {
     case 'ambulance':
@@ -76,51 +80,10 @@ function getServiceTypeName(serviceType: ServiceType): string {
   }
 }
 
-// Stats skeleton
-function StatsSkeleton() {
-  return (
-    <div className="grid gap-6 md:grid-cols-3">
-      {[...Array(3)].map((_, idx) => (
-        <Card key={idx}>
-          <CardHeader className="pb-3">
-            <Skeleton className="h-4 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-9 w-16" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// Units skeleton
-function UnitsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[...Array(4)].map((_, idx) => (
-        <div
-          key={idx}
-          className="flex items-center justify-between rounded-lg border p-4"
-        >
-          <div className="flex flex-1 items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-32" />
-            </div>
-          </div>
-          <div className="text-right space-y-2">
-            <Skeleton className="h-3 w-20 ml-auto" />
-            <Skeleton className="h-3 w-16 ml-auto" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function LiveTrackingPage() {
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    null
+  );
   const { data: providersResponse, isLoading: providersLoading } =
     useOrgServiceProviders();
   const { data: analyticsResponse, isLoading: analyticsLoading } =
@@ -128,10 +91,8 @@ export default function LiveTrackingPage() {
 
   const providers = providersResponse?.data?.data ?? [];
   const analytics = analyticsResponse?.data?.data;
-
   const isLoading = providersLoading || analyticsLoading;
 
-  // Calculate stats from real data
   const totalProviders = providers.length;
   const activeProviders = providers.filter(
     p => p.serviceStatus !== 'off_duty'
@@ -142,9 +103,25 @@ export default function LiveTrackingPage() {
   const assignedProviders = providers.filter(
     p => p.serviceStatus === 'assigned'
   ).length;
-
-  // Filter to show active providers (not off duty)
   const activeUnits = providers.filter(p => p.serviceStatus !== 'off_duty');
+
+  const stats = [
+    {
+      label: 'TOTAL PROVIDERS',
+      value: totalProviders,
+      detail: `${analytics?.providers.thisMonth ?? 0} added this month`,
+    },
+    {
+      label: 'ACTIVE UNITS',
+      value: activeProviders,
+      detail: `${assignedProviders} currently assigned`,
+    },
+    {
+      label: 'AVAILABLE NOW',
+      value: availableProviders,
+      detail: `${analytics?.providers.availabilityPercentage?.toFixed(1) ?? 0}% availability`,
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -155,129 +132,140 @@ export default function LiveTrackingPage() {
         </p>
       </div>
 
+      {/* Stats */}
       {isLoading ? (
-        <StatsSkeleton />
+        <div className="grid gap-4 md:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                Total Providers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{totalProviders}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {analytics?.providers.thisMonth ?? 0} added this month
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                Active Units
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{activeProviders}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {assignedProviders} currently assigned
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                Available Now
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{availableProviders}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {analytics?.providers.availabilityPercentage?.toFixed(1) ?? 0}%
-                availability
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-3">
+          {stats.map(stat => (
+            <Card key={stat.label}>
+              <CardContent className="p-4">
+                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                  {stat.label}
+                </span>
+                <p className="mt-1 text-3xl font-bold tracking-tight">
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {stat.detail}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
+      {/* Map */}
       <Card>
-        <CardHeader>
-          <CardTitle>Active Response Teams</CardTitle>
-          <CardDescription>
-            Live status of all service providers
-          </CardDescription>
+        <CardHeader className="border-b border-border pb-3">
+          <CardTitle className="text-base font-semibold">
+            Provider Locations
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
+          <ProviderMap
+            providers={providers}
+            selectedProviderId={selectedProviderId}
+            onSelectProvider={setSelectedProviderId}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Active Units List */}
+      <Card>
+        <CardHeader className="border-b border-border pb-3">
+          <CardTitle className="text-base font-semibold">
+            Active Response Teams
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
           {isLoading ? (
-            <UnitsSkeleton />
+            <div className="space-y-px">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 p-4">
+                  <Skeleton className="h-8 w-8" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : activeUnits.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Navigation className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No active response teams</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                All service providers are currently off duty
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Navigation className="text-muted-foreground mb-4 h-10 w-10" />
+              <p className="font-medium">No active response teams</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                All providers are currently off duty
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {activeUnits.map((provider: IServiceProvider) => {
                 const statusInfo = getStatusInfo(provider.serviceStatus);
                 const hasLocation =
                   provider.currentLocation?.latitude &&
                   provider.currentLocation?.longitude;
+                const isSelected = selectedProviderId === provider.id;
 
                 return (
                   <div
                     key={provider.id}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    onClick={() =>
+                      setSelectedProviderId(isSelected ? null : provider.id)
+                    }
+                    className={`flex cursor-pointer items-center gap-4 border-b border-border p-4 transition-colors last:border-0 ${
+                      isSelected ? 'bg-primary/5' : 'hover:bg-muted/50'
+                    }`}
                   >
-                    <div className="flex flex-1 items-center gap-3">
-                      <div
-                        className={`flex items-center justify-center rounded-full p-2 ${
-                          provider.serviceStatus === 'available'
-                            ? 'bg-green-100 text-green-600'
-                            : provider.serviceStatus === 'assigned'
-                              ? 'bg-orange-100 text-orange-600'
-                              : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {getServiceTypeIcon(provider.serviceType)}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{provider.name}</p>
-                        <p className="text-muted-foreground flex items-center gap-1 text-sm">
-                          <MapPin className="h-4 w-4" />
-                          {provider.serviceArea || provider.primaryAddress}
-                        </p>
-                        {provider.vehicleInformation &&
-                          provider.vehicleInformation.number !==
-                            'Not filled' && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {provider.vehicleInformation.type} -{' '}
-                              {provider.vehicleInformation.number}
-                            </p>
-                          )}
-                      </div>
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
+                        provider.serviceStatus === 'available'
+                          ? 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-950'
+                          : provider.serviceStatus === 'assigned'
+                            ? 'border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-800 dark:bg-orange-950'
+                            : 'border-border bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {getServiceTypeIcon(provider.serviceType)}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {getServiceTypeName(provider.serviceType)}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{provider.name}</p>
+                      <p className="text-muted-foreground flex items-center gap-1 text-sm truncate">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {provider.serviceArea || provider.primaryAddress}
                       </p>
-                      {hasLocation ? (
-                        <p className="text-primary flex items-center justify-end gap-1 text-xs mt-1">
-                          <Navigation className="h-3 w-3" />
-                          Location tracked
-                        </p>
-                      ) : (
-                        <p className="text-muted-foreground flex items-center justify-end gap-1 text-xs mt-1">
-                          <Navigation className="h-3 w-3" />
-                          No location data
-                        </p>
-                      )}
+                      {provider.vehicleInformation &&
+                        provider.vehicleInformation.number !== 'Not filled' && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {provider.vehicleInformation.type} —{' '}
+                            {provider.vehicleInformation.number}
+                          </p>
+                        )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        {getServiceTypeName(provider.serviceType)}
+                      </span>
+                      <div className="mt-1 flex items-center justify-end gap-1">
+                        {hasLocation ? (
+                          <span className="flex items-center gap-1 text-xs text-primary">
+                            <Navigation className="h-3 w-3" />
+                            Tracked
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Navigation className="h-3 w-3" />
+                            No data
+                          </span>
+                        )}
+                      </div>
                       <span
-                        className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${statusInfo.color}`}
+                        className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
                       >
                         <Activity className="h-3 w-3" />
                         {statusInfo.label}
@@ -291,59 +279,55 @@ export default function LiveTrackingPage() {
         </CardContent>
       </Card>
 
-      {/* All providers section */}
+      {/* All Providers */}
       {!isLoading && providers.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>All Service Providers</CardTitle>
-            <CardDescription>
-              Complete list of all registered service providers
-            </CardDescription>
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-base font-semibold">
+              All Service Providers
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="p-0">
+            <div>
               {providers.map((provider: IServiceProvider) => {
                 const statusInfo = getStatusInfo(provider.serviceStatus);
-
                 return (
                   <div
                     key={provider.id}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    className="flex items-center gap-4 border-b border-border p-4 last:border-0"
                   >
-                    <div className="flex flex-1 items-center gap-3">
-                      <div
-                        className={`flex items-center justify-center rounded-full p-2 ${
-                          provider.isVerified
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-yellow-100 text-yellow-600'
-                        }`}
-                      >
-                        {getServiceTypeIcon(provider.serviceType)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{provider.name}</p>
-                          {!provider.isVerified && (
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                              Unverified
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                          {provider.email}
-                        </p>
-                      </div>
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
+                        provider.isVerified
+                          ? 'border-primary/30 bg-primary/5 text-primary'
+                          : 'border-yellow-200 bg-yellow-50 text-yellow-600'
+                      }`}
+                    >
+                      {getServiceTypeIcon(provider.serviceType)}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {getServiceTypeName(provider.serviceType)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">{provider.name}</p>
+                        {!provider.isVerified && (
+                          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-yellow-600">
+                            Unverified
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-sm truncate">
+                        {provider.email}
                       </p>
-                      <span
-                        className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${statusInfo.color}`}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        {getServiceTypeName(provider.serviceType)}
+                      </span>
+                      <div
+                        className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}
                       >
                         <Activity className="h-3 w-3" />
                         {statusInfo.label}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 );

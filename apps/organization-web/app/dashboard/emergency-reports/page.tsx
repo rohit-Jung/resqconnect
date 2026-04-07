@@ -3,23 +3,15 @@
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertTriangle,
-  Car,
   Clock,
   Flame,
   MapPin,
   Shield,
   Stethoscope,
   Users,
-  Zap,
 } from 'lucide-react';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import {
@@ -28,102 +20,34 @@ import {
   ServiceCategory,
 } from '@/types/auth.types';
 
-// Get icon based on service type
 function getServiceIcon(serviceType: ServiceCategory) {
   switch (serviceType) {
     case 'fire_truck':
-      return <Flame className="h-6 w-6 text-orange-500" />;
+      return <Flame className="h-4 w-4 text-orange-500" />;
     case 'ambulance':
-      return <Stethoscope className="h-6 w-6 text-red-500" />;
+      return <Stethoscope className="h-4 w-4 text-red-500" />;
     case 'police':
-      return <Shield className="h-6 w-6 text-blue-500" />;
+      return <Shield className="h-4 w-4 text-blue-500" />;
     case 'rescue_team':
-      return <Users className="h-6 w-6 text-green-500" />;
+      return <Users className="h-4 w-4 text-green-500" />;
     default:
-      return <AlertTriangle className="h-6 w-6 text-gray-500" />;
+      return <AlertTriangle className="h-4 w-4 text-gray-500" />;
   }
 }
 
-// Get severity based on request status
-function getSeverityFromStatus(
-  status: RequestStatus
-): 'Critical' | 'High' | 'Medium' | 'Low' {
-  switch (status) {
-    case 'pending':
-    case 'no_providers_available':
-      return 'Critical';
-    case 'accepted':
-    case 'assigned':
-    case 'in_progress':
-      return 'High';
-    case 'completed':
-      return 'Low';
-    case 'rejected':
-    case 'cancelled':
-      return 'Medium';
-    default:
-      return 'Medium';
-  }
-}
-
-// Get human-readable service type name
 function getServiceTypeName(serviceType: ServiceCategory): string {
   switch (serviceType) {
     case 'fire_truck':
       return 'Fire Emergency';
     case 'ambulance':
-      return 'Ambulance Request';
+      return 'Ambulance';
     case 'police':
-      return 'Police Request';
+      return 'Police';
     case 'rescue_team':
-      return 'Rescue Operation';
+      return 'Rescue';
     default:
-      return 'Emergency Request';
+      return 'Emergency';
   }
-}
-
-// Stats skeleton
-function StatsSkeleton() {
-  return (
-    <div className="grid gap-6 md:grid-cols-4">
-      {[...Array(4)].map((_, idx) => (
-        <Card key={idx}>
-          <CardHeader className="pb-3">
-            <Skeleton className="h-4 w-24" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-9 w-16" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// Reports list skeleton
-function ReportsSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[...Array(4)].map((_, idx) => (
-        <div
-          key={idx}
-          className="flex items-center justify-between border-b pb-4 last:border-0"
-        >
-          <div className="flex flex-1 items-center gap-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-          </div>
-          <div className="text-right space-y-2">
-            <Skeleton className="h-3 w-20 ml-auto" />
-            <Skeleton className="h-6 w-16 ml-auto rounded-full" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export default function EmergencyReportsPage() {
@@ -131,26 +55,10 @@ export default function EmergencyReportsPage() {
   const analytics = analyticsResponse?.data?.data;
 
   const stats = [
-    {
-      label: 'Total Reports',
-      value: analytics?.emergencyRequests.total ?? 0,
-      color: 'bg-blue-100 text-blue-800',
-    },
-    {
-      label: 'This Month',
-      value: analytics?.emergencyRequests.thisMonth ?? 0,
-      color: 'bg-yellow-100 text-yellow-800',
-    },
-    {
-      label: 'Resolved',
-      value: analytics?.emergencyRequests.completed ?? 0,
-      color: 'bg-green-100 text-green-800',
-    },
-    {
-      label: 'Pending',
-      value: analytics?.emergencyRequests.pending ?? 0,
-      color: 'bg-red-100 text-red-800',
-    },
+    { label: 'TOTAL REPORTS', value: analytics?.emergencyRequests.total ?? 0 },
+    { label: 'THIS MONTH', value: analytics?.emergencyRequests.thisMonth ?? 0 },
+    { label: 'RESOLVED', value: analytics?.emergencyRequests.completed ?? 0 },
+    { label: 'PENDING', value: analytics?.emergencyRequests.pending ?? 0 },
   ];
 
   const reports = analytics?.emergencyRequests.recent ?? [];
@@ -164,19 +72,22 @@ export default function EmergencyReportsPage() {
         </p>
       </div>
 
+      {/* Stats */}
       {isLoading ? (
-        <StatsSkeleton />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-4">
           {stats.map(stat => (
             <Card key={stat.label}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-muted-foreground text-sm font-medium">
+              <CardContent className="p-4">
+                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                   {stat.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
+                </span>
+                <p className="mt-1 text-3xl font-bold tracking-tight">
                   {stat.value.toLocaleString()}
                 </p>
               </CardContent>
@@ -185,74 +96,78 @@ export default function EmergencyReportsPage() {
         </div>
       )}
 
+      {/* Recent Reports */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Emergency Reports</CardTitle>
-          <CardDescription>Latest emergency incidents reported</CardDescription>
+        <CardHeader className="border-b border-border pb-3">
+          <CardTitle className="text-base font-semibold">
+            Recent Emergency Reports
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <ReportsSkeleton />
+            <div className="space-y-px">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 p-4">
+                  <Skeleton className="h-8 w-8" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : reports.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                No emergency reports found
-              </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertTriangle className="text-muted-foreground mb-4 h-10 w-10" />
+              <p className="font-medium">No emergency reports found</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {reports.map((report: IRecentEmergencyRequest) => {
-                const severity = getSeverityFromStatus(report.requestStatus);
-                return (
-                  <div
-                    key={report.id}
-                    className="flex items-center justify-between border-b pb-4 last:border-0"
-                  >
-                    <div className="flex flex-1 items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                        {getServiceIcon(report.serviceType)}
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {getServiceTypeName(report.serviceType)}
-                        </p>
-                        <p className="text-muted-foreground flex items-center gap-1 text-sm">
-                          <MapPin className="h-4 w-4" />
-                          {report.location?.address ||
-                            `${report.location?.latitude}, ${report.location?.longitude}`}
-                        </p>
-                        {report.description && (
-                          <p className="text-muted-foreground text-xs mt-1 line-clamp-1">
-                            {report.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted-foreground flex items-center justify-end gap-1 text-sm">
-                        <Clock className="h-4 w-4" />
-                        {formatDistanceToNow(new Date(report.createdAt), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                      <span
-                        className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                          severity === 'Critical'
-                            ? 'bg-red-100 text-red-800'
-                            : severity === 'High'
-                              ? 'bg-orange-100 text-orange-800'
-                              : severity === 'Low'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {report.requestStatus.replace('_', ' ')}
-                      </span>
-                    </div>
+            <div>
+              {reports.map((report: IRecentEmergencyRequest) => (
+                <div
+                  key={report.id}
+                  className="flex items-center gap-4 border-b border-border p-4 last:border-0"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-muted/50">
+                    {getServiceIcon(report.serviceType)}
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">
+                      {getServiceTypeName(report.serviceType)}
+                    </p>
+                    <p className="text-muted-foreground flex items-center gap-1 text-sm truncate">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {report.location?.address ||
+                        `${report.location?.latitude}, ${report.location?.longitude}`}
+                    </p>
+                    {report.description && (
+                      <p className="text-muted-foreground mt-0.5 text-xs truncate">
+                        {report.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-muted-foreground flex items-center justify-end gap-1 text-xs">
+                      <Clock className="h-3 w-3" />
+                      {formatDistanceToNow(new Date(report.createdAt), {
+                        addSuffix: true,
+                      })}
+                    </p>
+                    <span
+                      className={`mt-1 inline-flex items-center font-mono text-[9px] uppercase tracking-[0.1em] ${
+                        report.requestStatus === 'pending' ||
+                        report.requestStatus === 'no_providers_available'
+                          ? 'text-red-600 dark:text-red-400'
+                          : report.requestStatus === 'completed'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-muted-foreground'
+                      }`}
+                    >
+                      {report.requestStatus.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
