@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
@@ -82,4 +82,23 @@ const useOrgList = (enabled: boolean = true) => {
   });
 };
 
-export { useOrgLogin, useOrgRegister, useOrgVerify, useOrgProfile, useOrgList };
+
+const useOrgUpdateProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    AxiosResponse<ApiResponse<{ organization: IOrgProfileResponse }>>,
+    AxiosError,
+    { name?: string; generalNumber?: string }
+  >({
+    mutationFn: data => {
+      return api.patch(orgEndpoints.updateProfile, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orgProfile'] });
+    },
+  });
+};
+
+
+export { useOrgLogin, useOrgRegister, useOrgVerify, useOrgProfile, useOrgList, useOrgUpdateProfile };
