@@ -1,4 +1,6 @@
-export const allowedOrigins = ['192.168.1.74', 'localhost'];
+import { envConfig } from './env.config';
+
+export const allowedOrigins = envConfig.allowed_origins;
 
 export const corsOptions = {
   origin: function (origin: any, callback: any) {
