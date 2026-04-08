@@ -12,6 +12,7 @@ import { GuestGuard } from '@/components/guest-guard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useSuperAdminLogin } from '@/services/super-admin/auth.api';
 import { IAdminLoginResponse, IOtpResponse } from '@/types/auth.types';
 import {
@@ -66,7 +67,7 @@ export default function SuperAdminLoginPage() {
         } else {
           const loginData = responseData as IAdminLoginResponse;
           if (loginData.token) {
-            localStorage.setItem('adminToken', loginData.token);
+            setTokenToStorage('adminToken', loginData.token);
           }
           toast.success('Welcome back');
           router.push('/dashboard');
