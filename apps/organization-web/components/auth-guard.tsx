@@ -4,6 +4,10 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import {
+  getTokenFromStorage,
+  removeTokenFromStorage,
+} from '@/lib/hooks/useLocalStorage';
 import { useOrgProfile } from '@/services/organization/auth.api';
 
 interface AuthGuardProps {
@@ -16,7 +20,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getTokenFromStorage('token');
     if (!token) {
       router.push('/login');
     } else {
@@ -29,7 +33,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   useEffect(() => {
     if (isError) {
-      localStorage.removeItem('token');
+      removeTokenFromStorage('token');
       router.push('/login');
     }
   }, [isError, router]);

@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { getTokenFromStorage } from '@/lib/hooks/useLocalStorage';
+
 interface GuestGuardProps {
   children: React.ReactNode;
 }
@@ -14,7 +16,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
 
   useEffect(() => {
     setIsClient(true);
-    const tokenFromStorage = localStorage.getItem('token');
+    const tokenFromStorage = getTokenFromStorage('token');
     setToken(tokenFromStorage);
     if (tokenFromStorage) {
       router.push('/dashboard');
