@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useOrgVerify } from '@/services/organization/auth.api';
 import { useVerifyUser } from '@/services/user/auth.api';
 import { TVerifyUser, verifyUserSchema } from '@/validations/auth.schema';
@@ -64,7 +65,7 @@ function VerifyPageContent() {
         toast.success('Account verified successfully');
         // If token is returned, store it
         if (response.data.data?.token) {
-          localStorage.setItem('token', response.data.data.token);
+          setTokenToStorage('token', response.data.data.token);
         }
       },
       onError: error => {

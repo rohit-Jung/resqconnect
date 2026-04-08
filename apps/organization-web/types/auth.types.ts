@@ -136,6 +136,13 @@ export interface IServiceProviderProfileResponse {
     email: string;
     serviceCategory: ServiceCategory;
   };
+  // Document fields
+  panCardUrl?: string;
+  citizenshipUrl?: string;
+  documentStatus?: 'not_submitted' | 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -177,6 +184,16 @@ export interface IRecentEmergencyRequest {
     address?: string;
   };
   createdAt: string;
+  requester?: {
+    id: string;
+    name: string;
+    phoneNumber?: string;
+  };
+  provider?: {
+    id: string;
+    name: string;
+    phoneNumber?: string;
+  };
 }
 
 export interface IRecentEmergencyResponse {

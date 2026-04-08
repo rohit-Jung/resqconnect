@@ -118,6 +118,15 @@ export default function NewServiceProviderPage() {
         ...formData,
         age: parseInt(data.age, 10),
         phoneNumber: parseInt(data.phoneNumber, 10),
+        // Only include document URLs if they are provided
+        ...(formData.panCardUrl &&
+          formData.panCardUrl.trim() !== '' && {
+            panCardUrl: formData.panCardUrl,
+          }),
+        ...(formData.citizenshipUrl &&
+          formData.citizenshipUrl.trim() !== '' && {
+            citizenshipUrl: formData.citizenshipUrl,
+          }),
       };
       await createMutation.mutateAsync(apiData);
       router.push('/dashboard/service-providers');
@@ -460,6 +469,69 @@ export default function NewServiceProviderPage() {
                 {errors.confirmPassword && (
                   <p className="text-primary text-sm font-medium">
                     {errors.confirmPassword.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Documents (Optional) */}
+          <div className="bg-card rounded-xl border p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
+              Verification Documents
+            </h2>
+            <p className="text-muted-foreground mb-4 text-sm dark:text-muted-foreground">
+              Upload document URLs for verification (optional). These can be
+              added later.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label
+                  htmlFor="panCardUrl"
+                  className="text-foreground dark:text-foreground"
+                >
+                  PAN Card URL
+                </Label>
+                <Input
+                  id="panCardUrl"
+                  type="url"
+                  placeholder="https://example.com/pan-card.pdf"
+                  className={`border-border focus:border-primary text-foreground ${
+                    errors.panCardUrl
+                      ? 'border-primary ring-1 ring-primary'
+                      : ''
+                  }`}
+                  aria-invalid={!!errors.panCardUrl}
+                  {...register('panCardUrl')}
+                />
+                {errors.panCardUrl && (
+                  <p className="text-primary text-sm font-medium">
+                    {errors.panCardUrl.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="citizenshipUrl"
+                  className="text-foreground dark:text-foreground"
+                >
+                  Citizenship Document URL
+                </Label>
+                <Input
+                  id="citizenshipUrl"
+                  type="url"
+                  placeholder="https://example.com/citizenship.pdf"
+                  className={`border-border focus:border-primary text-foreground ${
+                    errors.citizenshipUrl
+                      ? 'border-primary ring-1 ring-primary'
+                      : ''
+                  }`}
+                  aria-invalid={!!errors.citizenshipUrl}
+                  {...register('citizenshipUrl')}
+                />
+                {errors.citizenshipUrl && (
+                  <p className="text-primary text-sm font-medium">
+                    {errors.citizenshipUrl.message}
                   </p>
                 )}
               </div>

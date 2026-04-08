@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+import { getTokenFromStorage } from '@/lib/hooks/useLocalStorage';
 
 interface GuestGuardProps {
   children: React.ReactNode;
@@ -9,22 +11,28 @@ interface GuestGuardProps {
 
 export function GuestGuard({ children }: GuestGuardProps) {
   const router = useRouter();
-  const token = localStorage.getItem('token');
+  const [isClient, setIsClient] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (token) {
+    setIsClient(true);
+    const tokenFromStorage = getTokenFromStorage('token');
+    setToken(tokenFromStorage);
+    if (tokenFromStorage) {
       router.push('/dashboard');
     }
   }, [router]);
 
-  // If token exists, render nothing (redirecting)
-  if (typeof window !== 'undefined' && localStorage.getItem('token')) {
-    return null;
+  // During SSR, render children normally
+  // After hydration on client, redirect if token exists
+  if (!isClient) {
+    return <>{children}</>;
   }
 
-  // if (!token) {
-  //   return null;
-  // }
+  // If token exists after hydration, render nothing (redirecting)
+  if (token) {
+    return null;
+  }
 
   return <>{children}</>;
 }

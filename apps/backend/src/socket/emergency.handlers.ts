@@ -26,6 +26,28 @@ export function registerEmergencyHandlers(
   socket: Socket,
   role: TEntityRole
 ): void {
+  // Handle provider connecting and joining their personal provider room
+  // This allows backend to send NEW_EMERGENCY events to the provider
+  socket.on(
+    SocketEvents.PROVIDER_CONNECT,
+    async (data: { providerId?: string; requestId?: string }) => {
+      // If it's just providerId (new connection), join provider room
+      if (data.providerId && !data.requestId) {
+        const roomName = SocketRoom.PROVIDER(data.providerId);
+        socket.join(roomName);
+        logger.info(
+          `[ROOM_JOIN] Provider ${data.providerId} joined room ${roomName}`
+        );
+      } else if (data.requestId && data.providerId) {
+        // If both are provided, it's the old flow - connect to emergency room
+        await handleProviderConnect(io, socket, {
+          requestId: data.requestId,
+          providerId: data.providerId,
+        });
+      }
+    }
+  );
+
   // Handle provider accepting a request
   socket.on(
     SocketEvents.ACCEPT_REQUEST,
@@ -39,14 +61,6 @@ export function registerEmergencyHandlers(
     'reject-request',
     async (data: { requestId: string; providerId: string }) => {
       await handleRejectRequest(io, socket, data);
-    }
-  );
-
-  // Handle provider connecting to request room
-  socket.on(
-    SocketEvents.PROVIDER_CONNECT,
-    async (data: { requestId: string; providerId: string }) => {
-      await handleProviderConnect(io, socket, data);
     }
   );
 

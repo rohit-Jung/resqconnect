@@ -4,6 +4,10 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import {
+  getTokenFromStorage,
+  removeTokenFromStorage,
+} from '@/lib/hooks/useLocalStorage';
 import { useAdminProfile } from '@/services/super-admin/auth.api';
 
 interface AuthGuardProps {
@@ -17,7 +21,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   // Check if token exists in localStorage (client-side only)
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = getTokenFromStorage('adminToken');
     if (!token) {
       router.replace('/login');
     } else {
@@ -35,7 +39,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     if (isError) {
       // Clear invalid token
-      localStorage.removeItem('adminToken');
+      removeTokenFromStorage('adminToken');
       router.replace('/login');
     }
   }, [isError, router]);

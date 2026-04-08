@@ -23,7 +23,10 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useCreateOrganization } from '@/services/super-admin/organizations.api';
+import {
+  type ICreateOrganizationPayload,
+  useCreateOrganization,
+} from '@/services/super-admin/organizations.api';
 import {
   type ServiceCategory,
   type TCreateOrganization,
@@ -81,7 +84,7 @@ export default function NewOrganizationPage() {
       const apiData = {
         ...formData,
         generalNumber: parseInt(data.generalNumber, 10),
-      };
+      } as ICreateOrganizationPayload;
       createMutation.mutate(apiData, {
         onSuccess: () => {
           router.push('/dashboard/organizations');

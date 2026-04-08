@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useSuperAdminVerify } from '@/services/super-admin/auth.api';
 import {
   TSuperAdminVerify,
@@ -66,7 +67,7 @@ function VerifyPageContent() {
         toast.success('Account verified successfully');
         // If token is returned, store it
         if (response.data.data?.token) {
-          localStorage.setItem('adminToken', response.data.data.token);
+          setTokenToStorage('adminToken', response.data.data.token);
         }
       },
       onError: error => {

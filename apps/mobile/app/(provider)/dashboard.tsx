@@ -2,7 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -119,7 +125,9 @@ export default function ProviderDashboardScreen() {
     }
   }, [incomingRequests.length, pulseAnim]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    console.log('Dashboard mounting - attaching socket listeners');
+
     const handleNewEmergency = (data: any) => {
       const parsedData = newEmergencyEventPayloadSchema.safeParse(data);
       if (!parsedData.success) return;
@@ -164,7 +172,12 @@ export default function ProviderDashboardScreen() {
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
     socketManager.on(SocketEvents.REQUEST_COMPLETED, handleRequestCompleted);
 
+    console.log(
+      `Socket listeners attached - NEW_EMERGENCY, REQUEST_ACCEPTED, REQUEST_CANCELLED, REQUEST_COMPLETED`
+    );
+
     return () => {
+      console.log('Dashboard unmounting - detaching socket listeners');
       socketManager.off(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
       socketManager.off(SocketEvents.REQUEST_ACCEPTED, handleRequestTaken);
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
@@ -173,8 +186,10 @@ export default function ProviderDashboardScreen() {
   }, [
     addIncomingRequest,
     currentRequest,
+    incomingRequests,
     provider?.id,
     removeIncomingRequest,
+    serviceStatus,
     setCurrentRequest,
     setServiceStatus,
   ]);
@@ -287,19 +302,21 @@ export default function ProviderDashboardScreen() {
     }
   }, [currentLocation, serviceStatus]);
 
-  useEffect(() => {
-    if (serviceStatus !== 'available' || !currentLocation) {
-      return;
-    }
-
-    emitPeriodicLocation();
-
-    const intervalId = setInterval(() => {
-      emitPeriodicLocation();
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [serviceStatus, currentLocation, emitPeriodicLocation]);
+  // TODO: Re-enable periodic location updates after testing
+  // For testing, we're using simulated location updates from route in emergency-tracking.tsx
+  // useEffect(() => {
+  //   if (serviceStatus !== 'available' || !currentLocation) {
+  //     return;
+  //   }
+  //
+  //   emitPeriodicLocation();
+  //
+  //   const intervalId = setInterval(() => {
+  //     emitPeriodicLocation();
+  //   }, 10000);
+  //
+  //   return () => clearInterval(intervalId);
+  // }, [serviceStatus, currentLocation, emitPeriodicLocation]);
 
   return (
     <View style={styles.container}>
