@@ -302,19 +302,21 @@ export default function ProviderDashboardScreen() {
     }
   }, [currentLocation, serviceStatus]);
 
-  useEffect(() => {
-    if (serviceStatus !== 'available' || !currentLocation) {
-      return;
-    }
-
-    emitPeriodicLocation();
-
-    const intervalId = setInterval(() => {
-      emitPeriodicLocation();
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [serviceStatus, currentLocation, emitPeriodicLocation]);
+  // TODO: Re-enable periodic location updates after testing
+  // For testing, we're using simulated location updates from route in emergency-tracking.tsx
+  // useEffect(() => {
+  //   if (serviceStatus !== 'available' || !currentLocation) {
+  //     return;
+  //   }
+  //
+  //   emitPeriodicLocation();
+  //
+  //   const intervalId = setInterval(() => {
+  //     emitPeriodicLocation();
+  //   }, 10000);
+  //
+  //   return () => clearInterval(intervalId);
+  // }, [serviceStatus, currentLocation, emitPeriodicLocation]);
 
   return (
     <View style={styles.container}>

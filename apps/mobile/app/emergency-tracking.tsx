@@ -39,6 +39,8 @@ import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
 import {
   formatDistance,
   formatDuration,
+  getPointAtProgress,
+  getRemainingRouteAfterProgress,
   haversineDistance,
   mapboxToLatLng,
 } from '@/utils/location.utils';
@@ -104,8 +106,14 @@ export default function EmergencyTrackingScreen() {
   const mapRef = useRef<MapView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const lastRouteFetchLocation = useRef<LocationCoords | null>(null);
-  const locationBroadcastTimer = useRef<NodeJS.TimeOut | null>(null);
+  const locationBroadcastTimer = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
   const isRouteRefetchingRef = useRef(false);
+  const simulationProgressRef = useRef(0); // For simulated location movement (0-1)
+  const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
 
   // Determine if current user is provider or user
   const isProvider = role === 'provider';
@@ -122,6 +130,9 @@ export default function EmergencyTrackingScreen() {
   const [providerLocation, setProviderLocation] =
     useState<LocationCoords | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
+  const [remainingRouteCoordinates, setRemainingRouteCoordinates] = useState<
+    LatLng[]
+  >([]);
   const [routeInfo, setRouteInfo] = useState<{
     distance: number;
     duration: number;
@@ -162,9 +173,6 @@ export default function EmergencyTrackingScreen() {
     useCancelEmergencyRequest();
   const { mutate: confirmArrival, isPending: isConfirmingArrival } =
     useConfirmProviderArrival();
-
-  const { mutate: confirmArrived, isPending: isConfirmingArrived } =
-    useProviderConfirmArrival();
 
   const emergencyRequest = requestData?.data?.data;
   const nearbyProviders = useMemo(
@@ -230,6 +238,10 @@ export default function EmergencyTrackingScreen() {
       if (route) {
         const coords = mapboxToLatLng(route.coordinates);
         setRouteCoordinates(coords);
+        // Initialize remaining route with full route
+        setRemainingRouteCoordinates(coords);
+        // Reset simulation progress when new route is loaded
+        simulationProgressRef.current = 0;
         setRouteInfo({
           distance: route.distance,
           duration: route.duration,
@@ -268,6 +280,73 @@ export default function EmergencyTrackingScreen() {
       return () => pulse.stop();
     }
   }, [currentStatus, pulseAnim]);
+
+  // Simulated location movement along route (for testing)
+  // Moves the provider/user location along the calculated route every 1 second
+  useEffect(() => {
+    // Only enable for testing when we have a route and emergency is active
+    if (
+      !routeCoordinates.length ||
+      currentStatus !== EmergencyStatus.ACCEPTED ||
+      !isProvider
+    ) {
+      return;
+    }
+
+    console.log(
+      '[SIMULATION] Starting simulated location movement along route'
+    );
+
+    // Start simulation
+    simulationTimerRef.current = setInterval(() => {
+      simulationProgressRef.current += 0.01; // Move 1% of route per second
+
+      // Stop when reached destination
+      if (simulationProgressRef.current >= 1) {
+        simulationProgressRef.current = 1;
+        if (simulationTimerRef.current) {
+          clearInterval(simulationTimerRef.current);
+          simulationTimerRef.current = null;
+        }
+        console.log('[SIMULATION] Reached destination');
+        // Clear remaining route when destination reached
+        setRemainingRouteCoordinates([]);
+        return;
+      }
+
+      // Calculate new location along route
+      const newLocation = getPointAtProgress(
+        routeCoordinates,
+        simulationProgressRef.current
+      );
+
+      if (newLocation) {
+        console.log(
+          `[SIMULATION] Simulated location progress: ${(
+            simulationProgressRef.current * 100
+          ).toFixed(1)}%`,
+          newLocation
+        );
+        // Update provider's location for real-time display
+        setMyLocation(newLocation);
+        setProviderLocation(newLocation);
+
+        // Update remaining route (polyline trimming)
+        const remaining = getRemainingRouteAfterProgress(
+          routeCoordinates,
+          simulationProgressRef.current
+        );
+        setRemainingRouteCoordinates(remaining);
+      }
+    }, 1000); // Update every 1 second
+
+    return () => {
+      if (simulationTimerRef.current) {
+        clearInterval(simulationTimerRef.current);
+        simulationTimerRef.current = null;
+      }
+    };
+  }, [routeCoordinates, currentStatus, isProvider]);
 
   // Start location tracking
   useEffect(() => {
@@ -937,9 +1016,9 @@ export default function EmergencyTrackingScreen() {
         )}
 
         {/* Route Polyline */}
-        {routeCoordinates.length > 0 && (
+        {remainingRouteCoordinates.length > 0 && (
           <Polyline
-            coordinates={routeCoordinates}
+            coordinates={remainingRouteCoordinates}
             strokeColor={emergencyInfo.color}
             strokeWidth={4}
             lineCap="round"
