@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import {
+import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
+import type {
+  ApiResponse,
   IAdminLoginResponse,
   IAdminProfileResponse,
   IAdminVerifyResponse,
@@ -69,7 +71,7 @@ export const useAdminLogout = () => {
   return useMutation<AxiosResponse, AxiosError>({
     mutationFn: () => api.get(authEndpoints.logout),
     onSuccess: () => {
-      localStorage.removeItem('adminToken');
+      removeTokenFromStorage('adminToken');
       queryClient.clear();
     },
   });

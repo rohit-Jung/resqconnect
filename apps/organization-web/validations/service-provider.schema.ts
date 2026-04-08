@@ -30,6 +30,8 @@ export const serviceProviderRegisterSchema = z.object({
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
   serviceType: serviceTypeEnum,
+  panCardUrl: z.string().url('Invalid URL').optional(),
+  citizenshipUrl: z.string().url('Invalid URL').optional(),
 });
 
 // Form schema with string for numbers (converted before API call)
@@ -48,6 +50,8 @@ export const serviceProviderRegisterFormSchema = z
       .regex(/[0-9]/, 'Password must contain at least one number'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     serviceType: serviceTypeEnum,
+    panCardUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+    citizenshipUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

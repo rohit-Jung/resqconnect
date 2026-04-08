@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import { IOrganization } from '@/types/auth.types';
+import type { ApiResponse, IOrganization } from '@/types/auth.types';
 
 import api from '../axiosInstance';
 import { organizationEndpoints } from '../endPoints';

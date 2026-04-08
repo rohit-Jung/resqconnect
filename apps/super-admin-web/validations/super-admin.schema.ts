@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const superAdminLoginSchema = z.object({
-  role: z.enum(['user', 'admin']).default('admin'),
+  role: z.enum(['user', 'admin']),
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
@@ -25,7 +25,7 @@ export const createOrganizationSchema = z
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(1, 'Confirm password is required'),
     generalNumber: z.string().min(3, 'Phone number must be at least 7 digits'),
-    serviceCategory: z.string().min(1, 'Please select a service category'),
+    serviceCategory: z.enum(['ambulance', 'police', 'fire_brigade']),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: "Passwords don't match",

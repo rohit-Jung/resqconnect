@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
+import type { ApiResponse } from '@/types/auth.types';
+
 import api from '../axiosInstance';
 import { paymentEndpoints } from '../endPoints';
 

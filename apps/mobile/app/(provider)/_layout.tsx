@@ -6,7 +6,9 @@ import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { SocketEvents } from '@/constants/socket.constants';
 import { useGetDocumentStatus } from '@/services/document/document.api';
+import { socketManager } from '@/socket/socket-manager';
 import { useProviderStore } from '@/store/providerStore';
 
 const SIGNAL_RED = '#C44536';
@@ -40,6 +42,22 @@ const ProviderLayout: React.FC = () => {
       }
     }
   }, [data, isLoading, isError, provider, router]);
+
+  // Emit PROVIDER_CONNECT to tell backend this socket belongs to a provider
+  // This allows backend to send NEW_EMERGENCY events to provider:providerId room
+  useEffect(() => {
+    if (!provider) return;
+
+    const socket = socketManager.getSocket();
+    if (!socket?.connected) return;
+
+    console.log(
+      `[PROVIDER] Emitting PROVIDER_CONNECT for provider ${provider.id}`
+    );
+    socketManager.emit(SocketEvents.PROVIDER_CONNECT, {
+      providerId: provider.id,
+    });
+  }, [provider]);
 
   // TODO: constantly update the provider location here
   useEffect(() => {
