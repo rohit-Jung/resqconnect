@@ -1,12 +1,15 @@
 'use client';
 
 import {
+  AlertCircle,
   Ambulance,
   ArrowLeft,
   Calendar,
   CheckCircle,
   Clock,
+  Download,
   Edit,
+  FileText,
   Flame,
   LifeBuoy,
   Loader2,
@@ -355,6 +358,147 @@ export default function ServiceProviderDetailPage({
                 </div>
               </div>
             )}
+
+            {/* Documents Section */}
+            <div className="bg-card rounded-xl border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
+                  Verification Documents
+                </h2>
+                <Badge
+                  className={`rounded-none border-0 ${
+                    provider.documentStatus === 'approved'
+                      ? 'bg-green-100 text-green-700'
+                      : provider.documentStatus === 'pending'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : provider.documentStatus === 'rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {provider.documentStatus === 'approved'
+                    ? 'Approved'
+                    : provider.documentStatus === 'pending'
+                      ? 'Pending'
+                      : provider.documentStatus === 'rejected'
+                        ? 'Rejected'
+                        : 'Not Submitted'}
+                </Badge>
+              </div>
+
+              <div className="space-y-4">
+                {/* PAN Card */}
+                <div className="border-b pb-4 last:border-b-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                      PAN Card
+                    </p>
+                    {provider.panCardUrl && (
+                      <a
+                        href={provider.panCardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1 text-sm"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </a>
+                    )}
+                  </div>
+                  <p className="font-medium text-foreground dark:text-foreground">
+                    {provider.panCardUrl ? (
+                      <a
+                        href={provider.panCardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Not uploaded
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Citizenship Document */}
+                <div className="border-b pb-4 last:border-b-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                      Citizenship Document
+                    </p>
+                    {provider.citizenshipUrl && (
+                      <a
+                        href={provider.citizenshipUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1 text-sm"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </a>
+                    )}
+                  </div>
+                  <p className="font-medium text-foreground dark:text-foreground">
+                    {provider.citizenshipUrl ? (
+                      <a
+                        href={provider.citizenshipUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Not uploaded
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Rejection Reason */}
+                {provider.documentStatus === 'rejected' &&
+                  provider.rejectionReason && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-red-900">
+                            Rejection Reason
+                          </p>
+                          <p className="text-sm text-red-700 mt-1">
+                            {provider.rejectionReason}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Verification Info */}
+                {provider.documentStatus === 'approved' &&
+                  provider.verifiedAt && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-green-900">
+                            Verified on{' '}
+                            {new Date(provider.verifiedAt).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-green-700">
+                            By: {provider.verifiedBy || 'System'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </div>
           </div>
 
           {/* Sidebar */}
