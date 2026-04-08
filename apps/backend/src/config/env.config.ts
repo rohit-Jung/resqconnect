@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   DEV_IP: z.string().default('0.0.0.0'),
+  ALLOWED_ORIGINS: z
+    .string()
+    .default('*')
+    .transform(val =>
+      val === '*' ? ['*'] : val.split(',').map(v => v.trim())
+    ),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
@@ -28,6 +34,13 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+
+  // LOCAL SMS INFO
+  SMS_URI: z.string(),
+  SMS_USERNAME: z.string(),
+  SMS_PASSWORD: z.string(),
+
+  BACKEND_BASE: z.string(),
 });
 
 function createEnvConfig() {
@@ -42,6 +55,7 @@ function createEnvConfig() {
     port: parsedEnv.data.PORT,
     dev_ip: parsedEnv.data.DEV_IP,
     database_url: parsedEnv.data.DATABASE_URL,
+    allowed_origins: parsedEnv.data.ALLOWED_ORIGINS,
     jwt_secret: parsedEnv.data.JWT_SECRET,
     jwt_expiry: parsedEnv.data.JWT_EXPIRY,
     otp_secret: parsedEnv.data.OTP_SECRET,
@@ -66,6 +80,12 @@ function createEnvConfig() {
     cloudinary_cloud_name: parsedEnv.data.CLOUDINARY_CLOUD_NAME,
     cloudinary_api_key: parsedEnv.data.CLOUDINARY_API_KEY,
     cloudinary_api_secret: parsedEnv.data.CLOUDINARY_API_SECRET,
+
+    sms_uri_base: parsedEnv.data.SMS_URI,
+    sms_username: parsedEnv.data.SMS_USERNAME,
+    sms_password: parsedEnv.data.SMS_PASSWORD,
+
+    backend_base_path: parsedEnv.data.BACKEND_BASE,
   };
 }
 
