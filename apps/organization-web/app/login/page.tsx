@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useOrgLogin } from '@/services/organization/auth.api';
 import {
   ILoginResponse,
@@ -68,7 +69,7 @@ export default function LoginPage() {
         } else {
           const loginData = responseData as IOrgLoginResponse;
           if (loginData.token) {
-            localStorage.setItem('token', loginData.token);
+            setTokenToStorage('token', loginData.token);
           }
           toast.success('Welcome back');
           router.push('/dashboard');

@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
 
 export function DashboardHeader() {
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    removeTokenFromStorage('token');
     router.push('/login');
   };
 

@@ -1,5 +1,10 @@
 import axios from 'axios';
 
+import {
+  getTokenFromStorage,
+  removeTokenFromStorage,
+} from '@/lib/hooks/useLocalStorage';
+
 const routerVersion = `v1`;
 
 const api = axios.create({
@@ -14,8 +19,7 @@ const api = axios.create({
 api.interceptors.request.use(
   config => {
     // Get token from localStorage (organization token)
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getTokenFromStorage('token');
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -37,12 +41,13 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized errors
     if (error.response?.status === 401) {
       // Clear token and redirect to login
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
+      removeTokenFromStorage('token');
+      // Only redirect if not already on login page
+      if (
+        typeof window !== 'undefined' &&
+        !window.location.pathname.includes('/login')
+      ) {
+        window.location.href = '/login';
       }
     }
 
