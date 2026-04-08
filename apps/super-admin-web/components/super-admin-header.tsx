@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
 
 export function SuperAdminHeader() {
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+    removeTokenFromStorage('adminToken');
     router.push('/login');
   };
 

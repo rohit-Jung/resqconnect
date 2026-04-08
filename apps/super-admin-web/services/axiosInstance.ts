@@ -1,5 +1,10 @@
 import axios from 'axios';
 
+import {
+  getTokenFromStorage,
+  removeTokenFromStorage,
+} from '@/lib/hooks/useLocalStorage';
+
 const routerVersion = `v1`;
 
 const api = axios.create({
@@ -10,7 +15,7 @@ const api = axios.create({
 // Add request interceptor to attach auth token
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('adminToken');
+    const token = getTokenFromStorage('adminToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -27,7 +32,7 @@ api.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       // Clear token and redirect to login
-      localStorage.removeItem('adminToken');
+      removeTokenFromStorage('adminToken');
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
