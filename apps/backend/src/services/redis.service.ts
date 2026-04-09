@@ -8,6 +8,23 @@ export const EMERGENCY_LOCK_KEY = (requestId: string) =>
 export const PROVIDER_LOCATION_KEY = (providerId: string) =>
   `provider:${providerId}:location`;
 
+// Route cache keys - cache routes between same origin-destination pairs
+// Format: route:{origin_lat}:{origin_lng}:{dest_lat}:{dest_lng}:{profile}
+export const ROUTE_CACHE_KEY = (
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+  profile: string
+) => {
+  // Round to 4 decimal places to handle small location variations (~11 meters)
+  const oLat = Math.round(originLat * 10000) / 10000;
+  const oLng = Math.round(originLng * 10000) / 10000;
+  const dLat = Math.round(destLat * 10000) / 10000;
+  const dLng = Math.round(destLng * 10000) / 10000;
+  return `route:${oLat}:${oLng}:${dLat}:${dLng}:${profile}`;
+};
+
 // SMS deduplication keys
 export const SMS_PROCESSED_KEY = (messageSid: string) =>
   `sms:processed:${messageSid}`;
@@ -17,6 +34,7 @@ export const CACHE_EXPIRY = {
   PROVIDERS_LIST: 600,
   LOCK: 10,
   PROVIDER_LOCATION: 3600,
+  ROUTE: 3600, // Cache routes for 1 hour
   SMS_PROCESSED: 86400, // 24 hours - to prevent reprocessing
   SMS_LAST_POLL: 3600,
 };
@@ -282,4 +300,39 @@ export async function batchCheckMessagesProcessed(
   });
 
   return result;
+}
+
+/**
+ * Cache a computed route to avoid re-computing the same route
+ * Caches routes between same origin-destination pairs
+ */
+export async function cacheRoute(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+  profile: string,
+  routeData: any
+): Promise<void> {
+  const key = ROUTE_CACHE_KEY(originLat, originLng, destLat, destLng, profile);
+  await redis.set(key, JSON.stringify(routeData), 'EX', CACHE_EXPIRY.ROUTE);
+  console.log(`[ROUTE_CACHE] Cached route: ${key}`);
+}
+
+/**
+ * Get cached route for origin-destination pair
+ */
+export async function getCachedRoute(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+  profile: string
+): Promise<any | null> {
+  const key = ROUTE_CACHE_KEY(originLat, originLng, destLat, destLng, profile);
+  const data = await redis.get(key);
+  if (data) {
+    console.log(`[ROUTE_CACHE] Cache HIT: ${key}`);
+  }
+  return data ? JSON.parse(data) : null;
 }
