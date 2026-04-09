@@ -101,11 +101,32 @@ const registerServiceProvider = asyncHandler(
     const newServiceProvider = await db
       .insert(serviceProvider)
       .values({
-        ...parsedValues.data,
+        name: parsedValues.data.name,
+        age: parsedValues.data.age,
+        email: parsedValues.data.email,
+        phoneNumber: parsedValues.data.phoneNumber,
+        primaryAddress: parsedValues.data.primaryAddress,
         password: hashedPassword,
+        serviceType: parsedValues.data.serviceType,
+        organizationId: parsedValues.data.organizationId,
         lastLocation: sql`ST_SetSRID(ST_MakePoint(85.3240, 27.7172), 4326)`,
         h3Index: BigInt('0'),
-      })
+        currentLocation: {
+          latitude: '27.7172',
+          longitude: '85.3240',
+        },
+        // Set document status based on whether documents were provided
+        documentStatus:
+          parsedValues.data.panCardUrl || parsedValues.data.citizenshipUrl
+            ? 'pending'
+            : 'not_submitted',
+        ...(parsedValues.data.panCardUrl && {
+          panCardUrl: parsedValues.data.panCardUrl,
+        }),
+        ...(parsedValues.data.citizenshipUrl && {
+          citizenshipUrl: parsedValues.data.citizenshipUrl,
+        }),
+      } as any)
       .returning({
         name: serviceProvider.name,
         age: serviceProvider.age,
