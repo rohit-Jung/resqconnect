@@ -10,4 +10,5 @@ export default defineConfig({
   dbCredentials: {
     url: envConfig.database_url,
   },
+  extensionsFilters: ['postgis'],
 });
