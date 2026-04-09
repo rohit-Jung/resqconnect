@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 
-import { serviceTypeEnum } from '@/constants';
 import db from '@/db';
+import { serviceTypeEnum } from '@/models';
 import { serviceProvider } from '@/models';
 
 interface LatLng {

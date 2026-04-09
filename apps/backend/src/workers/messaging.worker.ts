@@ -43,6 +43,14 @@ const FETCH_INTERVAL = 3000;
 // Emergency phone number for fallback
 const EMERGENCY_PHONE_NUMBER = envConfig.emergency_phone_number || '112';
 
+// Health check state
+let lastPollTime: Date | null = null;
+let pollCount = 0;
+let errorCount = 0;
+let messagesProcessed = 0;
+let lastError: string | null = null;
+let workerStartTime: Date | null = null;
+
 async function processSingleMessage(message: TwilioMessage): Promise<{
   success: boolean;
   requestId?: string;
@@ -50,13 +58,15 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
 }> {
   const { sid, body, from } = message;
 
-  logger.info(`Processing SMS message ${sid} from ${from}`);
+  logger.info(`[WORKER] Processing SMS message ${sid} from ${from}`);
 
   // Parse the SMS message
   const parseResult = parseSMSMessage(body);
 
   if (!parseResult.success || !parseResult.data) {
-    logger.warn(`Invalid SMS format from ${from}: ${parseResult.error}`);
+    logger.warn(
+      `[WORKER] Invalid SMS format from ${from}: ${parseResult.error}`
+    );
 
     // Mark as processed with invalid status
     await markMessageProcessed(sid, {
@@ -82,7 +92,7 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
 
     if (!verification.verified) {
       logger.warn(
-        `User verification failed for ${from}: ${verification.error}`
+        `[WORKER] User verification failed for ${from}: ${verification.error}`
       );
 
       await markMessageProcessed(sid, {
@@ -111,7 +121,7 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
     const userResult = await findUserByPhoneNumber(from);
 
     if (!userResult.found || !userResult.user) {
-      logger.warn(`User not found for phone number ${from}`);
+      logger.warn(`[WORKER] User not found for phone number ${from}`);
 
       await markMessageProcessed(sid, {
         status: 'failed',
@@ -170,8 +180,9 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
     );
 
     logger.info(
-      `Successfully processed SMS ${sid}, created request ${result.requestId}`
+      `[WORKER] Successfully processed SMS ${sid}, created request ${result.requestId}`
     );
+    messagesProcessed++;
 
     return {
       success: true,
@@ -180,7 +191,9 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Error processing SMS ${sid}:`, error);
+    logger.error(`[WORKER] Error processing SMS ${sid}:`, error);
+    errorCount++;
+    lastError = errorMessage;
 
     await markMessageProcessed(sid, {
       userId,
@@ -212,6 +225,10 @@ async function createEmergencyRequest(
   error?: string;
 }> {
   const { emergencyType, location, description } = data;
+
+  logger.info(
+    `[WORKER] Creating emergency request for user ${userId}, type: ${emergencyType}`
+  );
 
   // Convert location to H3 index
   const h3Index = latLngToCell(
@@ -260,6 +277,8 @@ async function createEmergencyRequest(
         throw new Error('Failed to create emergency request');
       }
 
+      logger.info(`[WORKER] Created emergency request ${newRequest.id}`);
+
       // Create outbox event (Outbox pattern for Kafka)
       const eventPayload = {
         requestId: newRequest.id,
@@ -299,6 +318,10 @@ async function createEmergencyRequest(
 
     // Try to publish to Kafka immediately
     const kafkaTopic = getKafkaTopic(emergencyType);
+    logger.info(
+      `[WORKER] Attempting to publish request ${result.id} to Kafka topic ${kafkaTopic}`
+    );
+
     const published = await publishWithRetry(kafkaTopic, {
       key: result.id,
       value: JSON.stringify({
@@ -317,6 +340,9 @@ async function createEmergencyRequest(
     });
 
     if (published) {
+      logger.info(
+        `[WORKER] Successfully published request ${result.id} to Kafka`
+      );
       // Mark outbox event as published
       await db
         .update(outbox)
@@ -324,7 +350,7 @@ async function createEmergencyRequest(
         .where(eq(outbox.aggregateId, result.id));
     } else {
       logger.warn(
-        `Kafka unavailable, event queued in outbox for request ${result.id}`
+        `[WORKER] Kafka unavailable, event queued in outbox for request ${result.id}`
       );
     }
 
@@ -333,10 +359,15 @@ async function createEmergencyRequest(
       requestId: result.id,
     };
   } catch (error) {
-    logger.error('Error creating emergency request:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Database error';
+    logger.error(`[WORKER] Error creating emergency request:`, error);
+    errorCount++;
+    lastError = errorMessage;
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Database error',
+      error: errorMessage,
     };
   }
 }
@@ -354,29 +385,64 @@ function formatEmergencyType(type: string): string {
 async function handleIncomingMessages(toNumber: string): Promise<void> {
   try {
     // Get last poll timestamp for incremental fetching
-    const lastPollTime = await getLastSMSPollTimestamp();
+    const lastPollTimeFromRedis = await getLastSMSPollTimestamp();
+    logger.info(
+      `[WORKER] Polling for SMS messages. Last poll: ${lastPollTimeFromRedis || 'never'}`
+    );
 
-    // Fetch messages from Twilio
-    const messages = await getMessages(toNumber, 20, lastPollTime || undefined);
-
-    if (messages.length === 0) {
+    // Fetch messages from Twilio with error handling
+    let messages: TwilioMessage[] = [];
+    try {
+      messages = await getMessages(
+        toNumber,
+        20,
+        lastPollTimeFromRedis || undefined
+      );
+    } catch (twilioError) {
+      logger.error(`[WORKER] Twilio API error fetching messages:`, twilioError);
+      errorCount++;
+      lastError =
+        twilioError instanceof Error ? twilioError.message : 'Twilio API error';
       return;
     }
 
-    logger.info(`Fetched ${messages.length} SMS messages`);
+    if (messages.length === 0) {
+      logger.debug(`[WORKER] No new messages in this poll`);
+      return;
+    }
+
+    logger.info(`[WORKER] Fetched ${messages.length} SMS messages from Twilio`);
 
     // Filter to only incoming messages (direction: 'inbound')
     const inboundMessages = messages.filter(msg => msg.direction === 'inbound');
 
     if (inboundMessages.length === 0) {
+      logger.info(`[WORKER] No inbound messages in this batch`);
       // Update poll timestamp even if no inbound messages
       await setLastSMSPollTimestamp(new Date());
       return;
     }
 
+    logger.info(
+      `[WORKER] Processing ${inboundMessages.length} inbound messages`
+    );
+
     // Batch check which messages have already been processed
     const messageSids = inboundMessages.map(m => m.sid);
-    const processedMap = await batchCheckMessagesProcessed(messageSids);
+    let processedMap: Map<string, boolean>;
+    try {
+      processedMap = await batchCheckMessagesProcessed(messageSids);
+    } catch (redisError) {
+      logger.error(
+        `[WORKER] Redis error checking processed messages:`,
+        redisError
+      );
+      errorCount++;
+      lastError =
+        redisError instanceof Error ? redisError.message : 'Redis error';
+      // Continue anyway - we might process duplicates but safety is preserved
+      processedMap = new Map();
+    }
 
     // Filter out already processed messages
     const newMessages = inboundMessages.filter(
@@ -384,22 +450,56 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
     );
 
     if (newMessages.length === 0) {
-      logger.info('All fetched messages already processed');
-      await setLastSMSPollTimestamp(new Date());
+      logger.info(
+        `[WORKER] All ${inboundMessages.length} messages already processed`
+      );
+      try {
+        await setLastSMSPollTimestamp(new Date());
+      } catch (redisError) {
+        logger.error(
+          `[WORKER] Redis error updating poll timestamp:`,
+          redisError
+        );
+      }
       return;
     }
 
-    logger.info(`Processing ${newMessages.length} new SMS messages`);
+    logger.info(`[WORKER] Found ${newMessages.length} new messages to process`);
 
-    // Process messages sequentially to avoid race conditions
+    // Process messages sequentially to avoid race conditions and DB conflicts
     for (const message of newMessages) {
-      await processSingleMessage(message);
+      try {
+        await processSingleMessage(message);
+      } catch (processError) {
+        logger.error(
+          `[WORKER] Unexpected error processing message ${message.sid}:`,
+          processError
+        );
+        errorCount++;
+        lastError =
+          processError instanceof Error
+            ? processError.message
+            : 'Message processing error';
+      }
     }
 
     // Update last poll timestamp
-    await setLastSMSPollTimestamp(new Date());
+    try {
+      await setLastSMSPollTimestamp(new Date());
+      lastPollTime = new Date();
+      pollCount++;
+      logger.info(`[WORKER] Poll cycle completed. Total polls: ${pollCount}`);
+    } catch (redisError) {
+      logger.error(
+        `[WORKER] Redis error updating final poll timestamp:`,
+        redisError
+      );
+    }
   } catch (error) {
-    logger.error('Error fetching/processing SMS messages:', error);
+    logger.error(`[WORKER] Unexpected error in message handling loop:`, error);
+    errorCount++;
+    lastError =
+      error instanceof Error ? error.message : 'Unknown handling error';
   }
 }
 
@@ -407,20 +507,67 @@ async function startSMSPollingWorker(): Promise<void> {
   const toNumber = envConfig.to_number;
 
   if (!toNumber) {
-    logger.error('SMS polling: TO_NUMBER not configured in environment');
+    logger.error(
+      '[WORKER] SMS polling: TO_NUMBER not configured in environment'
+    );
     return;
   }
 
-  logger.info(`Starting SMS polling worker for number: ${toNumber}`);
-  logger.info(`Poll interval: ${FETCH_INTERVAL}ms`);
+  if (!envConfig.twilio_account_sid || !envConfig.twilio_auth_token) {
+    logger.error('[WORKER] SMS polling: Twilio credentials not configured');
+    return;
+  }
 
-  // Initial fetch
-  await handleIncomingMessages(toNumber);
+  logger.info(`[WORKER] SMS Receiving Number: ${toNumber}`);
+  logger.info(
+    `[WORKER] Poll Interval: ${FETCH_INTERVAL}ms (${FETCH_INTERVAL / 1000} seconds)`
+  );
 
-  // Poll at interval
-  setInterval(async () => {
+  workerStartTime = new Date();
+  pollCount = 0;
+  errorCount = 0;
+  messagesProcessed = 0;
+
+  // Initial fetch to verify Twilio connection
+  logger.info(`[WORKER] Running initial SMS poll to verify connectivity...`);
+  try {
     await handleIncomingMessages(toNumber);
+    logger.info(
+      `[WORKER] Initial poll successful - SMS Polling Worker is active`
+    );
+  } catch (initialError) {
+    logger.error(`[WORKER] Initial poll failed:`, initialError);
+    errorCount++;
+    lastError =
+      initialError instanceof Error
+        ? initialError.message
+        : 'Initial poll failed';
+    // Continue anyway - worker will retry
+  }
+
+  // Poll at interval with error recovery
+  const pollIntervalId = setInterval(async () => {
+    try {
+      await handleIncomingMessages(toNumber);
+    } catch (error) {
+      logger.error(`[WORKER] Unhandled error in polling interval:`, error);
+      errorCount++;
+      lastError =
+        error instanceof Error ? error.message : 'Polling interval error';
+      // Continue running - don't break the interval
+    }
   }, FETCH_INTERVAL);
+
+  // Graceful shutdown handler
+  process.on('SIGTERM', () => {
+    logger.info(`[WORKER] Received SIGTERM - Stopping SMS Polling Worker`);
+    clearInterval(pollIntervalId);
+  });
+
+  process.on('SIGINT', () => {
+    logger.info(`[WORKER] Received SIGINT - Stopping SMS Polling Worker`);
+    clearInterval(pollIntervalId);
+  });
 }
 
 export async function notifyUserViaSmS(
@@ -442,6 +589,30 @@ export async function sendProviderAssignedSMS(
   );
   const result = await sendSMS(userPhone, message);
   return result.success;
+}
+
+/**
+ * Get health status of the SMS Polling Worker
+ */
+export function getSMSWorkerHealth() {
+  const uptime = workerStartTime
+    ? Date.now() - workerStartTime.getTime()
+    : null;
+  const avgPollDuration = pollCount > 0 ? (uptime ? uptime / pollCount : 0) : 0;
+
+  return {
+    status: workerStartTime ? 'running' : 'not_started',
+    startTime: workerStartTime?.toISOString() || null,
+    uptime: uptime ? `${Math.floor(uptime / 1000)}s` : null,
+    pollCount,
+    errorCount,
+    messagesProcessed,
+    lastPollTime: lastPollTime?.toISOString() || null,
+    lastError,
+    avgPollDuration: `${Math.round(avgPollDuration)}ms`,
+    pollInterval: `${FETCH_INTERVAL}ms`,
+    isHealthy: errorCount < pollCount * 0.1, // Healthy if error rate < 10%
+  };
 }
 
 export {

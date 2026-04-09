@@ -12,6 +12,7 @@ import {
   newServiceProviderSchema,
   organization,
   serviceProvider,
+  user,
 } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
@@ -46,7 +47,6 @@ const registerOrganization = asyncHandler(
       throw new ApiError(400, 'Organization already exists');
     }
 
-    console.log('RAW PASSWORD:', parsedValues.data.password);
     const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
     const newOrganization = await db
       .insert(organization)
@@ -61,8 +61,6 @@ const registerOrganization = asyncHandler(
     if (!newOrganization) {
       throw new ApiError(500, 'Error creating organization');
     }
-
-    console.log('HASHED PASSWORD:', hashedPassword);
 
     res.status(201).json(
       new ApiResponse(201, 'Organization created', {
@@ -916,7 +914,7 @@ const getOrgDashboardAnalytics = asyncHandler(
       requestsThisMonth,
       pendingRequests,
       completedRequests,
-      recentEmergencyRequests,
+      recentEmergencyRequestsRaw,
     ] = await Promise.all([
       // Total emergency requests for this service type
       db
@@ -953,7 +951,7 @@ const getOrgDashboardAnalytics = asyncHandler(
             eq(emergencyRequest.requestStatus, 'completed')
           )
         ),
-      // Recent emergency requests (last 10)
+      // Recent emergency requests (last 10) - will be enriched below
       db
         .select({
           id: emergencyRequest.id,
@@ -962,12 +960,70 @@ const getOrgDashboardAnalytics = asyncHandler(
           description: emergencyRequest.description,
           location: emergencyRequest.location,
           createdAt: emergencyRequest.createdAt,
+          userId: emergencyRequest.userId,
         })
         .from(emergencyRequest)
         .where(eq(emergencyRequest.serviceType, org.serviceCategory))
         .orderBy(desc(emergencyRequest.createdAt))
         .limit(10),
     ]);
+
+    // Enrich emergency requests with user and provider data
+    const recentEmergencyRequests = await Promise.all(
+      recentEmergencyRequestsRaw.map(async request => {
+        // Get requester (user) info
+        const requesterData = await db.query.user.findFirst({
+          where: eq(user.id, request.userId),
+          columns: {
+            id: true,
+            name: true,
+            phoneNumber: true,
+          },
+        });
+
+        // Get provider info if request is assigned/completed
+        let providerData = null;
+        if (
+          request.requestStatus === 'assigned' ||
+          request.requestStatus === 'completed' ||
+          request.requestStatus === 'in_progress'
+        ) {
+          const emergencyResp = await db.query.emergencyResponse.findFirst({
+            where: eq(emergencyResponse.emergencyRequestId, request.id),
+          });
+
+          if (emergencyResp) {
+            const provider = await db.query.serviceProvider.findFirst({
+              where: eq(serviceProvider.id, emergencyResp.serviceProviderId),
+              columns: {
+                id: true,
+                name: true,
+                phoneNumber: true,
+              },
+            });
+            providerData = provider;
+          }
+        }
+
+        return {
+          ...request,
+          requester: requesterData
+            ? {
+                id: requesterData.id,
+                name: requesterData.name,
+                phoneNumber: requesterData.phoneNumber?.toString(),
+              }
+            : undefined,
+          provider: providerData
+            ? {
+                id: providerData.id,
+                name: providerData.name,
+                phoneNumber: providerData.phoneNumber?.toString(),
+              }
+            : undefined,
+        };
+      })
+    );
 
     // Calculate provider availability percentage
     const totalProvidersCount = totalProviders[0]?.count ?? 0;
@@ -1046,6 +1102,7 @@ export {
   updateOrgProfile,
   loginOrganization,
   listOrganizationsPublic,
+
   // Service Provider Management
   getOrgServiceProviders,
   getOrgServiceProviderById,
@@ -1053,6 +1110,7 @@ export {
   updateOrgServiceProvider,
   deleteOrgServiceProvider,
   verifyOrgServiceProvider,
+
   // Dashboard Analytics
   getOrgDashboardAnalytics,
 };

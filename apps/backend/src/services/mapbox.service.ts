@@ -1,5 +1,6 @@
 import { envConfig, logger } from '@/config';
 import { RoutingProfiles } from '@/constants/mapbox.constants';
+import { cacheRoute, getCachedRoute } from '@/services/redis.service';
 import type { RouteResponse, RouteResult } from '@/types/maps.types';
 import { constructDirectionUrl } from '@/utils/maps/mapbox';
 import type { Coordinates } from '@/validations/maps.validations';
@@ -10,6 +11,23 @@ export async function getRouteFromMapbox(
   profile: RoutingProfiles = RoutingProfiles.DrivingTraffic
 ): Promise<RouteResult> {
   try {
+    // Check cache first
+    const cachedRoute = await getCachedRoute(
+      origin.lat,
+      origin.lng,
+      destination.lat,
+      destination.lng,
+      profile
+    );
+
+    if (cachedRoute) {
+      console.log('[ROUTE_CACHE] Using cached route instead of API call');
+      return {
+        success: true,
+        route: cachedRoute,
+      };
+    }
+
     const url = constructDirectionUrl({
       profile,
       token: envConfig.mapbox_token,
@@ -44,18 +62,30 @@ export async function getRouteFromMapbox(
       };
     }
 
+    const processedRoute = {
+      coordinates: route.geometry.coordinates,
+      distance: Math.round((route.distance / 1000) * 100) / 100, // to km
+      duration: Math.round(route.duration / 60), //  to minutes
+      steps: route.legs[0]?.steps.map(step => ({
+        instruction: step.maneuver.instruction,
+        distance: Math.round(step.distance),
+        duration: Math.round(step.duration),
+      })),
+    };
+
+    // Cache the route for future use
+    await cacheRoute(
+      origin.lat,
+      origin.lng,
+      destination.lat,
+      destination.lng,
+      profile,
+      processedRoute
+    );
+
     return {
       success: true,
-      route: {
-        coordinates: route.geometry.coordinates,
-        distance: Math.round((route.distance / 1000) * 100) / 100, // to km
-        duration: Math.round(route.duration / 60), //  to minutes
-        steps: route.legs[0]?.steps.map(step => ({
-          instruction: step.maneuver.instruction,
-          distance: Math.round(step.distance),
-          duration: Math.round(step.duration),
-        })),
-      },
+      route: processedRoute,
     };
   } catch (error) {
     console.error('Error fetching route from Mapbox:', error);
@@ -97,11 +127,12 @@ export async function getBatchETAs(
       return origins.map(() => null);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { durations?: number[][] | null };
 
     // Extract durations (in seconds) and convert to minutes
-    return data.durations.map((row: number[]) =>
-      row[0] !== null ? Math.round(row[0] / 60) : null
+    const durations = data.durations || [];
+    return durations.map((row: number[]) =>
+      (row?.[0] ?? null) !== null ? Math.round((row[0] as number) / 60) : null
     );
   } catch (error) {
     logger.error('Error fetching batch ETAs:', error);
