@@ -13,8 +13,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { type z } from 'zod';
 
-import { serviceTypeEnum } from '../constants';
-import { serviceProvider } from './service-provider.model';
+import { serviceTypeEnum } from '.';
 import { user } from './user.model';
 
 export const requestStatusEnum = pgEnum('request_status', [

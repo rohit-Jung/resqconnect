@@ -16,7 +16,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
-import { ServiceTypeEnum, serviceTypeEnum } from '../constants';
+import { serviceTypeEnum } from '.';
 import { organization } from './organization.model';
 
 const geometry = customType<{ data: string }>({
@@ -37,8 +37,6 @@ export const documentStatusEnum = pgEnum('document_status', [
   'approved',
   'rejected',
 ]);
-
-export { ServiceTypeEnum };
 
 export const serviceProvider = pgTable(
   'service_provider',
@@ -131,16 +129,21 @@ export const serviceProviderRelations = relations(
 );
 
 export const serviceProviderSchema = createSelectSchema(serviceProvider);
-export const newServiceProviderSchema = serviceProviderSchema.pick({
-  name: true,
-  age: true,
-  email: true,
-  phoneNumber: true,
-  primaryAddress: true,
-  password: true,
-  serviceType: true,
-  organizationId: true,
-});
+export const newServiceProviderSchema = serviceProviderSchema
+  .pick({
+    name: true,
+    age: true,
+    email: true,
+    phoneNumber: true,
+    primaryAddress: true,
+    password: true,
+    serviceType: true,
+    organizationId: true,
+  })
+  .extend({
+    panCardUrl: z.string().url('Invalid PAN card URL').optional(),
+    citizenshipUrl: z.string().url('Invalid citizenship URL').optional(),
+  });
 
 export const loginServiceProviderSchema = createInsertSchema(
   serviceProvider

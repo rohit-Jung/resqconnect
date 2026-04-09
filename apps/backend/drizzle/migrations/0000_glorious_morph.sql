@@ -1,6 +1,7 @@
-CREATECREATE EXTENSION IF NOT EXISTS postgis;
-TYPE "public"."request_status" AS ENUM('pending', 'accepted', 'assigned', 'rejected', 'in_progress', 'completed', 'cancelled', 'no_providers_available');--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE TYPE "public"."request_status" AS ENUM('pending', 'accepted', 'assigned', 'rejected', 'in_progress', 'completed', 'cancelled', 'no_providers_available');--> statement-breakpoint
 CREATE TYPE "public"."status_update" AS ENUM('accepted', 'arrived', 'on_route', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."service_type" AS ENUM('ambulance', 'police', 'rescue_team', 'fire_truck');--> statement-breakpoint
 CREATE TYPE "public"."document_status" AS ENUM('not_submitted', 'pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."service_status" AS ENUM('available', 'assigned', 'off_duty');--> statement-breakpoint
 CREATE TYPE "public"."role" AS ENUM('user', 'admin');--> statement-breakpoint
