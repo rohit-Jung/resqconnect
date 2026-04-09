@@ -6,6 +6,7 @@ import { envConfig } from '@/config';
 import '@/services/kafka/kafka.service';
 
 import { app } from './app';
+import { registerSmsWebhook } from './services/sms.service';
 import { initializeSocketServer } from './socket';
 import { startAllWorkers } from './workers/background.worker';
 import { startSMSPollingWorker } from './workers/messaging.worker';
@@ -29,7 +30,9 @@ function startServer() {
     startAllWorkers();
 
     // Start SMS polling worker for offline emergency requests
-    startSMSPollingWorker().catch(console.log);
+    // startSMSPollingWorker().catch(console.log);
+
+    registerSmsWebhook().catch(console.log);
   } catch (error) {
     console.log('Error starting server', error);
   }
