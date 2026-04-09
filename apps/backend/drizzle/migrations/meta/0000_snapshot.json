@@ -1,5 +1,5 @@
 {
-  "id": "af1f61fa-7414-4370-b2ea-bd974b850f0d",
+  "id": "c3b10942-a64f-416c-b9f9-c29733d09505",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1574,6 +1574,16 @@
         "arrived",
         "on_route",
         "rejected"
+      ]
+    },
+    "public.service_type": {
+      "name": "service_type",
+      "schema": "public",
+      "values": [
+        "ambulance",
+        "police",
+        "rescue_team",
+        "fire_truck"
       ]
     },
     "public.document_status": {
