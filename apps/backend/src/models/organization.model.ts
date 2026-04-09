@@ -11,7 +11,7 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { type z } from 'zod';
 
-import { serviceTypeEnum } from '../constants';
+import { serviceTypeEnum } from '.';
 import { serviceProvider } from './service-provider.model';
 
 export const orgStatusEnum = pgEnum('org_status', [

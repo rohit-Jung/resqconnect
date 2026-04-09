@@ -1,3 +1,4 @@
+export * from './enums.model';
 export * from './service-provider.model';
 export * from './emergency-request.model';
 export * from './user.model';
