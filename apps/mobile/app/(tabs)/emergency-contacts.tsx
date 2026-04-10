@@ -6,9 +6,14 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -16,13 +21,20 @@ import {
   View,
 } from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
 import {
   CreateEmergencyContactData,
   EmergencyContact,
   UpdateEmergencyContactData,
   emergencyContactsApi,
 } from '@/services/emergency-contacts/emergency-contacts.api';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
+const SUCCESS_GREEN = '#10B981';
 
 const RELATIONSHIPS = [
   'Parent',
@@ -36,9 +48,9 @@ const RELATIONSHIPS = [
 ];
 
 const NOTIFICATION_METHODS = [
-  { value: 'sms', label: 'SMS Only' },
-  { value: 'push', label: 'App Notification' },
-  { value: 'both', label: 'Both' },
+  { value: 'sms', label: 'SMS' },
+  { value: 'push', label: 'APP' },
+  { value: 'both', label: 'BOTH' },
 ];
 
 export default function EmergencyContactsScreen() {
@@ -57,7 +69,6 @@ export default function EmergencyContactsScreen() {
     notificationMethod: 'sms',
   });
 
-  // Fetch emergency contacts
   const {
     data: contacts,
     isLoading,
@@ -68,7 +79,6 @@ export default function EmergencyContactsScreen() {
     queryFn: emergencyContactsApi.getAll,
   });
 
-  // Create contact mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateEmergencyContactData) =>
       emergencyContactsApi.create(data),
@@ -86,7 +96,6 @@ export default function EmergencyContactsScreen() {
     },
   });
 
-  // Update contact mutation
   const updateMutation = useMutation({
     mutationFn: ({
       id,
@@ -110,7 +119,6 @@ export default function EmergencyContactsScreen() {
     },
   });
 
-  // Delete contact mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => emergencyContactsApi.delete(id),
     onSuccess: () => {
@@ -125,7 +133,6 @@ export default function EmergencyContactsScreen() {
     },
   });
 
-  // Toggle notification mutation
   const toggleNotificationMutation = useMutation({
     mutationFn: (id: string) => emergencyContactsApi.toggleNotification(id),
     onSuccess: () => {
@@ -203,88 +210,63 @@ export default function EmergencyContactsScreen() {
   };
 
   const renderContactCard = (contact: EmergencyContact) => (
-    <View
-      key={contact.id}
-      className="mb-4 rounded-2xl bg-white p-4 shadow-sm"
-      style={{ elevation: 2 }}
-    >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text
-            className="text-lg font-semibold text-gray-800"
-            style={{ fontFamily: 'Inter' }}
-          >
-            {contact.name}
+    <View key={contact.id} style={styles.contactCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.avatarContainer}>
+          <Text style={styles.avatarText}>
+            {contact.name.charAt(0).toUpperCase()}
           </Text>
-          <Text
-            className="text-sm text-gray-500"
-            style={{ fontFamily: 'Inter' }}
-          >
-            {contact.relationship}
-          </Text>
-          <Text
-            className="mt-1 text-sm text-gray-600"
-            style={{ fontFamily: 'Inter' }}
-          >
-            📞 {contact.phoneNumber}
-          </Text>
-          {contact.email && (
-            <Text
-              className="text-sm text-gray-600"
-              style={{ fontFamily: 'Inter' }}
-            >
-              ✉️ {contact.email}
-            </Text>
-          )}
         </View>
-        <View className="items-end">
-          <View className="flex-row items-center">
-            <Text
-              className="mr-2 text-xs text-gray-500"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Notify
-            </Text>
-            <Switch
-              value={contact.notifyOnEmergency}
-              onValueChange={() => handleToggleNotification(contact)}
-              trackColor={{ false: '#ccc', true: '#22c55e' }}
-              thumbColor="#fff"
-            />
-          </View>
-          <Text
-            className="mt-1 text-xs text-gray-400"
-            style={{ fontFamily: 'Inter' }}
-          >
-            via {contact.notificationMethod}
-          </Text>
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{contact.name.toUpperCase()}</Text>
+          <Text style={styles.contactRelation}>{contact.relationship}</Text>
         </View>
       </View>
 
-      <View className="mt-3 flex-row justify-end border-t border-gray-100 pt-3">
+      <View style={styles.cardDetails}>
+        <View style={styles.detailRow}>
+          <Ionicons name="call-outline" size={14} color={MID_GRAY} />
+          <Text style={styles.detailText}>{contact.phoneNumber}</Text>
+        </View>
+        {contact.email && (
+          <View style={styles.detailRow}>
+            <Ionicons name="mail-outline" size={14} color={MID_GRAY} />
+            <Text style={styles.detailText}>{contact.email}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.cardFooter}>
+        <View style={styles.notifyRow}>
+          <Text style={styles.notifyLabel}>NOTIFY</Text>
+          <Switch
+            value={contact.notifyOnEmergency}
+            onValueChange={() => handleToggleNotification(contact)}
+            trackColor={{ false: LIGHT_GRAY, true: SUCCESS_GREEN }}
+            thumbColor={OFF_WHITE}
+          />
+        </View>
+        <Text style={styles.methodText}>
+          VIA: {contact.notificationMethod.toUpperCase()}
+        </Text>
+      </View>
+
+      <View style={styles.cardActions}>
         <TouchableOpacity
+          style={styles.actionButton}
           onPress={() => openEditModal(contact)}
-          className="mr-4 flex-row items-center"
+          activeOpacity={0.7}
         >
-          <Ionicons name="pencil-outline" size={18} color="#3b82f6" />
-          <Text
-            className="ml-1 text-sm text-blue-500"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Edit
-          </Text>
+          <Ionicons name="pencil-outline" size={16} color={PRIMARY} />
+          <Text style={styles.actionText}>EDIT</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDelete(contact)}
-          className="flex-row items-center"
+          activeOpacity={0.7}
         >
-          <Ionicons name="trash-outline" size={18} color="#ef4444" />
-          <Text
-            className="ml-1 text-sm text-red-500"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Delete
-          </Text>
+          <Ionicons name="trash-outline" size={16} color={SIGNAL_RED} />
+          <Text style={[styles.actionText, styles.deleteText]}>DELETE</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -297,285 +279,609 @@ export default function EmergencyContactsScreen() {
       transparent={true}
       onRequestClose={() => setIsModalVisible(false)}
     >
-      <View className="flex-1 justify-end bg-black/50">
-        <View className="rounded-t-3xl bg-white p-6">
-          <View className="mb-4 flex-row items-center justify-between">
-            <Text
-              className="text-xl text-gray-800"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              {editingContact ? 'Edit Contact' : 'Add Emergency Contact'}
-            </Text>
-            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Name */}
-            <View className="mb-4">
-              <Text
-                className="mb-1 text-sm font-medium text-gray-700"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Name *
+      <Pressable
+        style={styles.modalOverlay}
+        onPress={() => setIsModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingContact ? 'EDIT CONTACT' : 'ADD CONTACT'}
               </Text>
-              <TextInput
-                className="rounded-xl border border-gray-300 px-4 py-3"
-                placeholder="Enter name"
-                value={formData.name}
-                onChangeText={text => setFormData({ ...formData, name: text })}
-                style={{ fontFamily: 'Inter' }}
-              />
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={MID_GRAY} />
+              </TouchableOpacity>
             </View>
 
-            {/* Phone Number */}
-            <View className="mb-4">
-              <Text
-                className="mb-1 text-sm font-medium text-gray-700"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Phone Number *
-              </Text>
-              <TextInput
-                className="rounded-xl border border-gray-300 px-4 py-3"
-                placeholder="Enter phone number"
-                value={formData.phoneNumber}
-                onChangeText={text =>
-                  setFormData({ ...formData, phoneNumber: text })
-                }
-                keyboardType="phone-pad"
-                style={{ fontFamily: 'Inter' }}
-              />
-            </View>
-
-            {/* Email */}
-            <View className="mb-4">
-              <Text
-                className="mb-1 text-sm font-medium text-gray-700"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Email (Optional)
-              </Text>
-              <TextInput
-                className="rounded-xl border border-gray-300 px-4 py-3"
-                placeholder="Enter email"
-                value={formData.email}
-                onChangeText={text => setFormData({ ...formData, email: text })}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={{ fontFamily: 'Inter' }}
-              />
-            </View>
-
-            {/* Relationship */}
-            <View className="mb-4">
-              <Text
-                className="mb-1 text-sm font-medium text-gray-700"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Relationship *
-              </Text>
-              <View className="flex-row flex-wrap">
-                {RELATIONSHIPS.map(rel => (
-                  <TouchableOpacity
-                    key={rel}
-                    onPress={() =>
-                      setFormData({ ...formData, relationship: rel })
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>NAME *</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons
+                    name="person-outline"
+                    size={16}
+                    color={MID_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter name"
+                    placeholderTextColor={MID_GRAY}
+                    value={formData.name}
+                    onChangeText={text =>
+                      setFormData({ ...formData, name: text })
                     }
-                    className={`mb-2 mr-2 rounded-full px-4 py-2 ${
-                      formData.relationship === rel
-                        ? 'bg-primary'
-                        : 'bg-gray-100'
-                    }`}
-                  >
-                    <Text
-                      className={`text-sm ${
-                        formData.relationship === rel
-                          ? 'text-white'
-                          : 'text-gray-700'
-                      }`}
-                      style={{ fontFamily: 'Inter' }}
-                    >
-                      {rel}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                  />
+                </View>
               </View>
-            </View>
 
-            {/* Notify on Emergency */}
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text
-                className="text-sm font-medium text-gray-700"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Notify on Emergency
-              </Text>
-              <Switch
-                value={formData.notifyOnEmergency}
-                onValueChange={value =>
-                  setFormData({ ...formData, notifyOnEmergency: value })
-                }
-                trackColor={{ false: '#ccc', true: '#22c55e' }}
-                thumbColor="#fff"
-              />
-            </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>PHONE NUMBER *</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons
+                    name="call-outline"
+                    size={16}
+                    color={MID_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter phone number"
+                    placeholderTextColor={MID_GRAY}
+                    keyboardType="phone-pad"
+                    value={formData.phoneNumber}
+                    onChangeText={text =>
+                      setFormData({ ...formData, phoneNumber: text })
+                    }
+                  />
+                </View>
+              </View>
 
-            {/* Notification Method */}
-            {formData.notifyOnEmergency && (
-              <View className="mb-4">
-                <Text
-                  className="mb-2 text-sm font-medium text-gray-700"
-                  style={{ fontFamily: 'Inter' }}
-                >
-                  Notification Method
-                </Text>
-                <View className="flex-row">
-                  {NOTIFICATION_METHODS.map(method => (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>EMAIL (OPTIONAL)</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={16}
+                    color={MID_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter email"
+                    placeholderTextColor={MID_GRAY}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={formData.email}
+                    onChangeText={text =>
+                      setFormData({ ...formData, email: text })
+                    }
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>RELATIONSHIP *</Text>
+                <View style={styles.relationshipGrid}>
+                  {RELATIONSHIPS.map(rel => (
                     <TouchableOpacity
-                      key={method.value}
+                      key={rel}
+                      style={[
+                        styles.relationshipChip,
+                        formData.relationship === rel &&
+                          styles.relationshipChipActive,
+                      ]}
                       onPress={() =>
-                        setFormData({
-                          ...formData,
-                          notificationMethod: method.value as
-                            | 'sms'
-                            | 'push'
-                            | 'both',
-                        })
+                        setFormData({ ...formData, relationship: rel })
                       }
-                      className={`mr-2 flex-1 rounded-xl py-3 ${
-                        formData.notificationMethod === method.value
-                          ? 'bg-primary'
-                          : 'bg-gray-100'
-                      }`}
+                      activeOpacity={0.7}
                     >
                       <Text
-                        className={`text-center text-sm ${
-                          formData.notificationMethod === method.value
-                            ? 'text-white'
-                            : 'text-gray-700'
-                        }`}
-                        style={{ fontFamily: 'Inter' }}
+                        style={[
+                          styles.relationshipText,
+                          formData.relationship === rel &&
+                            styles.relationshipTextActive,
+                        ]}
                       >
-                        {method.label}
+                        {rel.toUpperCase()}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
-            )}
 
-            {/* Submit Button */}
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="mt-4 rounded-xl bg-primary py-4"
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text
-                  className="text-center text-lg text-white"
-                  style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-                >
-                  {editingContact ? 'Update Contact' : 'Add Contact'}
-                </Text>
+              <View style={styles.formGroup}>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.formLabel}>NOTIFY ON EMERGENCY</Text>
+                  <Switch
+                    value={formData.notifyOnEmergency}
+                    onValueChange={value =>
+                      setFormData({ ...formData, notifyOnEmergency: value })
+                    }
+                    trackColor={{ false: LIGHT_GRAY, true: PRIMARY }}
+                    thumbColor={OFF_WHITE}
+                  />
+                </View>
+              </View>
+
+              {formData.notifyOnEmergency && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>NOTIFICATION METHOD</Text>
+                  <View style={styles.methodGrid}>
+                    {NOTIFICATION_METHODS.map(method => (
+                      <TouchableOpacity
+                        key={method.value}
+                        style={[
+                          styles.methodOption,
+                          formData.notificationMethod === method.value &&
+                            styles.methodOptionActive,
+                        ]}
+                        onPress={() =>
+                          setFormData({
+                            ...formData,
+                            notificationMethod: method.value as
+                              | 'sms'
+                              | 'push'
+                              | 'both',
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.methodOptionText,
+                            formData.notificationMethod === method.value &&
+                              styles.methodOptionTextActive,
+                          ]}
+                        >
+                          {method.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
               )}
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
+
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSubmit}
+                disabled={createMutation.isPending || updateMutation.isPending}
+                activeOpacity={0.8}
+              >
+                {createMutation.isPending || updateMutation.isPending ? (
+                  <ActivityIndicator color={OFF_WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>
+                    {editingContact ? 'UPDATE CONTACT' : 'ADD CONTACT'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
     </Modal>
   );
 
   return (
-    <SafeAreaContainer>
-      <View className="flex-1 bg-gray-50">
-        {/* Header */}
-        <View className="flex-row items-center justify-between bg-primary px-6 pb-4 pt-2">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => router.back()} className="mr-3">
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text
-              className="text-2xl text-white"
-              style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
-            >
-              Emergency Contacts
-            </Text>
+    <View style={styles.container}>
+      {/* Header - Swiss style */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={openAddModal}
+          style={styles.addButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={24} color={OFF_WHITE} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandMark}>RESQ</Text>
+            <Text style={styles.brandDot}>.</Text>
           </View>
-          <TouchableOpacity
-            onPress={openAddModal}
-            className="rounded-full bg-white/20 p-2"
-          >
-            <Ionicons name="add" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.headerLine} />
+          <Text style={styles.tagline}>EMERGENCY CONTACTS</Text>
         </View>
+      </View>
 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            colors={[PRIMARY]}
+            tintColor={PRIMARY}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         {/* Info Banner */}
-        <View className="mx-4 mt-4 rounded-xl bg-blue-50 p-4">
-          <View className="flex-row items-start">
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color="#3b82f6"
-            />
-            <Text
-              className="ml-2 flex-1 text-sm text-blue-700"
-              style={{ fontFamily: 'Inter' }}
-            >
-              Your emergency contacts will be notified when you request
-              emergency assistance. You can toggle notifications for each
-              contact individually.
-            </Text>
-          </View>
+        <View style={styles.infoBanner}>
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            color={PRIMARY}
+          />
+          <Text style={styles.infoText}>
+            Your emergency contacts will be notified when you request emergency
+            assistance.
+          </Text>
         </View>
 
         {/* Contact List */}
-        <ScrollView
-          className="flex-1 px-4 pt-4"
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          {isLoading ? (
-            <View className="items-center justify-center py-8">
-              <ActivityIndicator size="large" color="#E63946" />
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+          </View>
+        ) : contacts && contacts.length > 0 ? (
+          contacts.map(renderContactCard)
+        ) : (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="people-outline" size={64} color={LIGHT_GRAY} />
             </View>
-          ) : contacts && contacts.length > 0 ? (
-            contacts.map(renderContactCard)
-          ) : (
-            <View className="items-center justify-center py-12">
-              <Ionicons name="people-outline" size={64} color="#d1d5db" />
-              <Text
-                className="mt-4 text-center text-lg text-gray-400"
-                style={{ fontFamily: 'Inter' }}
-              >
-                No emergency contacts yet
-              </Text>
-              <Text
-                className="mt-1 text-center text-sm text-gray-400"
-                style={{ fontFamily: 'Inter' }}
-              >
-                Add contacts who should be notified in emergencies
-              </Text>
-              <TouchableOpacity
-                onPress={openAddModal}
-                className="mt-4 rounded-xl bg-primary px-6 py-3"
-              >
-                <Text className="text-white" style={{ fontFamily: 'Inter' }}>
-                  Add Your First Contact
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          <View className="h-8" />
-        </ScrollView>
+            <Text style={styles.emptyTitle}>NO CONTACTS YET</Text>
+            <Text style={styles.emptyDescription}>
+              Add contacts who should be notified in emergencies
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={openAddModal}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyButtonText}>ADD FIRST CONTACT</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
 
-        {renderModal()}
-      </View>
-    </SafeAreaContainer>
+      {renderModal()}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  header: {
+    backgroundColor: OFF_WHITE,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  brandMark: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 4,
+  },
+  brandDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: SIGNAL_RED,
+    lineHeight: 34,
+  },
+  headerLine: {
+    width: 48,
+    height: 2,
+    backgroundColor: SIGNAL_RED,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: MID_GRAY,
+    letterSpacing: 2,
+  },
+  addButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    padding: 8,
+    backgroundColor: SIGNAL_RED,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 24,
+    paddingHorizontal: 24,
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#DBEAFE',
+    padding: 16,
+    marginBottom: 24,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 11,
+    color: PRIMARY,
+    letterSpacing: 0.5,
+    lineHeight: 16,
+    marginLeft: 10,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  contactCard: {
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    padding: 16,
+    marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: OFF_WHITE,
+    letterSpacing: 1,
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  contactRelation: {
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 0.5,
+  },
+  cardDetails: {
+    paddingLeft: 60,
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailText: {
+    fontSize: 12,
+    color: MID_GRAY,
+    marginLeft: 8,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: LIGHT_GRAY,
+    padding: 12,
+    marginBottom: 12,
+  },
+  notifyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notifyLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+    marginRight: 8,
+  },
+  methodText: {
+    fontSize: 9,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: PRIMARY,
+  },
+  deleteButton: {
+    borderColor: SIGNAL_RED,
+  },
+  actionText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: PRIMARY,
+    letterSpacing: 1,
+    marginLeft: 4,
+  },
+  deleteText: {
+    color: SIGNAL_RED,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 12,
+    color: MID_GRAY,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  emptyButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+  },
+  bottomSpacer: {
+    height: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalKeyboard: {
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: OFF_WHITE,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    padding: 24,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: PRIMARY,
+    letterSpacing: 2,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: PRIMARY,
+    paddingVertical: 12,
+  },
+  relationshipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+  },
+  relationshipChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    margin: 4,
+  },
+  relationshipChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  relationshipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  relationshipTextActive: {
+    color: OFF_WHITE,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  methodGrid: {
+    flexDirection: 'row',
+  },
+  methodOption: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    marginRight: 8,
+  },
+  methodOptionActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  methodOptionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  methodOptionTextActive: {
+    color: OFF_WHITE,
+  },
+  submitButton: {
+    backgroundColor: PRIMARY,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  submitButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 2,
+  },
+});

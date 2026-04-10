@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Server, Socket } from 'socket.io';
 
+import { logger } from '@/config/logger/winston.config';
 import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
@@ -71,6 +72,28 @@ export function registerEmergencyHandlers(
       await handleLocationUpdate(io, socket, data);
     }
   );
+
+  // Handle arrival confirmation
+  socket.on(
+    SocketEvents.CONFIRM_ARRIVAL,
+    async (
+      data: { requestId: string; role: 'user' | 'provider' },
+      callback?: (ack?: any) => void
+    ) => {
+      await handleConfirmArrival(io, socket, data, callback);
+    }
+  );
+
+  // Handle cancel request
+  socket.on(
+    SocketEvents.CANCEL_REQUEST_SOCKET,
+    async (
+      data: { requestId: string; role: 'user' | 'provider' },
+      callback?: (ack?: any) => void
+    ) => {
+      await handleCancelRequestSocket(io, socket, data, callback);
+    }
+  );
 }
 
 async function handleAcceptRequest(
@@ -81,17 +104,15 @@ async function handleAcceptRequest(
   const { requestId, providerId } = data;
 
   try {
-    console.log(
-      `🤝 Provider ${providerId} attempting to accept request ${requestId}`
+    logger.info(
+      `[ACCEPT_ATTEMPT] Provider ${providerId} attempting to accept request ${requestId}`
     );
 
-    // 1. Try to acquire Redis distributed lock
     const acquired = await acquireLock(requestId, providerId);
 
-    // 2. If lock NOT acquired, someone else got it first
     if (!acquired) {
-      console.log(
-        `❌ Provider ${providerId} lost race for request ${requestId}`
+      logger.debug(
+        `[LOST_RACE] Provider ${providerId} lost race for request ${requestId}`
       );
 
       socket.emit(SocketEvents.REQUEST_ALREADY_TAKEN, {
@@ -124,10 +145,9 @@ async function handleAcceptRequest(
         location: emergencyRequest.location,
       });
 
-    // 4. If UPDATE returned 0 rows, request was already taken
     if (result.length === 0) {
-      console.log(
-        `❌ Request ${requestId} already accepted by someone else (DB check)`
+      logger.debug(
+        `Request ${requestId} already accepted by someone else (DB check)`
       );
 
       // Release lock
@@ -140,11 +160,10 @@ async function handleAcceptRequest(
       return;
     }
 
-    // 5. SUCCESS! This provider got it
     const request = result[0];
 
     if (!request) {
-      console.log(`❌ Request ${requestId} not found after update`);
+      logger.error(`[ERROR] Request ${requestId} not found after update`);
       await releaseLock(requestId);
       socket.emit(SocketEvents.ACCEPT_FAILED, {
         requestId,
@@ -153,16 +172,34 @@ async function handleAcceptRequest(
       return;
     }
 
-    console.log(
-      `✅ Provider ${providerId} successfully accepted request ${requestId}`
+    logger.info(
+      `[ACCEPT_SUCCESS] Provider ${providerId} successfully accepted request ${requestId}`
     );
 
-    // Log event
     await db.insert(requestEvents).values({
       requestId,
       eventType: 'accepted',
       providerId,
       metadata: { acceptedAt: new Date().toISOString() },
+    });
+
+    // Create emergency response record
+    const providerData = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.id, providerId),
+    });
+
+    await db.insert(emergencyResponse).values({
+      emergencyRequestId: requestId,
+      serviceProviderId: providerId,
+      originLocation: {
+        latitude: providerData?.currentLocation?.latitude || '0',
+        longitude: providerData?.currentLocation?.longitude || '0',
+      },
+      destinationLocation: {
+        latitude: request.location?.latitude.toString() || '0',
+        longitude: request.location?.longitude.toString() || '0',
+      },
+      assignedAt: new Date(),
     });
 
     // Get list of providers who received this request
@@ -217,8 +254,8 @@ async function handleAcceptRequest(
 
         if (routeResult.success && routeResult.route) {
           routeData = routeResult.route;
-          console.log(
-            `🗺️ Route calculated: ${routeData.distance}km, ${routeData.duration}min`
+          logger.debug(
+            `Route calculated: ${routeData.distance}km, ${routeData.duration}min`
           );
         }
       }
@@ -258,10 +295,7 @@ async function handleAcceptRequest(
       await releaseLock(requestId);
     }, 2000);
   } catch (error) {
-    console.error(
-      `❌ Error handling accept from provider ${providerId}:`,
-      error
-    );
+    logger.error(`Error handling accept from provider ${providerId}:`, error);
 
     socket.emit(SocketEvents.ACCEPT_FAILED, {
       requestId,
@@ -281,9 +315,10 @@ async function handleRejectRequest(
   const { requestId, providerId } = data;
 
   try {
-    console.log(`❌ Provider ${providerId} rejected request ${requestId}`);
+    logger.error(
+      `[ERROR] Provider ${providerId} rejected request ${requestId}`
+    );
 
-    // Log event
     await db.insert(requestEvents).values({
       requestId,
       eventType: 'rejected',
@@ -297,8 +332,8 @@ async function handleRejectRequest(
       message: 'Request rejected.',
     });
   } catch (error) {
-    console.error(
-      `❌ Error handling reject from provider ${providerId}:`,
+    logger.error(
+      `[ERROR] Error handling reject from provider ${providerId}:`,
       error
     );
   }
@@ -315,9 +350,10 @@ async function handleProviderConnect(
   const { requestId, providerId } = data;
 
   try {
-    console.log(`🔌 Provider ${providerId} connecting to request ${requestId}`);
+    logger.info(
+      `[CONNECTED] Provider ${providerId} connecting to request ${requestId}`
+    );
 
-    // 1. Verify this provider is assigned to this request via emergencyResponse
     const response = await db
       .select({
         id: emergencyResponse.id,
@@ -346,10 +382,9 @@ async function handleProviderConnect(
       .where(eq(emergencyRequest.id, requestId))
       .limit(1);
 
-    // 2. If not found, reject connection
     if (response.length === 0 || request.length === 0) {
-      console.log(
-        `❌ Provider ${providerId} not assigned to request ${requestId}`
+      logger.error(
+        `[ERROR] Provider ${providerId} not assigned to request ${requestId}`
       );
 
       socket.emit(SocketEvents.CONNECTION_REJECTED, {
@@ -370,7 +405,6 @@ async function handleProviderConnect(
       return;
     }
 
-    // 3. Update DB - mark as connected
     await db
       .update(emergencyRequest)
       .set({
@@ -379,12 +413,10 @@ async function handleProviderConnect(
       })
       .where(eq(emergencyRequest.id, requestId));
 
-    // 4. Join provider to room
     const roomName = SocketRoom.EMERGENCY(requestId);
     socket.join(roomName);
-    console.log(`🏠 Provider ${providerId} joined room ${roomName}`);
+    logger.debug(`[ROOM] Provider ${providerId} joined room ${roomName}`);
 
-    // Log event
     await db.insert(requestEvents).values({
       requestId,
       eventType: 'provider-connected',
@@ -392,7 +424,6 @@ async function handleProviderConnect(
       metadata: { connectedAt: new Date().toISOString() },
     });
 
-    // 5. Initialize Redis location cache for this provider
     await cacheProviderLocation(providerId, {
       lat: 0,
       lng: 0,
@@ -414,12 +445,12 @@ async function handleProviderConnect(
       roomId: roomName,
     });
 
-    console.log(
-      `✅ Provider ${providerId} successfully connected to request ${requestId}`
+    logger.debug(
+      `[SUCCESS] Provider ${providerId} successfully connected to request ${requestId}`
     );
   } catch (error) {
-    console.error(
-      `❌ Error connecting provider ${providerId} to request ${requestId}:`,
+    logger.error(
+      `[ERROR] Error connecting provider ${providerId} to request ${requestId}:`,
       error
     );
 
@@ -468,7 +499,7 @@ async function handleUserJoinRoom(
     // Join user to room
     const roomName = SocketRoom.EMERGENCY(requestId);
     socket.join(roomName);
-    console.log(`👤 User ${userId} joined room ${roomName}`);
+    logger.info(`[USER] User ${userId} joined room ${roomName}`);
 
     // Get assigned provider from emergency response table
     const response = await db
@@ -521,7 +552,7 @@ async function handleUserJoinRoom(
       status: req?.status || 'pending',
     });
   } catch (error) {
-    console.error(`❌ Error joining user ${userId} to room:`, error);
+    logger.error(`[ERROR] Error joining user ${userId} to room:`, error);
 
     socket.emit(SocketEvents.JOIN_REJECTED, {
       requestId,
@@ -554,18 +585,16 @@ async function handleLocationUpdate(
     const senderId = isProvider ? providerId : userId;
     const senderType = isProvider ? 'Provider' : 'User';
 
-    // 1. Validate sender is in room
     const roomName = SocketRoom.EMERGENCY(requestId);
     const rooms = Array.from(socket.rooms);
 
     if (!rooms.includes(roomName)) {
-      console.warn(
-        `⚠️ ${senderType} ${senderId} not in room for request ${requestId}`
+      logger.warn(
+        `[WARN] ${senderType} ${senderId} not in room for request ${requestId}`
       );
       return;
     }
 
-    // 2. Validate coordinates
     if (
       !location ||
       typeof location.lat !== 'number' ||
@@ -575,14 +604,13 @@ async function handleLocationUpdate(
       location.lng < -180 ||
       location.lng > 180
     ) {
-      console.warn(
-        `⚠️ Invalid coordinates from ${senderType} ${senderId}:`,
+      logger.warn(
+        `[WARN] Invalid coordinates from ${senderType} ${senderId}:`,
         location
       );
       return;
     }
 
-    // 3. Update Redis cache for provider (non-blocking, best-effort)
     if (isProvider && providerId) {
       cacheProviderLocation(providerId, {
         lat: location.lat,
@@ -590,11 +618,10 @@ async function handleLocationUpdate(
         timestamp: timestamp || Date.now(),
         requestId,
       }).catch(error => {
-        console.error('Redis unavailable for location cache:', error);
+        logger.error('Redis unavailable for location cache:', error);
       });
     }
 
-    // 4. Broadcast to room - use different events for provider vs user
     const eventName = isProvider
       ? SocketEvents.PROVIDER_LOCATION_UPDATED
       : SocketEvents.USER_LOCATION_UPDATED;
@@ -609,10 +636,285 @@ async function handleLocationUpdate(
       userId: !isProvider ? userId : undefined,
     });
 
-    console.log(
-      `📍 ${senderType} location broadcasted for request ${requestId}`
+    logger.debug(
+      `[LOCATION] ${senderType} location broadcasted for request ${requestId}`
     );
   } catch (error) {
-    console.error('❌ Error handling location update:', error);
+    logger.error('[ERROR] Error handling location update:', error);
+  }
+}
+
+/**
+ * Handle arrival confirmation - mark request and response as completed
+ */
+async function handleConfirmArrival(
+  io: Server,
+  socket: Socket,
+  data: { requestId: string; role: 'user' | 'provider' },
+  callback?: (ack?: any) => void
+): Promise<void> {
+  const { requestId, role } = data;
+
+  try {
+    logger.debug(
+      `[SUCCESS] ${role} confirming arrival for request ${requestId}`
+    );
+
+    const request = await db
+      .select()
+      .from(emergencyRequest)
+      .where(eq(emergencyRequest.id, requestId))
+      .limit(1);
+
+    if (request.length === 0) {
+      callback?.({ error: 'Emergency request not found' });
+      socket.emit(SocketEvents.ACCEPT_FAILED, {
+        requestId,
+        message: 'Emergency request not found',
+      });
+      return;
+    }
+
+    const emergReq = request[0]!;
+
+    const response = await db
+      .select()
+      .from(emergencyResponse)
+      .where(eq(emergencyResponse.emergencyRequestId, requestId))
+      .limit(1);
+
+    if (response.length === 0) {
+      callback?.({ error: 'No provider assigned to this request' });
+      socket.emit(SocketEvents.ACCEPT_FAILED, {
+        requestId,
+        message: 'No provider assigned to this request',
+      });
+      return;
+    }
+
+    const emergResp = response[0]!;
+    const completedAt = new Date().toISOString();
+
+    await db.transaction(async tx => {
+      // Update emergency request
+      await tx
+        .update(emergencyRequest)
+        .set({
+          requestStatus: 'completed',
+          updatedAt: completedAt,
+        })
+        .where(eq(emergencyRequest.id, requestId));
+
+      // Update emergency response
+      await tx
+        .update(emergencyResponse)
+        .set({
+          statusUpdate: 'accepted', // Keep status as accepted, use completion timestamp
+          updatedAt: completedAt,
+        })
+        .where(eq(emergencyResponse.id, emergResp.id));
+
+      // Mark provider as available
+      if (emergResp.serviceProviderId) {
+        await tx
+          .update(serviceProvider)
+          .set({
+            serviceStatus: 'available',
+          })
+          .where(eq(serviceProvider.id, emergResp.serviceProviderId));
+      }
+
+      await tx.insert(requestEvents).values({
+        requestId,
+        eventType: 'completed',
+        providerId: emergResp.serviceProviderId,
+        metadata: {
+          completedAt,
+          completedBy: role,
+        },
+      });
+    });
+
+    logger.info(
+      `[COMPLETED] Request ${requestId} marked as completed by ${role}`
+    );
+
+    // Send acknowledgment to client
+    callback?.();
+
+    io.to(SocketRoom.EMERGENCY(requestId)).emit(
+      SocketEvents.REQUEST_COMPLETED,
+      {
+        requestId,
+        completedBy: role,
+        completedAt,
+        message: 'Emergency has been marked as complete.',
+      }
+    );
+
+    // Also emit to user and provider rooms
+    if (emergReq.userId) {
+      io.to(SocketRoom.USER(emergReq.userId)).emit(
+        SocketEvents.REQUEST_COMPLETED,
+        {
+          requestId,
+          completedBy: role,
+          completedAt,
+          message: 'Emergency has been marked as complete.',
+        }
+      );
+    }
+
+    if (emergResp.serviceProviderId) {
+      io.to(SocketRoom.PROVIDER(emergResp.serviceProviderId)).emit(
+        SocketEvents.REQUEST_COMPLETED,
+        {
+          requestId,
+          completedBy: role,
+          completedAt,
+          message: 'Emergency has been marked as complete.',
+        }
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `[ERROR] Error confirming arrival for request ${requestId}:`,
+      error
+    );
+
+    callback?.({ error: 'Failed to confirm arrival' });
+
+    socket.emit(SocketEvents.ACCEPT_FAILED, {
+      requestId,
+      message: 'Failed to confirm arrival. Please try again.',
+    });
+  }
+}
+
+/**
+ * Handle cancel request from user or provider via socket
+ */
+async function handleCancelRequestSocket(
+  io: Server,
+  socket: Socket,
+  data: { requestId: string; role: 'user' | 'provider' },
+  callback?: (ack?: any) => void
+): Promise<void> {
+  const { requestId, role } = data;
+
+  try {
+    logger.debug(`[ERROR] ${role} cancelling request ${requestId}`);
+
+    const request = await db
+      .select()
+      .from(emergencyRequest)
+      .where(eq(emergencyRequest.id, requestId))
+      .limit(1);
+
+    if (request.length === 0) {
+      callback?.({ error: 'Emergency request not found' });
+      socket.emit(SocketEvents.ACCEPT_FAILED, {
+        requestId,
+        message: 'Emergency request not found',
+      });
+      return;
+    }
+
+    const emergReq = request[0]!;
+
+    // Check if already cancelled
+    if (emergReq.requestStatus === 'cancelled') {
+      callback?.({ error: 'Request is already cancelled' });
+      socket.emit(SocketEvents.ACCEPT_FAILED, {
+        requestId,
+        message: 'Request is already cancelled',
+      });
+      return;
+    }
+
+    const cancelledAt = new Date().toISOString();
+
+    await db.transaction(async tx => {
+      // Update emergency request
+      await tx
+        .update(emergencyRequest)
+        .set({
+          requestStatus: 'cancelled',
+          updatedAt: cancelledAt,
+        })
+        .where(eq(emergencyRequest.id, requestId));
+
+      await tx.insert(requestEvents).values({
+        requestId,
+        eventType: 'request_cancelled',
+        providerId: undefined,
+        metadata: {
+          cancelledAt,
+          cancelledBy: role,
+        },
+      });
+    });
+
+    logger.info(`[SUCCESS] Request ${requestId} cancelled by ${role}`);
+
+    // Send acknowledgment to client
+    callback?.();
+
+    const otherPartyRole = role === 'user' ? 'provider' : 'user';
+    const messageText =
+      role === 'user'
+        ? 'The user has cancelled this emergency request.'
+        : 'The service provider has cancelled this emergency request.';
+
+    io.to(SocketRoom.EMERGENCY(requestId)).emit(
+      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+      {
+        requestId,
+        cancelledBy: role,
+        cancelledAt,
+        message: messageText,
+      }
+    );
+
+    // Also emit to specific user and provider rooms
+    if (emergReq.userId) {
+      io.to(SocketRoom.USER(emergReq.userId)).emit(
+        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+        {
+          requestId,
+          cancelledBy: role,
+          cancelledAt,
+          message: messageText,
+        }
+      );
+    }
+
+    // Get provider ID from emergency response
+    const response = await db
+      .select()
+      .from(emergencyResponse)
+      .where(eq(emergencyResponse.emergencyRequestId, requestId))
+      .limit(1);
+
+    if (response.length > 0 && response[0]?.serviceProviderId) {
+      io.to(SocketRoom.PROVIDER(response[0].serviceProviderId)).emit(
+        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+        {
+          requestId,
+          cancelledBy: role,
+          cancelledAt,
+          message: messageText,
+        }
+      );
+    }
+  } catch (error) {
+    logger.error(`[ERROR] Error cancelling request ${requestId}:`, error);
+
+    callback?.({ error: 'Failed to cancel request' });
+
+    socket.emit(SocketEvents.ACCEPT_FAILED, {
+      requestId,
+      message: 'Failed to cancel request. Please try again.',
+    });
   }
 }

@@ -64,110 +64,132 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage system-wide settings
-        </p>
+    <div className="min-h-screen bg-background dark:bg-background">
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+            Settings
+          </h1>
+          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+            Manage system-wide settings
+          </p>
+        </div>
       </div>
-
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Settings</CardTitle>
-            <CardDescription>Update your admin profile details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="adminName">Name</Label>
-              <Input
-                id="adminName"
-                placeholder="Enter your name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="adminEmail">Email</Label>
-              <Input
-                id="adminEmail"
-                type="email"
-                placeholder="Enter email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              {saveSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Profile updated successfully!
-                </p>
-              )}
-              {updateProfileMutation.isError && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {updateProfileMutation.error?.message || 'Failed to update'}
-                </p>
-              )}
-              <Button
-                onClick={handleSave}
-                disabled={!hasChanges || updateProfileMutation.isPending}
-                className="ml-auto"
-              >
-                {updateProfileMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
-                  </>
+      <div className="px-6 pb-8 space-y-6">
+        <div className="grid gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Settings</CardTitle>
+              <CardDescription>
+                Update your admin profile details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="adminName">Name</Label>
+                <Input
+                  id="adminName"
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="adminEmail">Email</Label>
+                <Input
+                  id="adminEmail"
+                  type="email"
+                  placeholder="Enter email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                {saveSuccess && (
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    Profile updated successfully!
+                  </p>
                 )}
+                {updateProfileMutation.isError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    {updateProfileMutation.error?.message || 'Failed to update'}
+                  </p>
+                )}
+                <Button
+                  onClick={handleSave}
+                  disabled={!hasChanges || updateProfileMutation.isPending}
+                  className="ml-auto"
+                >
+                  {updateProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>
+                Configure global system parameters
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="systemName">System Name</Label>
+                <Input
+                  id="systemName"
+                  placeholder="Enter system name"
+                  className="mt-1.5"
+                  defaultValue="ResqConnect"
+                  disabled
+                />
+                <p className="text-muted-foreground mt-1 text-xs">
+                  System name is configured via environment variables
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Manage admin security options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                asChild
+              >
+                <a href="/change-password">
+                  <Lock className="mr-2 h-4 w-4" />
+                  Change Password
+                </a>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Settings</CardTitle>
-            <CardDescription>
-              Configure global system parameters
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="systemName">System Name</Label>
-              <Input
-                id="systemName"
-                placeholder="Enter system name"
-                className="mt-1.5"
-                defaultValue="ResqConnect"
-                disabled
-              />
-              <p className="text-muted-foreground mt-1 text-xs">
-                System name is configured via environment variables
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Settings</CardTitle>
-            <CardDescription>Manage admin security options</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <a href="/change-password">
-                <Lock className="mr-2 h-4 w-4" />
-                Change Password
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

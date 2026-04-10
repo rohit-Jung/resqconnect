@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
+import { logger } from '@/config/logger/winston.config';
 import db from '@/db';
 import {
   emergencyRequest,
@@ -161,7 +162,7 @@ const createEmergencyResponse = asyncHandler(
         .delete(emergencyResponse)
         .where(eq(emergencyResponse.id, newEmergencyResponse[0]!.id));
 
-      console.log(
+      logger.debug(
         'Error updating emergency request and service provider status'
       );
       throw new ApiError(
@@ -170,8 +171,8 @@ const createEmergencyResponse = asyncHandler(
       );
     }
 
-    console.log('Optimal path', optimalPath);
-    console.log('New emergency response', newEmergencyResponse);
+    logger.debug('Optimal path', optimalPath);
+    logger.debug('New emergency response', newEmergencyResponse);
 
     res.status(201).json(
       new ApiResponse(201, 'Emergency response created', {
@@ -187,7 +188,7 @@ const getEmergencyResponse = asyncHandler(
     const { id } = req.params;
 
     if (!id) {
-      console.log('Emergency response ID is required');
+      logger.debug('Emergency response ID is required');
       throw new ApiError(400, 'Emergency response ID is required');
     }
 
@@ -197,7 +198,7 @@ const getEmergencyResponse = asyncHandler(
       });
 
     if (!existingEmergencyResponse) {
-      console.log('Emergency response not found');
+      logger.debug('Emergency response not found');
       throw new ApiError(404, 'Emergency response not found');
     }
 
@@ -214,10 +215,10 @@ const updateEmergencyResponse = asyncHandler(
     const { id } = req.params;
     const { statusUpdate, updateDescription } = req.body;
 
-    console.log('🔄 Status Update:', { statusUpdate, updateDescription });
+    logger.debug('🔄 Status Update:', { statusUpdate, updateDescription });
 
     if (!id) {
-      console.log('Emergency response ID is required');
+      logger.debug('Emergency response ID is required');
       throw new ApiError(400, 'Emergency response ID is required');
     }
 
@@ -227,7 +228,7 @@ const updateEmergencyResponse = asyncHandler(
       });
 
     if (!existingEmergencyResponse) {
-      console.log('Emergency response not found');
+      logger.debug('Emergency response not found');
       throw new ApiError(404, 'Emergency response not found');
     }
 
@@ -288,7 +289,7 @@ const updateEmergencyResponse = asyncHandler(
     });
 
     if (!updatedEmergencyResponse) {
-      console.log('Error updating emergency response');
+      logger.debug('Error updating emergency response');
       throw new ApiError(500, 'Error updating emergency response');
     }
 
@@ -301,7 +302,7 @@ const updateEmergencyResponse = asyncHandler(
     });
 
     if (!emergencyRequestDetails) {
-      console.log('Emergency request not found');
+      logger.debug('Emergency request not found');
       throw new ApiError(404, 'Emergency request not found');
     }
 
@@ -322,7 +323,7 @@ const deleteEmergencyResponse = asyncHandler(
     const { id } = req.params;
 
     if (!id) {
-      console.log('Emergency response ID is required');
+      logger.debug('Emergency response ID is required');
       throw new ApiError(400, 'Emergency response ID is required');
     }
 
@@ -332,7 +333,7 @@ const deleteEmergencyResponse = asyncHandler(
       });
 
     if (!existingEmergencyResponse) {
-      console.log('Emergency response not found');
+      logger.debug('Emergency response not found');
       throw new ApiError(404, 'Emergency response not found');
     }
 
@@ -352,7 +353,7 @@ const deleteEmergencyResponse = asyncHandler(
       });
 
     if (!deletedEmergencyResponse) {
-      console.log('Error deleting emergency response');
+      logger.debug('Error deleting emergency response');
       throw new ApiError(500, 'Error deleting emergency response');
     }
 
@@ -373,7 +374,7 @@ const getProviderResponses = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      console.log('Unauthorized');
+      logger.debug('Unauthorized');
       throw new ApiError(401, 'Unauthorized');
     }
 
@@ -390,7 +391,7 @@ const getProviderResponses = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      console.log('Unauthorized Service Provider');
+      logger.debug('Unauthorized Service Provider');
       throw new ApiError(401, 'Unauthorized Service Provider');
     }
 
@@ -401,7 +402,7 @@ const getProviderResponses = asyncHandler(
       ),
     });
 
-    console.log('PROVIDER Responses', providerResponses);
+    logger.debug('PROVIDER Responses', providerResponses);
     return res
       .status(200)
       .json(

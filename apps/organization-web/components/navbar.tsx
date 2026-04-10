@@ -11,7 +11,7 @@ export function Navbar() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-lg font-bold tracking-tight text-foreground">
-            RESQ<span className="text-primary">.</span>
+            RESQ<span className="text-primary">. Connect</span>
           </span>
         </Link>
 

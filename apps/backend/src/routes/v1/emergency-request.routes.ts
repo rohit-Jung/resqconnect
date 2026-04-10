@@ -9,14 +9,15 @@ import {
   createEmergencyRequest,
   deleteEmergencyRequest,
   getEmergencyRequest,
+  getProviderEmergencyHistory,
   getRecentEmergencyRequests,
   getUserEmergencyHistory,
   getUsersEmergencyRequests,
+  providerConfirmedArrival,
   rejectEmergencyRequest,
   updateEmergencyRequest,
 } from '@/controllers/emergency-request.controller';
 import {
-  requireAuthenticatedProvider,
   requireAuthenticatedUser,
   validateQueryParams,
   validateRequestBody,
@@ -60,19 +61,25 @@ emergencyRequestRouter.patch(
   confirmProviderArrival
 );
 
-emergencyRequestRouter.post(
+emergencyRequestRouter.patch(
+  '/:id/confirm-arrived',
+  validateServiceProvider,
+  providerConfirmedArrival
+);
+
+emergencyRequestRouter.patch(
   '/:id/accept',
   validateServiceProvider,
   acceptEmergencyRequest
 );
 
-emergencyRequestRouter.post(
+emergencyRequestRouter.patch(
   '/:id/reject',
   validateServiceProvider,
   rejectEmergencyRequest
 );
 
-emergencyRequestRouter.post(
+emergencyRequestRouter.patch(
   '/:id/complete',
   validateServiceProvider,
   completeEmergencyRequest
@@ -84,6 +91,13 @@ emergencyRequestRouter.get(
   validateQueryParams(getHistoryQuerySchema),
   requireAuthenticatedUser,
   getUserEmergencyHistory
+);
+
+emergencyRequestRouter.get(
+  '/provider/history',
+  validateServiceProvider,
+  validateQueryParams(getHistoryQuerySchema),
+  getProviderEmergencyHistory
 );
 
 emergencyRequestRouter

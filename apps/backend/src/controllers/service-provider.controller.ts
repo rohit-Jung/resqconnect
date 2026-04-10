@@ -10,10 +10,10 @@ import {
   type TServiceProvider,
   emergencyRequest,
   emergencyResponse,
-  loginServiceProviderSchema,
   newServiceProviderSchema,
   organization,
   serviceProvider,
+  verifyDocumentsSchema,
 } from '@/models';
 import {
   notifyServiceProvider,
@@ -129,37 +129,10 @@ const registerServiceProvider = asyncHandler(
 
 const loginServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
-    const parsedValues = loginServiceProviderSchema.safeParse(req.body);
-
-    if (!parsedValues.success) {
-      console.log('Parsing Error: ', parsedValues.error.issues);
-      const validationError = new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${String(issue.path[0])} : ${issue.message} `
-        )
-      );
-
-      return res.status(400).json(validationError);
-    }
+    const { email, password, currentLocation } = req.body;
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.email, parsedValues.data.email),
-      columns: {
-        id: true,
-        name: true,
-        age: true,
-        currentLocation: true,
-        phoneNumber: true,
-        email: true,
-        password: true,
-        isVerified: true,
-        serviceStatus: true,
-        serviceType: true,
-        vehicleInformation: true,
-        serviceArea: true,
-      },
+      where: eq(serviceProvider.email, email),
     });
 
     if (!existingServiceProvider) {
@@ -170,7 +143,7 @@ const loginServiceProvider = asyncHandler(
     }
 
     const isPasswordValid = await bcrypt.compare(
-      parsedValues.data.password,
+      password,
       existingServiceProvider.password
     );
 
@@ -207,13 +180,81 @@ const loginServiceProvider = asyncHandler(
       );
     }
 
+    // Check document verification status
+    const documentStatus = existingServiceProvider.documentStatus;
+
+    if (documentStatus === 'not_submitted') {
+      const token = generateJWT({
+        ...existingServiceProvider,
+        kind: 'service_provider',
+      } as any);
+
+      return res.status(403).json(
+        new ApiResponse(403, 'Documents required for verification', {
+          code: 'DOCUMENTS_REQUIRED',
+          serviceProviderId: existingServiceProvider.id,
+          token,
+          message:
+            'Please upload your PAN card and citizenship documents for verification.',
+        })
+      );
+    }
+
+    if (documentStatus === 'pending') {
+      return res.status(403).json(
+        new ApiResponse(403, 'Documents pending verification', {
+          code: 'VERIFICATION_PENDING',
+          serviceProviderId: existingServiceProvider.id,
+          message:
+            'Your documents are being reviewed. Please wait for approval.',
+        })
+      );
+    }
+
+    if (documentStatus === 'rejected') {
+      return res.status(403).json(
+        new ApiResponse(403, 'Documents rejected', {
+          code: 'DOCUMENTS_REJECTED',
+          serviceProviderId: existingServiceProvider.id,
+          rejectionReason: existingServiceProvider.rejectionReason,
+          message:
+            'Your documents were rejected. Please re-upload with valid documents.',
+        })
+      );
+    }
+
+    // documentStatus === 'approved' - allow login
+    // Update location if provided during login
+    const { latitude, longitude } = currentLocation;
+    console.log(latitude, longitude);
+    const locationPoint = `POINT(${longitude} ${latitude})`;
+    const h3Index = latLngToCell(Number(latitude), Number(longitude), 8);
+    const h3IndexBigInt = BigInt(`0x${h3Index}`);
+
+    await db
+      .update(serviceProvider)
+      .set({
+        currentLocation: {
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+        },
+        lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
+        h3Index: h3IndexBigInt,
+      })
+      .where(eq(serviceProvider.id, existingServiceProvider.id));
+
+    existingServiceProvider.currentLocation = {
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+    };
+
     const token = generateJWT({
       ...existingServiceProvider,
       kind: 'service_provider',
     } as any);
 
-    const loggedInServiceProvider: Partial<TServiceProvider> = JSON.parse(
-      JSON.stringify(existingServiceProvider)
+    const loggedInServiceProvider: Partial<TServiceProvider> = bigIntToString(
+      existingServiceProvider
     );
     delete loggedInServiceProvider.password;
 
@@ -252,6 +293,15 @@ const logoutServiceProvider = asyncHandler(
     if (!existingServiceProvider) {
       throw new ApiError(401, 'Unauthorized Service Provider');
     }
+
+    // Set status to off_duty when logging out
+    await db
+      .update(serviceProvider)
+      .set({
+        serviceStatus: 'off_duty',
+        statusUpdatedAt: new Date().toISOString(),
+      })
+      .where(eq(serviceProvider.id, loggedInServiceProvider.id));
 
     res
       .status(200)
@@ -590,11 +640,59 @@ const updateServiceProviderStatus = asyncHandler(
       throw new ApiError(400, 'Status is required');
     }
 
-    // Update service provider status
+    // Validate status value
+    const validStatuses = ['available', 'assigned', 'off_duty'];
+    if (!validStatuses.includes(status)) {
+      throw new ApiError(400, 'Invalid status value');
+    }
+
+    // Check for cooldown (30 seconds)
+    const STATUS_COOLDOWN_MS = 30000; // 30 seconds
+    const existingProvider = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.id, loggedInUser.id),
+      columns: {
+        id: true,
+        serviceStatus: true,
+        statusUpdatedAt: true,
+      },
+    });
+
+    if (!existingProvider) {
+      throw new ApiError(404, 'Service provider not found');
+    }
+
+    // If same status, no need to update
+    if (existingProvider.serviceStatus === status) {
+      return res.status(200).json(
+        new ApiResponse(200, 'Status unchanged', {
+          serviceProvider: existingProvider,
+        })
+      );
+    }
+
+    // Check cooldown - only enforce for status changes, not first time
+    if (existingProvider.statusUpdatedAt) {
+      const lastUpdate = new Date(existingProvider.statusUpdatedAt).getTime();
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdate;
+
+      if (timeSinceLastUpdate < STATUS_COOLDOWN_MS) {
+        const remainingSeconds = Math.ceil(
+          (STATUS_COOLDOWN_MS - timeSinceLastUpdate) / 1000
+        );
+        throw new ApiError(
+          429,
+          `Please wait ${remainingSeconds} seconds before changing status again`
+        );
+      }
+    }
+
+    // Update service provider status with timestamp
     const updatedProvider = await db
       .update(serviceProvider)
       .set({
         serviceStatus: status,
+        statusUpdatedAt: new Date().toISOString(),
       })
       .where(eq(serviceProvider.id, loggedInUser.id))
       .returning();
@@ -940,6 +1038,256 @@ const updateServiceProviderLocation = asyncHandler(
   }
 );
 
+const uploadVerificationDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+
+    if (!loggedInProvider || !loggedInProvider.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    // Get the uploaded files from multer
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    if (!files?.panCard?.[0] || !files?.citizenship?.[0]) {
+      throw new ApiError(
+        400,
+        'Both PAN card and citizenship documents are required'
+      );
+    }
+
+    const panCardUrl = (files.panCard[0] as any).path;
+    const citizenshipUrl = (files.citizenship[0] as any).path;
+
+    // Update provider with document URLs and set status to pending
+    const [updatedProvider] = await db
+      .update(serviceProvider)
+      .set({
+        panCardUrl,
+        citizenshipUrl,
+        documentStatus: 'pending',
+        rejectionReason: null,
+      })
+      .where(eq(serviceProvider.id, loggedInProvider.id))
+      .returning({
+        id: serviceProvider.id,
+        name: serviceProvider.name,
+        documentStatus: serviceProvider.documentStatus,
+      });
+
+    if (!updatedProvider) {
+      throw new ApiError(500, 'Failed to upload documents');
+    }
+
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        'Documents uploaded successfully. Pending verification.',
+        {
+          provider: updatedProvider,
+        }
+      )
+    );
+  }
+);
+
+const getDocumentStatus = asyncHandler(async (req: Request, res: Response) => {
+  const loggedInProvider = req.user;
+
+  if (!loggedInProvider || !loggedInProvider.id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const provider = await db.query.serviceProvider.findFirst({
+    where: eq(serviceProvider.id, loggedInProvider.id),
+    columns: {
+      id: true,
+      name: true,
+      documentStatus: true,
+      rejectionReason: true,
+      verifiedAt: true,
+    },
+  });
+
+  if (!provider) {
+    throw new ApiError(404, 'Service provider not found');
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, 'Document status retrieved', {
+      documentStatus: provider.documentStatus,
+      rejectionReason: provider.rejectionReason,
+      verifiedAt: provider.verifiedAt,
+    })
+  );
+});
+
+const getPendingVerifications = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInOrg = req.user;
+
+    if (!loggedInOrg || !loggedInOrg.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    const pendingProviders = await db.query.serviceProvider.findMany({
+      where: and(
+        eq(serviceProvider.organizationId, loggedInOrg.id),
+        eq(serviceProvider.documentStatus, 'pending')
+      ),
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        serviceType: true,
+        documentStatus: true,
+        panCardUrl: true,
+        citizenshipUrl: true,
+        createdAt: true,
+      },
+    });
+
+    res.status(200).json(
+      new ApiResponse(200, 'Pending verifications retrieved', {
+        providers: pendingProviders,
+        count: pendingProviders.length,
+      })
+    );
+  }
+);
+
+const getProviderDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInOrg = req.user;
+    const { providerId } = req.params;
+
+    if (!loggedInOrg || !loggedInOrg.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!providerId) {
+      throw new ApiError(400, 'Provider ID is required');
+    }
+
+    const provider = await db.query.serviceProvider.findFirst({
+      where: and(
+        eq(serviceProvider.id, providerId),
+        eq(serviceProvider.organizationId, loggedInOrg.id)
+      ),
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        serviceType: true,
+        documentStatus: true,
+        panCardUrl: true,
+        citizenshipUrl: true,
+        rejectionReason: true,
+        verifiedAt: true,
+        verifiedBy: true,
+        createdAt: true,
+      },
+    });
+
+    if (!provider) {
+      throw new ApiError(
+        404,
+        'Service provider not found or does not belong to your organization'
+      );
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, 'Provider documents retrieved', {
+        provider,
+      })
+    );
+  }
+);
+
+const verifyProviderDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInOrg = req.user;
+    const { providerId } = req.params;
+
+    if (!loggedInOrg || !loggedInOrg.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!providerId) {
+      throw new ApiError(400, 'Provider ID is required');
+    }
+
+    const parsedBody = verifyDocumentsSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      throw ApiError.validationError(parsedBody.error);
+    }
+
+    const { action, rejectionReason } = parsedBody.data;
+
+    // Validate rejection reason is provided when rejecting
+    if (action === 'reject' && !rejectionReason) {
+      throw new ApiError(
+        400,
+        'Rejection reason is required when rejecting documents'
+      );
+    }
+
+    // Check if provider belongs to this organization
+    const existingProvider = await db.query.serviceProvider.findFirst({
+      where: and(
+        eq(serviceProvider.id, providerId),
+        eq(serviceProvider.organizationId, loggedInOrg.id)
+      ),
+    });
+
+    if (!existingProvider) {
+      throw new ApiError(
+        404,
+        'Service provider not found or does not belong to your organization'
+      );
+    }
+
+    if (existingProvider.documentStatus !== 'pending') {
+      throw new ApiError(400, 'Documents are not pending verification');
+    }
+
+    // Update document status
+    const [updatedProvider] = await db
+      .update(serviceProvider)
+      .set({
+        documentStatus: action === 'approve' ? 'approved' : 'rejected',
+        rejectionReason: action === 'reject' ? rejectionReason : null,
+        verifiedAt: action === 'approve' ? new Date().toISOString() : null,
+        verifiedBy: action === 'approve' ? loggedInOrg.id : null,
+      })
+      .where(eq(serviceProvider.id, providerId))
+      .returning({
+        id: serviceProvider.id,
+        name: serviceProvider.name,
+        documentStatus: serviceProvider.documentStatus,
+        rejectionReason: serviceProvider.rejectionReason,
+        verifiedAt: serviceProvider.verifiedAt,
+      });
+
+    if (!updatedProvider) {
+      throw new ApiError(500, 'Failed to update document status');
+    }
+
+    const message =
+      action === 'approve'
+        ? 'Provider documents approved successfully'
+        : 'Provider documents rejected';
+
+    res.status(200).json(
+      new ApiResponse(200, message, {
+        provider: updatedProvider,
+      })
+    );
+  }
+);
+
 export {
   registerServiceProvider,
   loginServiceProvider,
@@ -955,4 +1303,9 @@ export {
   changeProviderPassword,
   getNearbyProviders,
   updateServiceProviderLocation,
+  uploadVerificationDocuments,
+  getDocumentStatus,
+  getPendingVerifications,
+  getProviderDocuments,
+  verifyProviderDocuments,
 };

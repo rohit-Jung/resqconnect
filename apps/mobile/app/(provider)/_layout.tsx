@@ -1,66 +1,198 @@
 import { Ionicons } from '@expo/vector-icons';
 
+import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { Tabs } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+
+import { useGetDocumentStatus } from '@/services/document/document.api';
+import { useProviderStore } from '@/store/providerStore';
+
+const SIGNAL_RED = '#C44536';
+const PRIMARY = '#E63946';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
 
 const ProviderLayout: React.FC = () => {
+  const router = useRouter();
+
+  const [location, setLocation] = useState<Location.LocationObject | null>(
+    null
+  );
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { provider, isLoading: isStoreLoading } = useProviderStore();
+  const { data, isLoading: isApiLoading, isError } = useGetDocumentStatus(true);
+
+  const isLoading = isStoreLoading || isApiLoading;
+
+  useEffect(() => {
+    if (isLoading || isError || !data?.data?.data) return;
+    if (!provider) return;
+
+    const documentStatus = data.data.data.documentStatus;
+    if (documentStatus !== 'approved') {
+      if (documentStatus === 'not_submitted') {
+        router.replace('/upload-documents');
+      } else {
+        router.replace('/verification-pending');
+      }
+    }
+  }, [data, isLoading, isError, provider, router]);
+
+  // TODO: constantly update the provider location here
+  useEffect(() => {
+    async function getCurrentLocation() {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+    }
+
+    getCurrentLocation();
+  }, []);
+
+  if (isLoading || !provider) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: OFF_WHITE,
+        }}
+      >
+        <ActivityIndicator size="large" color={SIGNAL_RED} />
+      </View>
+    );
+  }
+
+  if (isError || !data?.data?.data) {
+    return (
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: SIGNAL_RED,
+          tabBarInactiveTintColor: MID_GRAY,
+          tabBarStyle: {
+            backgroundColor: OFF_WHITE,
+            borderTopWidth: 1,
+            borderTopColor: LIGHT_GRAY,
+            height: 85,
+            paddingRight: 10,
+            paddingLeft: 10,
+            paddingBottom: 8,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: '700',
+            letterSpacing: 1,
+          },
+        }}
+      >
+        <Tabs.Screen name="dashboard" />
+        <Tabs.Screen name="history" />
+        <Tabs.Screen name="settings" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+    );
+  }
+
+  const documentStatus = data.data.data.documentStatus;
+  if (documentStatus !== 'approved') {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: OFF_WHITE,
+        }}
+      >
+        <ActivityIndicator size="large" color={SIGNAL_RED} />
+      </View>
+    );
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#E13333',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: SIGNAL_RED,
+        tabBarInactiveTintColor: MID_GRAY,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: OFF_WHITE,
           borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          height: 80,
+          borderTopColor: LIGHT_GRAY,
+          height: 85,
+          paddingRight: 10,
+          paddingLeft: 10,
           paddingBottom: 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontFamily: 'Inter',
-          fontSize: 12,
+          fontSize: 10,
+          fontWeight: '700',
+          letterSpacing: 1,
         },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          title: 'HOME',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={24}
+              color={color}
+            />
           ),
-          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
+          title: 'HISTORY',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'time' : 'time-outline'}
+              size={24}
+              color={color}
+            />
           ),
-          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
+          title: 'SETTINGS',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'settings' : 'settings-outline'}
+              size={24}
+              color={color}
+            />
           ),
-          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          title: 'PROFILE',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'person' : 'person-outline'}
+              size={24}
+              color={color}
+            />
           ),
-          headerShown: false,
         }}
       />
     </Tabs>

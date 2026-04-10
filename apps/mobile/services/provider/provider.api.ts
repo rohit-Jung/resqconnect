@@ -63,6 +63,11 @@ export interface EmergencyRequestForProvider {
   createdAt: string;
 }
 
+export type AcceptedResponse = { requestId: string } & Omit<
+  EmergencyRequestForProvider,
+  'requestStatus' | 'userName' | 'id'
+>;
+
 export const serviceProviderApi = {
   // Get provider profile
   getProfile: async (): Promise<ServiceProviderProfile> => {
@@ -84,11 +89,14 @@ export const serviceProviderApi = {
   // Update service status (available, assigned, off_duty)
   updateStatus: async (
     status: 'available' | 'assigned' | 'off_duty'
-  ): Promise<ServiceProviderProfile> => {
+  ): Promise<{
+    serviceProvider: ServiceProviderProfile;
+    cooldownRemaining?: number;
+  }> => {
     const response = await api.patch(serviceProviderEndpoints.updateStatus, {
       status,
     });
-    return response.data.data.serviceProvider;
+    return response.data.data;
   },
 
   // Get pending emergency requests for provider
@@ -100,18 +108,23 @@ export const serviceProviderApi = {
   },
 
   // Accept an emergency request
-  acceptRequest: async (requestId: string): Promise<void> => {
-    await api.post(`${emergencyRequestEndpoints.getAll}/${requestId}/accept`);
+  acceptRequest: async (requestId: string): Promise<AcceptedResponse> => {
+    const response = await api.patch(
+      `${emergencyRequestEndpoints.getAll}/${requestId}/accept`
+    );
+    return response.data.data;
   },
 
   // Reject an emergency request
   rejectRequest: async (requestId: string): Promise<void> => {
-    await api.post(`${emergencyRequestEndpoints.getAll}/${requestId}/reject`);
+    await api.patch(`${emergencyRequestEndpoints.getAll}/${requestId}/reject`);
   },
 
   // Complete an emergency request
   completeRequest: async (requestId: string): Promise<void> => {
-    await api.post(`${emergencyRequestEndpoints.getAll}/${requestId}/complete`);
+    await api.patch(
+      `${emergencyRequestEndpoints.getAll}/${requestId}/complete`
+    );
   },
 
   // Update provider location

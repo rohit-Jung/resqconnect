@@ -6,19 +6,28 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
-import InputBox from '@/components/ui/InputBox';
+import Header from '@/components/Header';
 import { useProviderChangePassword } from '@/services/user/auth.api';
 import {
   TChangePassword,
   changePasswordSchema,
 } from '@/validations/auth.schema';
+
+const SIGNAL_RED = '#C44536';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 export default function ProviderChangePassword() {
   const router = useRouter();
@@ -41,13 +50,13 @@ export default function ProviderChangePassword() {
   const onSubmit = (data: TChangePassword) => {
     changePassword(data, {
       onSuccess: () => {
-        Alert.alert('Success', 'Your password has been changed successfully.', [
+        Alert.alert('SUCCESS', 'Your password has been changed successfully.', [
           { text: 'OK', onPress: () => router.back() },
         ]);
       },
       onError: (error: any) => {
         Alert.alert(
-          'Error',
+          'ERROR',
           error.response?.data?.message ||
             'Failed to change password. Please try again.'
         );
@@ -56,191 +65,263 @@ export default function ProviderChangePassword() {
   };
 
   return (
-    <SafeAreaContainer style={styles.safeArea} scrollable={false}>
-      <View style={styles.container}>
-        {/* Back Button - Fixed at top */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backArrow}
-        >
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <Header title="CHANGE PASSWORD" showBackButton />
 
-        {/* Centered Content */}
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Change Password</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>UPDATE PASSWORD</Text>
             <Text style={styles.subtitle}>
               Enter your current password and a new password
             </Text>
           </View>
 
           {/* Form */}
-          <View style={styles.form}>
-            {/* Old Password */}
+          <View style={styles.formContainer}>
             <Controller
               control={control}
               name="oldPassword"
               render={({ field: { onChange, onBlur, value } }) => (
-                <InputBox
-                  icon="lock"
-                  placeholder="Current Password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  error={errors.oldPassword?.message}
-                  editable={!isPending}
-                />
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={18}
+                      color={MID_GRAY}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Enter current password"
+                      placeholderTextColor={MID_GRAY}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      value={value}
+                    />
+                  </View>
+                  {errors.oldPassword && (
+                    <Text style={styles.errorText}>
+                      {errors.oldPassword.message}
+                    </Text>
+                  )}
+                </View>
               )}
             />
 
-            {/* New Password */}
             <Controller
               control={control}
               name="newPassword"
               render={({ field: { onChange, onBlur, value } }) => (
-                <InputBox
-                  icon="lock"
-                  placeholder="New Password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  error={errors.newPassword?.message}
-                  editable={!isPending}
-                />
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={18}
+                      color={MID_GRAY}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Enter new password"
+                      placeholderTextColor={MID_GRAY}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      value={value}
+                    />
+                  </View>
+                  {errors.newPassword && (
+                    <Text style={styles.errorText}>
+                      {errors.newPassword.message}
+                    </Text>
+                  )}
+                </View>
               )}
             />
 
-            {/* Confirm Password */}
             <Controller
               control={control}
               name="confirmPassword"
               render={({ field: { onChange, onBlur, value } }) => (
-                <InputBox
-                  icon="lock"
-                  placeholder="Confirm New Password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  error={errors.confirmPassword?.message}
-                  editable={!isPending}
-                />
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={18}
+                      color={MID_GRAY}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Confirm new password"
+                      placeholderTextColor={MID_GRAY}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      value={value}
+                    />
+                  </View>
+                  {errors.confirmPassword && (
+                    <Text style={styles.errorText}>
+                      {errors.confirmPassword.message}
+                    </Text>
+                  )}
+                </View>
               )}
             />
-
-            <TouchableOpacity
-              style={[styles.button, isPending && styles.buttonDisabled]}
-              onPress={handleSubmit(onSubmit)}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Change Password</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.backButtonText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              isPending && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={isPending}
+            activeOpacity={0.8}
+          >
+            {isPending ? (
+              <ActivityIndicator color={OFF_WHITE} />
+            ) : (
+              <Text style={styles.submitButtonText}>UPDATE PASSWORD</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelButtonText}>CANCEL</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaContainer>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: OFF_WHITE,
   },
-  backArrow: {
-    height: 40,
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 20,
-  },
-  content: {
+  keyboardView: {
     flex: 1,
-    justifyContent: 'center',
   },
-  header: {
-    marginBottom: 40,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  titleSection: {
+    marginBottom: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#1F2937',
-    fontFamily: 'ChauPhilomeneOne_400Regular',
+    fontSize: 24,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 2,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontFamily: 'Inter',
+    fontSize: 12,
+    color: MID_GRAY,
+    marginTop: 8,
+    letterSpacing: 1,
   },
-  form: {
-    gap: 16,
+  formContainer: {
+    flex: 1,
   },
-  errorContainer: {
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: BLACK,
+    paddingVertical: 12,
+    fontWeight: '500',
   },
   errorText: {
-    marginLeft: 8,
+    fontSize: 10,
+    color: SIGNAL_RED,
+    marginTop: 6,
+    letterSpacing: 1,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  submitButton: {
+    height: 56,
+    backgroundColor: SIGNAL_RED,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  submitButtonDisabled: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  submitButtonText: {
     fontSize: 14,
-    color: '#EF4444',
-    fontFamily: 'Inter',
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
   },
-  button: {
-    padding: 16,
-    borderRadius: 12,
+  cancelButton: {
+    height: 56,
     alignItems: 'center',
-    backgroundColor: '#E13333',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BLACK,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter',
-  },
-  backButton: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#E13333',
-    fontFamily: 'Inter',
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BLACK,
+    letterSpacing: 3,
   },
 });

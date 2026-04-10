@@ -64,7 +64,25 @@ export const useConfirmProviderArrival = () => {
     string
   >({
     mutationFn: requestId => {
-      return api.post(emergencyRequestEndpoints.confirmArrival(requestId));
+      return api.patch(emergencyRequestEndpoints.confirmArrival(requestId));
+    },
+  });
+};
+
+export const useProviderConfirmArrival = () => {
+  return useMutation<
+    AxiosResponse<ApiResponse<{ message: string }>>,
+    AxiosError,
+    string
+  >({
+    mutationFn: requestId => {
+      console.log(
+        '[API REQUEST]',
+        emergencyRequestEndpoints.providerConfirmArrival(requestId)
+      );
+      return api.patch(
+        emergencyRequestEndpoints.providerConfirmArrival(requestId)
+      );
     },
   });
 };
@@ -133,14 +151,17 @@ export const useGetUserEmergencyHistory = (
       params.limit,
       params.status,
     ],
-    queryFn: () =>
-      api.get(emergencyRequestEndpoints.userHistory, {
+    queryFn: async () => {
+      const response = await api.get(emergencyRequestEndpoints.userHistory, {
         params: {
           page: params.page || 1,
           limit: params.limit || 10,
           ...(params.status && { status: params.status }),
         },
-      }),
+      });
+
+      return response?.data || {};
+    },
     enabled,
   });
 };
@@ -156,14 +177,20 @@ export const useGetProviderEmergencyHistory = (
       params.limit,
       params.status,
     ],
-    queryFn: () =>
-      api.get(emergencyRequestEndpoints.providerHistory, {
-        params: {
-          page: params.page || 1,
-          limit: params.limit || 10,
-          ...(params.status && { status: params.status }),
-        },
-      }),
+    queryFn: async () => {
+      const response = await api.get(
+        emergencyRequestEndpoints.providerHistory,
+        {
+          params: {
+            page: params.page || 1,
+            limit: params.limit || 10,
+            ...(params.status && { status: params.status }),
+          },
+        }
+      );
+
+      return response?.data || {};
+    },
     enabled,
   });
 };

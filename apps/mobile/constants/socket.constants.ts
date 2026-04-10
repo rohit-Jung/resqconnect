@@ -39,6 +39,7 @@ export enum SocketEvents {
   PROVIDER_LOCATION = 'provider-location',
   PROVIDER_LOCATION_UPDATED = 'provider-location-updated',
   USER_LOCATION_UPDATED = 'user-location-updated',
+  PROVIDER_PERIODIC_LOCATION = 'provider-periodic-location',
 
   // Search escalation
   SEARCH_EXPANDED = 'search-expanded',
@@ -52,9 +53,13 @@ export enum SocketEvents {
   REQUEST_CANCEL = 'request-cancel',
   REQUEST_COMPLETED = 'request-completed',
   REQUEST_CANCELLED = 'request-cancelled',
+  REQUEST_CANCELLED_NOTIFICATION = 'request-cancelled-notification',
+  CANCEL_REQUEST_SOCKET = 'cancel-request-socket',
 
   // Arrival events
   PROVIDER_ARRIVAL_CONFIRMED = 'provider-arrival-confirmed',
+  PROVIDER_CONFIRM_ARRIVAL = 'provider-confirm-arrival',
+  CONFIRM_ARRIVAL = 'confirm-arrival',
 
   // Provider status update
   UPDATE_STATUS = 'status-update',

@@ -14,9 +14,11 @@ export interface ServiceProvider {
   phoneNumber?: number;
   age?: number;
   primaryAddress?: string;
+  serviceArea?: string;
   profilePicture?: string | null;
   serviceType: 'ambulance' | 'police' | 'fire_truck' | 'rescue_team';
   serviceStatus: 'available' | 'assigned' | 'off_duty';
+  statusUpdatedAt?: string;
   organizationId: string;
   vehicleInformation?: {
     type: string;
@@ -125,10 +127,10 @@ export const useProviderStore = create<ProviderState>()(
           incomingRequests: state.incomingRequests.filter(
             r => r.requestId !== requestId
           ),
-          currentRequest:
-            state.currentRequest?.requestId === requestId
-              ? null
-              : state.currentRequest,
+          // currentRequest:
+          //   state.currentRequest?.requestId === requestId
+          //     ? null
+          //     : state.currentRequest,
         })),
 
       clearIncomingRequests: () =>
@@ -149,8 +151,38 @@ export const useProviderStore = create<ProviderState>()(
         isAuthenticated: state.isAuthenticated,
         serviceStatus: state.serviceStatus,
       }),
-      onRehydrateStorage: () => state => {
-        state?.setLoading(false);
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[ProviderStore] Rehydration error:', error);
+        }
+
+        const TIMEOUT_MS = 5000;
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const handleTimeout = async () => {
+          console.warn(
+            '[ProviderStore] Rehydration timeout - clearing session'
+          );
+          await SecureStore.deleteItemAsync(TOKEN_KEY);
+          await AsyncStorage.removeItem('provider-storage');
+          if (state) {
+            state.provider = null;
+            state.token = null;
+            state.isAuthenticated = false;
+            state.isLoading = false;
+          }
+        };
+
+        timeoutId = setTimeout(handleTimeout, TIMEOUT_MS);
+
+        if (state) {
+          const originalSetLoading = state.setLoading.bind(state);
+          state.setLoading = (loading: boolean) => {
+            clearTimeout(timeoutId);
+            originalSetLoading(loading);
+          };
+          state.isLoading = false;
+        }
       },
     }
   )

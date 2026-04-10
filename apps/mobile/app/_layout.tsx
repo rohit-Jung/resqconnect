@@ -139,7 +139,16 @@ export default function RootLayout() {
     };
 
     checkAuthAndFetchProfile();
-  }, [isLoading, isProviderLoading]);
+  }, [
+    isLoading,
+    isProviderLoading,
+    provider,
+    setProvider,
+    setUser,
+    setUserType,
+    user,
+    userType,
+  ]);
 
   useEffect(() => {
     if (

@@ -2,17 +2,32 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import SafeAreaContainer from '@/components/SafeAreaContainer';
-import Button from '@/components/ui/Button';
-import InputBox from '@/components/ui/InputBox';
+import Header from '@/components/Header';
 import OTPInput from '@/components/ui/OTPInput';
 import { useResetPassword } from '@/services/user/auth.api';
 import {
   TResetPasswordForm,
   resetPasswordFormSchema,
 } from '@/validations/auth.schema';
+
+const SIGNAL_RED = '#C44536';
+const OFF_WHITE = '#F5F4F0';
+const MID_GRAY = '#888888';
+const LIGHT_GRAY = '#E8E6E1';
+const BLACK = '#000000';
 
 const ResetPasswordScreen: React.FC = () => {
   const router = useRouter();
@@ -43,7 +58,7 @@ const ResetPasswordScreen: React.FC = () => {
 
   const onSubmit = (data: TResetPasswordForm) => {
     if (!userId) {
-      Alert.alert('Error', 'Invalid session. Please try again.');
+      Alert.alert('ERROR', 'Invalid session. Please try again.');
       router.replace('/(auth)/forgot-password');
       return;
     }
@@ -56,7 +71,7 @@ const ResetPasswordScreen: React.FC = () => {
       },
       {
         onSuccess: () => {
-          Alert.alert('Success', 'Password reset successfully!', [
+          Alert.alert('SUCCESS', 'Password reset successfully!', [
             {
               text: 'OK',
               onPress: () => router.replace('/(auth)/sign-in'),
@@ -65,7 +80,7 @@ const ResetPasswordScreen: React.FC = () => {
         },
         onError: (error: any) => {
           Alert.alert(
-            'Error',
+            'ERROR',
             error.response?.data?.message ||
               'Failed to reset password. Please try again.'
           );
@@ -75,105 +90,223 @@ const ResetPasswordScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaContainer>
-      <View className="flex-1 items-center justify-start bg-white px-8 pt-12">
-        {/* Logo */}
-        <View className="mb-6 h-32 w-40">
-          <Image
-            source={require('../../assets/resq-connect-logo.png')}
-            resizeMode="contain"
-            className="h-full w-full"
-          />
-        </View>
+    <View style={styles.container}>
+      <Header title="RESET PASSWORD" showBackButton />
 
-        {/* Title */}
-        <Text
-          className="mb-2 text-3xl text-black"
-          style={{ fontFamily: 'ChauPhilomeneOne_400Regular' }}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          Reset Password
-        </Text>
-
-        {/* Subtitle */}
-        <Text
-          className="mb-6 text-center text-base text-gray-600"
-          style={{ fontFamily: 'Inter' }}
-        >
-          Enter the OTP sent to{'\n'}
-          <Text className="font-semibold">{email || 'your email'}</Text>
-        </Text>
-
-        {/* OTP Input */}
-        <View className="mb-6 w-full">
-          <Text
-            className="mb-2 text-sm text-gray-600"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Enter OTP
-          </Text>
-          <OTPInput length={6} onComplete={handleOTPComplete} />
-          {errors.otpToken && (
-            <Text className="mt-1 text-sm text-red-500">
-              {errors.otpToken.message}
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>RESET PASSWORD</Text>
+            <Text style={styles.subtitle}>
+              Enter the OTP sent to{'\n'}
+              <Text style={styles.emailText}>{email || 'your email'}</Text>
             </Text>
-          )}
-        </View>
+          </View>
 
-        {/* Password Inputs */}
-        <View className="mb-6 w-full gap-3">
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <InputBox
-                placeholder="New Password"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                secureTextEntry
-                error={errors.password?.message}
-              />
+          {/* OTP Input */}
+          <View style={styles.otpSection}>
+            <Text style={styles.inputLabel}>ENTER OTP</Text>
+            <OTPInput length={6} onComplete={handleOTPComplete} />
+            {errors.otpToken && (
+              <Text style={styles.errorText}>{errors.otpToken.message}</Text>
             )}
-          />
+          </View>
 
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <InputBox
-                placeholder="Confirm New Password"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                secureTextEntry
-                error={errors.confirmPassword?.message}
-              />
-            )}
-          />
-        </View>
+          {/* Password Inputs */}
+          <View style={styles.inputSection}>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Enter new password"
+                      placeholderTextColor={MID_GRAY}
+                      secureTextEntry
+                      editable={!isPending}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      value={value}
+                    />
+                  </View>
+                  {errors.password && (
+                    <Text style={styles.errorText}>
+                      {errors.password.message}
+                    </Text>
+                  )}
+                </View>
+              )}
+            />
 
-        {/* Password Requirements */}
-        <View className="mb-6 w-full">
-          <Text
-            className="text-xs text-gray-500"
-            style={{ fontFamily: 'Inter' }}
-          >
-            Password must contain at least 8 characters, one uppercase, one
-            lowercase, one number, and one special character.
-          </Text>
-        </View>
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Confirm new password"
+                      placeholderTextColor={MID_GRAY}
+                      secureTextEntry
+                      editable={!isPending}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      value={value}
+                    />
+                  </View>
+                  {errors.confirmPassword && (
+                    <Text style={styles.errorText}>
+                      {errors.confirmPassword.message}
+                    </Text>
+                  )}
+                </View>
+              )}
+            />
+          </View>
+
+          {/* Password Requirements */}
+          <View style={styles.requirementsSection}>
+            <Text style={styles.requirementsText}>
+              Password must contain at least 8 characters, one uppercase, one
+              lowercase, one number, and one special character.
+            </Text>
+          </View>
+        </ScrollView>
 
         {/* Submit Button */}
-        <Button
-          label={isPending ? 'Resetting...' : 'Reset Password'}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isPending}
-        />
-        {isPending && <ActivityIndicator className="mt-4" color="#E13333" />}
-      </View>
-      <View className="h-16 w-full bg-primary" />
-    </SafeAreaContainer>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, isPending && styles.buttonDisabled]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={isPending}
+            activeOpacity={0.8}
+          >
+            {isPending ? (
+              <ActivityIndicator color={OFF_WHITE} />
+            ) : (
+              <Text style={styles.buttonText}>RESET PASSWORD</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: OFF_WHITE,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  titleSection: {
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: BLACK,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: MID_GRAY,
+    marginTop: 8,
+    letterSpacing: 1,
+    lineHeight: 20,
+  },
+  emailText: {
+    color: SIGNAL_RED,
+    fontWeight: '600',
+  },
+  otpSection: {
+    marginBottom: 32,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: MID_GRAY,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: MID_GRAY,
+  },
+  textInput: {
+    fontSize: 16,
+    color: BLACK,
+    paddingVertical: 12,
+    fontWeight: '500',
+  },
+  errorText: {
+    fontSize: 10,
+    color: SIGNAL_RED,
+    marginTop: 6,
+    letterSpacing: 1,
+  },
+  requirementsSection: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+  },
+  requirementsText: {
+    fontSize: 11,
+    color: MID_GRAY,
+    letterSpacing: 1,
+    lineHeight: 18,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
+  },
+  button: {
+    height: 56,
+    backgroundColor: SIGNAL_RED,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: LIGHT_GRAY,
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: OFF_WHITE,
+    letterSpacing: 3,
+  },
+});
 
 export default ResetPasswordScreen;

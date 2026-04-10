@@ -11,7 +11,6 @@ import {
 import {
   AGGREGATE_TYPES,
   EVENT_TYPES,
-  KAFKA_TOPICS,
   OUTBOX_EVENT_TYPES,
 } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
@@ -119,7 +118,7 @@ const createEmergencyRequest = asyncHandler(
         return newRequest;
       });
 
-      const published = await publishWithRetry(KAFKA_TOPICS.MEDICAL_EVENTS, {
+      const published = await publishWithRetry(getKafkaTopic(emergencyType), {
         key: result.id,
         value: JSON.stringify({
           type: EVENT_TYPES.REQUEST_CREATED,
@@ -145,6 +144,8 @@ const createEmergencyRequest = asyncHandler(
           `Kafka unavailable, event queued in outbox for request ${result.id}`
         );
       }
+
+      console.log('[CONTROLLER], Created, Published', result, published);
 
       res.status(201).json(
         new ApiResponse(201, 'Emergency request created', {
@@ -486,13 +487,35 @@ const acceptEmergencyRequest = asyncHandler(
           providerId,
           metadata: { acceptedAt: new Date().toISOString() },
         }),
+        (async () => {
+          const providerData = await db.query.serviceProvider.findFirst({
+            where: eq(serviceProvider.id, providerId),
+          });
+
+          return db.insert(emergencyResponse).values({
+            emergencyRequestId: requestId,
+            serviceProviderId: providerId,
+            originLocation: {
+              latitude: providerData?.currentLocation?.latitude || '0',
+              longitude: providerData?.currentLocation?.longitude || '0',
+            },
+            destinationLocation: {
+              latitude: existingRequest.location?.latitude.toString() || '0',
+              longitude: existingRequest.location?.longitude.toString() || '0',
+            },
+            assignedAt: new Date(),
+          });
+        })(),
       ]);
 
       const providerIds = await getEmergencyProviders(requestId);
+      console.log('Got providers', providerIds);
+
       const io = getIo();
 
       if (io) {
         for (const pid of providerIds) {
+          console.log('pid', pid);
           if (pid !== providerId) {
             io.to(SocketRoom.PROVIDER(pid)).emit(
               SocketEvents.REQUEST_ALREADY_TAKEN,
@@ -720,6 +743,80 @@ const confirmProviderArrival = asyncHandler(
   }
 );
 
+const providerConfirmedArrival = asyncHandler(
+  async (req: Request, res: Response) => {
+    const requestId = req.params.id as string;
+    const providerId = req.user?.id;
+
+    if (!providerId) {
+      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+    }
+
+    if (!requestId) {
+      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+    }
+
+    const existingRequest = await db.query.emergencyRequest.findFirst({
+      where: and(eq(emergencyRequest.id, requestId)),
+    });
+
+    if (!existingRequest) {
+      throw new ApiError(
+        HttpStatusCode.NotFound,
+        'Emergency request not found or not authorized'
+      );
+    }
+
+    if (
+      existingRequest.requestStatus !== 'accepted' &&
+      existingRequest.requestStatus !== 'assigned'
+    ) {
+      throw new ApiError(
+        HttpStatusCode.BadRequest,
+        'Request is not in accepted or assigned status'
+      );
+    }
+
+    const response = await db.query.emergencyResponse.findFirst({
+      where: eq(emergencyResponse.emergencyRequestId, requestId),
+    });
+
+    const arrivedAt = new Date().toISOString();
+
+    await Promise.all([
+      db
+        .update(emergencyRequest)
+        .set({ requestStatus: 'in_progress' })
+        .where(eq(emergencyRequest.id, requestId)),
+      db.insert(requestEvents).values({
+        requestId,
+        eventType: 'in_progress',
+        metadata: {
+          arrivedAt,
+          confirmedByUser: false,
+          confirmedByProvider: true,
+        },
+      }),
+    ]);
+
+    const io = getIo();
+    if (io && response?.serviceProviderId) {
+      io.to(SocketRoom.PROVIDER(response.serviceProviderId)).emit(
+        SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
+        {
+          requestId,
+          arrivedAt,
+          message: 'Provider has confirmed their arrival',
+        }
+      );
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, 'Provider arrival confirmed', { arrivedAt }));
+  }
+);
+
 const getUserEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInUser = req.user;
@@ -739,6 +836,8 @@ const getUserEmergencyHistory = asyncHandler(
     };
 
     const offset = (page - 1) * limit;
+
+    console.log('[RECEIVED]', req.user, (req as any).validatedQuery, status);
 
     const whereConditions = status
       ? and(
@@ -821,17 +920,167 @@ const getUserEmergencyHistory = asyncHandler(
   }
 );
 
+const getProviderEmergencyHistory = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+    const { page, limit, sortBy, status } = (req as any).validatedQuery as {
+      page: number;
+      limit: number;
+      sortBy: 'asc' | 'desc';
+      status?: 'completed' | 'cancelled' | 'in_progress';
+    };
+
+    const offset = (page - 1) * limit;
+
+    const baseCondition = eq(
+      emergencyResponse.serviceProviderId,
+      loggedInProvider!.id
+    );
+
+    let queryConditions: ReturnType<typeof eq> = baseCondition;
+    if (status) {
+      queryConditions = and(
+        baseCondition,
+        eq(emergencyRequest.requestStatus, status)
+      ) as ReturnType<typeof eq>;
+    }
+
+    const emergencyResponses = await db
+      .select({
+        response: emergencyResponse,
+        request: emergencyRequest,
+        user: user,
+      })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .innerJoin(user, eq(emergencyRequest.userId, user.id))
+      .where(queryConditions)
+      .orderBy(
+        sortBy === 'asc'
+          ? emergencyResponse.respondedAt
+          : desc(emergencyResponse.respondedAt)
+      )
+      .limit(limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .where(baseCondition);
+
+    const [completedResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'completed')
+        )
+      );
+
+    const [cancelledResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'cancelled')
+        )
+      );
+
+    const [avgResult] = await db
+      .select({
+        avgTime: sql<number>`AVG(EXTRACT(EPOCH FROM (${emergencyResponse.respondedAt} - ${emergencyRequest.createdAt})))::int`,
+      })
+      .from(emergencyResponse)
+      .innerJoin(
+        emergencyRequest,
+        eq(emergencyResponse.emergencyRequestId, emergencyRequest.id)
+      )
+      .where(
+        and(
+          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyRequest.requestStatus, 'completed'),
+          sql`${emergencyResponse.respondedAt} IS NOT NULL`
+        )
+      );
+
+    const totalCount = totalResult?.count ?? 0;
+
+    const history = emergencyResponses.map(
+      ({ response, request, user: userData }) => ({
+        id: request.id,
+        emergencyType: request.serviceType,
+        emergencyDescription: request.description,
+        status: request.requestStatus,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+        emergencyLocation: request.location,
+        responseTime:
+          response.respondedAt && request.createdAt
+            ? Math.floor(
+                (new Date(response.respondedAt).getTime() -
+                  new Date(request.createdAt).getTime()) /
+                  1000
+              )
+            : null,
+        distanceTraveled: null,
+        user: userData
+          ? {
+              id: userData.id,
+              name: userData.name,
+              phoneNumber: userData.phoneNumber,
+            }
+          : null,
+      })
+    );
+
+    const stats = {
+      total: totalCount,
+      completed: completedResult?.count ?? 0,
+      cancelled: cancelledResult?.count ?? 0,
+      avgResponseTime: avgResult?.avgTime ?? null,
+    };
+
+    return res.status(200).json(
+      new ApiResponse(200, 'Provider emergency history retrieved', {
+        history,
+        stats,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+      })
+    );
+  }
+);
+
 export {
-  createEmergencyRequest,
-  getEmergencyRequest,
-  getUsersEmergencyRequests,
-  updateEmergencyRequest,
-  deleteEmergencyRequest,
-  getRecentEmergencyRequests,
-  cancelEmergencyRequest,
   acceptEmergencyRequest,
-  rejectEmergencyRequest,
+  cancelEmergencyRequest,
   completeEmergencyRequest,
   confirmProviderArrival,
+  createEmergencyRequest,
+  deleteEmergencyRequest,
+  getEmergencyRequest,
+  getProviderEmergencyHistory,
+  getRecentEmergencyRequests,
   getUserEmergencyHistory,
+  getUsersEmergencyRequests,
+  providerConfirmedArrival,
+  rejectEmergencyRequest,
+  updateEmergencyRequest,
 };

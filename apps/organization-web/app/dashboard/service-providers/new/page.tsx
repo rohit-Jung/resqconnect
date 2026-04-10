@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Ambulance,
   ArrowLeft,
+  Eye,
+  EyeOff,
   Flame,
   Info,
   LifeBuoy,
@@ -18,7 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
@@ -76,6 +78,8 @@ const getCategoryDisplayName = (category: ServiceCategory): string => {
 
 export default function NewServiceProviderPage() {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const createMutation = useOrgRegisterProvider();
 
   // Fetch org data to get the allowed service type
@@ -96,10 +100,11 @@ export default function NewServiceProviderPage() {
     formState: { errors },
     setValue,
   } = useForm<TServiceProviderRegisterForm>({
+    mode: 'onBlur',
     resolver: zodResolver(serviceProviderRegisterFormSchema),
   });
 
-  // Auto-set the service type when org data is loaded
+  console.log('errrors', errors);
   useEffect(() => {
     if (allowedServiceType) {
       setValue('serviceType', allowedServiceType);
@@ -108,263 +113,383 @@ export default function NewServiceProviderPage() {
 
   const onSubmit = async (data: TServiceProviderRegisterForm) => {
     try {
-      // Convert form data to API format, excluding confirmPassword
       const { confirmPassword, ...formData } = data;
       const apiData = {
         ...formData,
         age: parseInt(data.age, 10),
         phoneNumber: parseInt(data.phoneNumber, 10),
       };
-      createMutation.mutate(apiData, {
-        onSuccess: () => {
-          router.push('/dashboard/service-providers');
-        },
-        onError(error) {
-          alert('Failed to register service provider');
-          console.log('Error: ', error);
-        },
-      });
-    } catch (error) {
+      await createMutation.mutateAsync(apiData);
+      router.push('/dashboard/service-providers');
+    } catch (error: unknown) {
       console.error('Error creating service provider:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response?: { data?: { message?: string } } };
+        alert(
+          err.response?.data?.message || 'Failed to register service provider'
+        );
+      } else {
+        alert('Failed to register service provider');
+      }
     }
   };
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
-        <Link href="/dashboard/service-providers">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Add New Service Provider</h1>
-          <p className="text-muted-foreground">
+    <div className="min-h-screen bg-background dark:bg-background">
+      {/* Swiss Style Header */}
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/service-providers">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none h-10 w-10"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+            Add Provider
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
             Register a new service provider for your organization
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Service Type - Auto-selected based on organization category */}
-        <div className="bg-card rounded-xl border p-6">
-          <h2 className="mb-4 text-lg font-semibold">Service Type</h2>
+      {/* Form Container */}
+      <div className="px-6 pb-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Service Type - Auto-selected based on organization category */}
+          <div className="bg-card rounded-xl border p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
+              Service Type
+            </h2>
 
-          {isLoadingOrg ? (
-            <div className="space-y-3">
-              <Skeleton className="h-24 w-full rounded-xl" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          ) : typeConfig && allowedServiceType ? (
-            <>
-              {/* Info message explaining the restriction */}
-              <div className="bg-muted/50 mb-4 flex items-start gap-3 rounded-lg border p-4">
-                <Info className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium">
-                    Service type automatically assigned
-                  </p>
-                  <p className="text-muted-foreground mt-1">
-                    Your organization is registered as{' '}
-                    <span className="font-medium">
-                      {getCategoryDisplayName(orgServiceCategory!)}
-                    </span>
-                    . Service providers can only be created with the matching
-                    service type.
-                  </p>
-                </div>
+            {isLoadingOrg ? (
+              <div className="space-y-3">
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-4 w-3/4" />
               </div>
-
-              {/* Display the auto-selected service type */}
-              <div className="border-primary bg-primary/5 rounded-xl border-2 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="bg-primary text-primary-foreground rounded-lg p-2">
-                    {typeConfig.icon}
-                  </div>
-                  <div>
-                    <p className="font-medium">{typeConfig.label}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {typeConfig.description}
+            ) : typeConfig && allowedServiceType ? (
+              <>
+                {/* Info message explaining the restriction */}
+                <div className="bg-muted mb-4 flex items-start gap-3 rounded-lg border border-border p-4">
+                  <Info className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0 dark:text-muted-foreground" />
+                  <div className="text-sm">
+                    <p className="font-medium text-foreground dark:text-foreground">
+                      Service type automatically assigned
+                    </p>
+                    <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+                      Your organization is registered as{' '}
+                      <span className="font-medium">
+                        {getCategoryDisplayName(orgServiceCategory!)}
+                      </span>
+                      . Service providers can only be created with the matching
+                      service type.
                     </p>
                   </div>
                 </div>
+
+                {/* Display the auto-selected service type */}
+                <div className="border-primary bg-primary/5 rounded-xl border-2 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-primary text-primary-foreground rounded-lg p-2">
+                      {typeConfig.icon}
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground dark:text-foreground">
+                        {typeConfig.label}
+                      </p>
+                      <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                        {typeConfig.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-muted-foreground text-sm dark:text-muted-foreground">
+                Unable to determine organization service category.
               </div>
-            </>
-          ) : (
-            <div className="text-muted-foreground text-sm">
-              Unable to determine organization service category.
+            )}
+
+            {errors.serviceType && (
+              <p className="text-primary mt-2 text-sm">
+                {errors.serviceType.message}
+              </p>
+            )}
+          </div>
+
+          {/* Personal Information */}
+          <div className="bg-card rounded-xl border p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
+              Provider Information
+            </h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="name"
+                    className="text-foreground dark:text-foreground"
+                  >
+                    Full Name
+                  </Label>
+                  <div className="relative">
+                    <User className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
+                      className={`pl-10 pr-3 border-border focus:border-primary text-foreground ${
+                        errors.name ? 'border-primary ring-1 ring-primary' : ''
+                      }`}
+                      aria-invalid={!!errors.name}
+                      {...register('name')}
+                    />
+                  </div>
+                  {errors.name && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.name.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="email"
+                    className="text-foreground dark:text-foreground"
+                  >
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <Mail className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      className={`pl-10 pr-3 border-border focus:border-primary text-foreground ${
+                        errors.email ? 'border-primary ring-1 ring-primary' : ''
+                      }`}
+                      aria-invalid={!!errors.email}
+                      {...register('email')}
+                    />
+                  </div>
+                  {errors.email && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.email.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="age"
+                    className="text-foreground dark:text-foreground"
+                  >
+                    Age
+                  </Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    placeholder="25"
+                    className={`border-border focus:border-primary text-foreground ${
+                      errors.age ? 'border-primary ring-1 ring-primary' : ''
+                    }`}
+                    aria-invalid={!!errors.age}
+                    {...register('age')}
+                  />
+                  {errors.age && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.age.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="phoneNumber"
+                    className="text-foreground dark:text-foreground"
+                  >
+                    Phone Number
+                  </Label>
+                  <div className="relative">
+                    <Phone className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      placeholder="9841234567"
+                      className={`pl-10 pr-3 border-border focus:border-primary text-foreground ${
+                        errors.phoneNumber
+                          ? 'border-primary ring-1 ring-primary'
+                          : ''
+                      }`}
+                      aria-invalid={!!errors.phoneNumber}
+                      {...register('phoneNumber')}
+                    />
+                  </div>
+                  {errors.phoneNumber && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.phoneNumber.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="primaryAddress"
+                    className="text-foreground dark:text-foreground"
+                  >
+                    Primary Address
+                  </Label>
+                  <div className="relative">
+                    <MapPin className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
+                    <Input
+                      id="primaryAddress"
+                      placeholder="Kathmandu, Nepal"
+                      className={`pl-10 pr-3 border-border focus:border-primary text-foreground ${
+                        errors.primaryAddress
+                          ? 'border-primary ring-1 ring-primary'
+                          : ''
+                      }`}
+                      aria-invalid={!!errors.primaryAddress}
+                      {...register('primaryAddress')}
+                    />
+                  </div>
+                  {errors.primaryAddress && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.primaryAddress.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+          </div>
 
-          {errors.serviceType && (
-            <p className="text-destructive mt-2 text-sm">
-              {errors.serviceType.message}
+          {/* Password */}
+          <div className="bg-card rounded-xl border p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
+              Account Security
+            </h2>
+            <p className="text-muted-foreground mb-4 text-sm dark:text-muted-foreground">
+              Set a temporary password for the provider. They can change it
+              after logging in.
             </p>
-          )}
-        </div>
-
-        {/* Personal Information */}
-        <div className="bg-card rounded-xl border p-6">
-          <h2 className="mb-4 text-lg font-semibold">Provider Information</h2>
-          <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label
+                  htmlFor="password"
+                  className="text-foreground dark:text-foreground"
+                >
+                  Password
+                </Label>
                 <div className="relative">
-                  <User className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                  <Lock className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
                   <Input
-                    id="name"
-                    placeholder="John Doe"
-                    className="pl-10"
-                    {...register('name')}
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className={`pl-10 pr-10 border-border focus:border-primary text-foreground ${
+                      errors.password
+                        ? 'border-primary ring-1 ring-primary'
+                        : ''
+                    }`}
+                    aria-invalid={!!errors.password}
+                    {...register('password')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground dark:text-muted-foreground"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
-                {errors.name && (
-                  <p className="text-destructive text-sm">
-                    {errors.name.message}
+                {errors.password && (
+                  <p className="text-primary text-sm font-medium">
+                    {errors.password.message}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label
+                  htmlFor="confirmPassword"
+                  className="text-foreground dark:text-foreground"
+                >
+                  Confirm Password
+                </Label>
                 <div className="relative">
-                  <Mail className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                  <Lock className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 dark:text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    className="pl-10"
-                    {...register('email')}
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className={`pl-10 pr-10 border-border focus:border-primary text-foreground ${
+                      errors.confirmPassword
+                        ? 'border-primary ring-1 ring-primary'
+                        : ''
+                    }`}
+                    aria-invalid={!!errors.confirmPassword}
+                    {...register('confirmPassword')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground dark:text-muted-foreground"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
-                {errors.email && (
-                  <p className="text-destructive text-sm">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="25"
-                  {...register('age')}
-                />
-                {errors.age && (
-                  <p className="text-destructive text-sm">
-                    {errors.age.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                <div className="relative">
-                  <Phone className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    id="phoneNumber"
-                    type="tel"
-                    placeholder="9841234567"
-                    className="pl-10"
-                    {...register('phoneNumber')}
-                  />
-                </div>
-                {errors.phoneNumber && (
-                  <p className="text-destructive text-sm">
-                    {errors.phoneNumber.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="primaryAddress">Primary Address</Label>
-                <div className="relative">
-                  <MapPin className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    id="primaryAddress"
-                    placeholder="Kathmandu, Nepal"
-                    className="pl-10"
-                    {...register('primaryAddress')}
-                  />
-                </div>
-                {errors.primaryAddress && (
-                  <p className="text-destructive text-sm">
-                    {errors.primaryAddress.message}
+                {errors.confirmPassword && (
+                  <p className="text-primary text-sm font-medium">
+                    {errors.confirmPassword.message}
                   </p>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Password */}
-        <div className="bg-card rounded-xl border p-6">
-          <h2 className="mb-4 text-lg font-semibold">Account Security</h2>
-          <p className="text-muted-foreground mb-4 text-sm">
-            Set a temporary password for the provider. They can change it after
-            logging in.
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  {...register('password')}
-                />
-              </div>
-              {errors.password && (
-                <p className="text-destructive text-sm">
-                  {errors.password.message}
-                </p>
+          {/* Submit */}
+          <div className="flex items-center justify-end gap-4">
+            <Link href="/dashboard/service-providers">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-border text-muted-foreground hover:bg-muted hover:text-foreground rounded-none dark:text-muted-foreground"
+              >
+                Cancel
+              </Button>
+            </Link>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending || !allowedServiceType}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none"
+            >
+              {createMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  {...register('confirmPassword')}
-                />
-              </div>
-              {errors.confirmPassword && (
-                <p className="text-destructive text-sm">
-                  {errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Submit */}
-        <div className="flex items-center justify-end gap-4">
-          <Link href="/dashboard/service-providers">
-            <Button type="button" variant="outline">
-              Cancel
+              Create Provider
             </Button>
-          </Link>
-          <Button
-            type="submit"
-            disabled={createMutation.isPending || !allowedServiceType}
-          >
-            {createMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Create Provider
-          </Button>
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

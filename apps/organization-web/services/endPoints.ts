@@ -23,6 +23,12 @@ export const orgEndpoints = {
   deleteProvider: (id: string) => `/organization/service-providers/${id}`,
   verifyProvider: (id: string) =>
     `/organization/service-providers/${id}/verify`,
+  // Document verification
+  pendingVerifications: `/organization/verifications/pending`,
+  getProviderDocuments: (providerId: string) =>
+    `/organization/verifications/${providerId}`,
+  verifyDocuments: (providerId: string) =>
+    `/organization/verifications/${providerId}/verify`,
 };
 
 export const paymentEndpoints = {

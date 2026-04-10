@@ -121,288 +121,323 @@ export default function ServiceProvidersPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="text-primary h-8 w-8 animate-spin" />
+      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
+        <Loader2 className="text-primary h-8 w-8 animate-spin dark:text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Service Providers</h1>
-          <p className="text-muted-foreground">
+    <div className="min-h-screen bg-background dark:bg-background">
+      {/* Swiss Style Header */}
+      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
+              RESQ
+            </span>
+            <span className="text-xl font-bold text-primary dark:text-primary">
+              .
+            </span>
+          </div>
+          <Link href="/dashboard/service-providers/new">
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
+              <Plus className="h-4 w-4" />
+              Add Provider
+            </Button>
+          </Link>
+        </div>
+        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+            Service Providers
+          </h1>
+          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
             Manage your organization&apos;s service providers
           </p>
         </div>
-        <Link href="/dashboard/service-providers/new">
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Provider
-          </Button>
-        </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="bg-card rounded-xl border p-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-blue-100 p-2">
-              <Users className="h-5 w-5 text-blue-600" />
+      {/* Content */}
+      <div className="px-6 pb-8 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                  Total Providers
+                </p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
+                  {providers.length}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Total Providers</p>
-              <p className="text-2xl font-bold">{providers.length}</p>
+          </div>
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-green-100 dark:bg-green-900/30 p-2">
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                  Available
+                </p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
+                  {
+                    providers.filter(p => p.serviceStatus === 'available')
+                      .length
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-yellow-100 dark:bg-yellow-900/30 p-2">
+                <Loader2 className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                  On Assignment
+                </p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
+                  {providers.filter(p => p.serviceStatus === 'assigned').length}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-muted p-2">
+                <XCircle className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm dark:text-muted-foreground">
+                  Off Duty
+                </p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
+                  {providers.filter(p => p.serviceStatus === 'off_duty').length}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="bg-card rounded-xl border p-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-green-100 p-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Available</p>
-              <p className="text-2xl font-bold">
-                {providers.filter(p => p.serviceStatus === 'available').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl border p-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-yellow-100 p-2">
-              <Loader2 className="h-5 w-5 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">On Assignment</p>
-              <p className="text-2xl font-bold">
-                {providers.filter(p => p.serviceStatus === 'assigned').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl border p-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gray-100 p-2">
-              <XCircle className="h-5 w-5 text-gray-600" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Off Duty</p>
-              <p className="text-2xl font-bold">
-                {providers.filter(p => p.serviceStatus === 'off_duty').length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search by name, email, or phone..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}
-          className="bg-background rounded-md border px-3 py-2 text-sm"
-        >
-          <option value="all">All Status</option>
-          <option value="available">Available</option>
-          <option value="assigned">On Assignment</option>
-          <option value="off_duty">Off Duty</option>
-        </select>
-        <select
-          value={filterType}
-          onChange={e => setFilterType(e.target.value)}
-          className="bg-background rounded-md border px-3 py-2 text-sm"
-        >
-          <option value="all">All Types</option>
-          <option value="ambulance">Ambulance</option>
-          <option value="fire_truck">Fire Truck</option>
-          <option value="police">Police</option>
-          <option value="rescue_team">Rescue Team</option>
-        </select>
-      </div>
-
-      {/* Providers List */}
-      <div className="bg-card overflow-hidden rounded-xl border">
-        {filteredProviders.length === 0 ? (
-          <div className="p-8 text-center">
-            <Users className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-            <h3 className="mb-2 text-lg font-medium">
-              No service providers found
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || filterStatus !== 'all' || filterType !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Get started by adding your first service provider'}
-            </p>
-            {!searchQuery && filterStatus === 'all' && filterType === 'all' && (
-              <Link href="/dashboard/service-providers/new">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Provider
-                </Button>
-              </Link>
-            )}
+        {/* Filters */}
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              placeholder="Search by name, email, or phone..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 border-border focus:border-primary rounded-none"
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium">
-                    Provider
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">
-                    Contact
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">
-                    Service Type
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">
-                    Verified
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-medium">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredProviders.map(provider => {
-                  const typeConfig = SERVICE_TYPE_CONFIG[provider.serviceType];
-                  const statusConfig = STATUS_CONFIG[provider.serviceStatus];
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="bg-card rounded-none border-border px-3 py-2 text-sm text-foreground"
+          >
+            <option value="all">All Status</option>
+            <option value="available">Available</option>
+            <option value="assigned">On Assignment</option>
+            <option value="off_duty">Off Duty</option>
+          </select>
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="bg-card rounded-none border-border px-3 py-2 text-sm text-foreground"
+          >
+            <option value="all">All Types</option>
+            <option value="ambulance">Ambulance</option>
+            <option value="fire_truck">Fire Truck</option>
+            <option value="police">Police</option>
+            <option value="rescue_team">Rescue Team</option>
+          </select>
+        </div>
 
-                  return (
-                    <tr key={provider.id} className="hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
-                            <span className="text-primary font-medium">
-                              {provider.name.charAt(0).toUpperCase()}
-                            </span>
+        {/* Providers List */}
+        <div className="bg-card overflow-hidden rounded-xl border">
+          {filteredProviders.length === 0 ? (
+            <div className="p-8 text-center">
+              <Users className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+              <h3 className="mb-2 text-lg font-medium text-foreground">
+                No service providers found
+              </h3>
+              <p className="text-muted-foreground mb-4 dark:text-muted-foreground">
+                {searchQuery || filterStatus !== 'all' || filterType !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Get started by adding your first service provider'}
+              </p>
+              {!searchQuery &&
+                filterStatus === 'all' &&
+                filterType === 'all' && (
+                  <Link href="/dashboard/service-providers/new">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Provider
+                    </Button>
+                  </Link>
+                )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      Provider
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      Contact
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      Service Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      Verified
+                    </th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredProviders.map(provider => {
+                    const typeConfig =
+                      SERVICE_TYPE_CONFIG[provider.serviceType];
+                    const statusConfig = STATUS_CONFIG[provider.serviceStatus];
+
+                    return (
+                      <tr key={provider.id} className="hover:bg-muted/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 flex h-10 w-10 items-center justify-center">
+                              <span className="text-primary font-medium">
+                                {provider.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {provider.name}
+                              </p>
+                              <p className="text-muted-foreground flex items-center gap-1 text-sm dark:text-muted-foreground">
+                                <MapPin className="h-3 w-3" />
+                                {provider.primaryAddress}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{provider.name}</p>
-                            <p className="text-muted-foreground flex items-center gap-1 text-sm">
-                              <MapPin className="h-3 w-3" />
-                              {provider.primaryAddress}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-1">
+                            <p className="flex items-center gap-1 text-sm text-foreground">
+                              <Mail className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
+                              {provider.email}
+                            </p>
+                            <p className="flex items-center gap-1 text-sm text-foreground">
+                              <Phone className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
+                              {provider.phoneNumber}
                             </p>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-1 text-sm">
-                            <Mail className="text-muted-foreground h-3 w-3" />
-                            {provider.email}
-                          </p>
-                          <p className="flex items-center gap-1 text-sm">
-                            <Phone className="text-muted-foreground h-3 w-3" />
-                            {provider.phoneNumber}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div
-                          className={`flex items-center gap-2 ${typeConfig.color}`}
-                        >
-                          {typeConfig.icon}
-                          <span className="text-sm font-medium">
-                            {typeConfig.label}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant="secondary"
-                          className={`${statusConfig.bgColor} ${statusConfig.color}`}
-                        >
-                          {statusConfig.label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {provider.isVerified ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-yellow-500" />
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="relative inline-block">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setActiveDropdown(
-                                activeDropdown === provider.id
-                                  ? null
-                                  : provider.id
-                              )
-                            }
+                        </td>
+                        <td className="px-4 py-3">
+                          <div
+                            className={`flex items-center gap-2 ${typeConfig.color}`}
                           >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                          {activeDropdown === provider.id && (
-                            <div className="bg-card absolute right-0 z-10 mt-1 w-48 rounded-lg border shadow-lg">
-                              <Link
-                                href={`/dashboard/service-providers/${provider.id}`}
-                                className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View Details
-                              </Link>
-                              <Link
-                                href={`/dashboard/service-providers/${provider.id}/edit`}
-                                className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm"
-                              >
-                                <Edit className="h-4 w-4" />
-                                Edit
-                              </Link>
-                              {!provider.isVerified && (
-                                <button
-                                  onClick={() => handleVerify(provider.id)}
-                                  className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-green-600"
-                                  disabled={verifyMutation.isPending}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                  {verifyMutation.isPending
-                                    ? 'Verifying...'
-                                    : 'Verify'}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleDelete(provider.id)}
-                                className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                {deleteId === provider.id
-                                  ? 'Confirm Delete'
-                                  : 'Delete'}
-                              </button>
-                            </div>
+                            {typeConfig.icon}
+                            <span className="text-sm font-medium text-foreground">
+                              {typeConfig.label}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            variant="secondary"
+                            className={`${statusConfig.bgColor} ${statusConfig.color} rounded-none border-0`}
+                          >
+                            {statusConfig.label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          {provider.isVerified ? (
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-yellow-500" />
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="relative inline-block">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-none"
+                              onClick={() =>
+                                setActiveDropdown(
+                                  activeDropdown === provider.id
+                                    ? null
+                                    : provider.id
+                                )
+                              }
+                            >
+                              <MoreVertical className="h-4 w-4 text-foreground" />
+                            </Button>
+                            {activeDropdown === provider.id && (
+                              <div className="bg-popover absolute right-0 z-10 mt-1 w-48 rounded-lg border shadow-lg">
+                                <Link
+                                  href={`/dashboard/service-providers/${provider.id}`}
+                                  className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm text-foreground"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  View Details
+                                </Link>
+                                <Link
+                                  href={`/dashboard/service-providers/${provider.id}/edit`}
+                                  className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm text-foreground"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  Edit
+                                </Link>
+                                {!provider.isVerified && (
+                                  <button
+                                    onClick={() => handleVerify(provider.id)}
+                                    className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-green-600"
+                                    disabled={verifyMutation.isPending}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                    {verifyMutation.isPending
+                                      ? 'Verifying...'
+                                      : 'Verify'}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDelete(provider.id)}
+                                  className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  {deleteId === provider.id
+                                    ? 'Confirm Delete'
+                                    : 'Delete'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

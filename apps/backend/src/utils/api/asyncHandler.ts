@@ -16,10 +16,19 @@ export function asyncHandler(
       console.log('Error caught in asyncHandler', error);
       const stack = error.stack || '';
 
+      // Preserve the errors array if it exists
+      const errors = Array.isArray(error.errors) ? error.errors : [];
+
       res
         .status(error.statusCode || 500)
         .json(
-          new ApiError(error.statusCode || 500, error.message, [], null, stack)
+          new ApiError(
+            error.statusCode || 500,
+            error.message,
+            errors,
+            null,
+            stack
+          )
         );
     }
   };

@@ -15,7 +15,7 @@ import {
   updatePushToken,
   updateUser,
   verifyUser,
-} from '@/controllers/auth.controller';
+} from '@/controllers/user.controller';
 import {
   validateRequestBody,
   validateRoleAuth,
@@ -28,7 +28,7 @@ import {
   updateEmergencySettingsSchema,
   updatePushTokenSchema,
   verifyUserSchema,
-} from '@/validations/auth.validations';
+} from '@/validations/user.validations';
 
 const userRouter = express.Router();
 const validateUser = validateRoleAuth([UserRoles.USER]);

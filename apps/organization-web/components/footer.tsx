@@ -14,11 +14,8 @@ export function Footer() {
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
           <div className="space-y-6">
             <div className="flex items-center gap-2">
-              <div className="bg-primary text-primary-foreground flex items-center justify-center rounded-lg p-1">
-                <ShieldCheck className="h-6 w-6" />
-              </div>
               <span className="text-xl font-bold tracking-tight text-foreground">
-                ResQ <span className="text-primary">Connect</span>
+                RESQ<span className="text-primary">. Connect</span>
               </span>
             </div>
             <p className="max-w-xs text-sm leading-relaxed">
