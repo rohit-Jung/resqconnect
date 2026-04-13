@@ -26,14 +26,28 @@ import {
   getProviderDocuments,
   verifyProviderDocuments,
 } from '@/controllers/service-provider.controller';
-import { validateOrg, validateRoleAuth } from '@/middlewares/auth.middleware';
+import {
+  validateOrg,
+  validateRoleAuth,
+  validateRequestBody,
+} from '@/middlewares/auth.middleware';
+import {
+  registerOrganizationSchema,
+  loginOrganizationSchema,
+  verifyOrgOTPSchema,
+  updateOrgProfileSchema,
+  registerOrgServiceProviderSchema,
+  updateOrgServiceProviderSchema,
+} from '@/validations/organization.validations';
 
 const organizationRouter = Router();
 const validateAdmin = validateRoleAuth([UserRoles.ADMIN]);
 
 organizationRouter.route('/').get(validateAdmin, getAllOrganizations);
 organizationRouter.route('/profile').get(validateOrg, getOrgProfile);
-organizationRouter.route('/profile').patch(validateOrg, updateOrgProfile);
+organizationRouter
+  .route('/profile')
+  .patch(validateOrg, validateRequestBody(updateOrgProfileSchema), updateOrgProfile);
 
 // Dashboard analytics for organization
 organizationRouter
@@ -43,22 +57,36 @@ organizationRouter
 // Public endpoint to list organizations for service provider registration
 organizationRouter.route('/list').get(listOrganizationsPublic);
 
-organizationRouter.route('/register').post(registerOrganization);
+organizationRouter
+  .route('/register')
+  .post(validateRequestBody(registerOrganizationSchema), registerOrganization);
 
-organizationRouter.route('/login').post(loginOrganization);
+organizationRouter
+  .route('/login')
+  .post(validateRequestBody(loginOrganizationSchema), loginOrganization);
 
-organizationRouter.route('/verify').post(verifyOrgOTP);
+organizationRouter
+  .route('/verify')
+  .post(validateRequestBody(verifyOrgOTPSchema), verifyOrgOTP);
 
 //Service Provider Management Routes
 organizationRouter
   .route('/service-providers')
   .get(validateOrg, getOrgServiceProviders)
-  .post(validateOrg, registerOrgServiceProvider);
+  .post(
+    validateOrg,
+    validateRequestBody(registerOrgServiceProviderSchema),
+    registerOrgServiceProvider
+  );
 
 organizationRouter
   .route('/service-providers/:id')
   .get(validateOrg, getOrgServiceProviderById)
-  .patch(validateOrg, updateOrgServiceProvider)
+  .patch(
+    validateOrg,
+    validateRequestBody(updateOrgServiceProviderSchema),
+    updateOrgServiceProvider
+  )
   .delete(validateOrg, deleteOrgServiceProvider);
 
 organizationRouter

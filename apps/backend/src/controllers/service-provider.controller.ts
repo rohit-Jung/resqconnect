@@ -8,22 +8,15 @@ import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import {
   type TServiceProvider,
-  emergencyRequest,
-  emergencyResponse,
-  newServiceProviderSchema,
   organization,
   serviceProvider,
   verifyDocumentsSchema,
 } from '@/models';
-import {
-  notifyServiceProvider,
-  notifyUser,
-} from '@/services/notification.service';
 import { getIo } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { calculateDistance, getBestServiceProvider } from '@/utils/maps';
+import { calculateDistance } from '@/utils/maps';
 import { sendOTP } from '@/utils/services/email';
 import { generateJWT } from '@/utils/tokens/jwtTokens';
 
@@ -43,32 +36,23 @@ function bigIntToString(obj: any): any {
 
 const registerServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
-    const parsedValues = newServiceProviderSchema.safeParse(req.body);
-
-    if (!parsedValues.success) {
-      console.log('Parsing Error: ', parsedValues.error.issues);
-      const validationError = new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${String(issue.path[0])} : ${issue.message} `
-        )
-      );
-
-      return res.status(400).json(validationError);
-    }
-
-    if (
-      parsedValues.data.phoneNumber &&
-      /^[0-9]{10}$/.exec(parsedValues.data.phoneNumber.toString()) === null
-    ) {
-      throw new ApiError(400, 'Invalid phone number');
-    }
+    const {
+      name,
+      age,
+      email,
+      phoneNumber,
+      primaryAddress,
+      password,
+      serviceType,
+      organizationId,
+      panCardUrl,
+      citizenshipUrl,
+    } = req.body;
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
       where: or(
-        eq(serviceProvider.phoneNumber, parsedValues.data.phoneNumber),
-        eq(serviceProvider.email, parsedValues.data.email)
+        eq(serviceProvider.phoneNumber, phoneNumber),
+        eq(serviceProvider.email, email)
       ),
     });
 
@@ -80,35 +64,33 @@ const registerServiceProvider = asyncHandler(
     }
 
     const existingOrganization = await db.query.organization.findFirst({
-      where: eq(organization.id, parsedValues.data.organizationId),
+      where: eq(organization.id, organizationId),
     });
 
     if (!existingOrganization) {
       throw new ApiError(404, 'Organization not found');
     }
 
-    if (
-      existingOrganization.serviceCategory !== parsedValues.data.serviceType
-    ) {
+    if (existingOrganization.serviceCategory !== serviceType) {
       throw new ApiError(
         400,
         'Service Type does not match with organization service category'
       );
     }
 
-    const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newServiceProvider = await db
       .insert(serviceProvider)
       .values({
-        name: parsedValues.data.name,
-        age: parsedValues.data.age,
-        email: parsedValues.data.email,
-        phoneNumber: parsedValues.data.phoneNumber,
-        primaryAddress: parsedValues.data.primaryAddress,
+        name,
+        age,
+        email,
+        phoneNumber,
+        primaryAddress,
         password: hashedPassword,
-        serviceType: parsedValues.data.serviceType,
-        organizationId: parsedValues.data.organizationId,
+        serviceType,
+        organizationId,
         lastLocation: sql`ST_SetSRID(ST_MakePoint(85.3240, 27.7172), 4326)`,
         h3Index: BigInt('0'),
         currentLocation: {
@@ -116,15 +98,12 @@ const registerServiceProvider = asyncHandler(
           longitude: '85.3240',
         },
         // Set document status based on whether documents were provided
-        documentStatus:
-          parsedValues.data.panCardUrl || parsedValues.data.citizenshipUrl
-            ? 'pending'
-            : 'not_submitted',
-        ...(parsedValues.data.panCardUrl && {
-          panCardUrl: parsedValues.data.panCardUrl,
+        documentStatus: panCardUrl || citizenshipUrl ? 'pending' : 'not_submitted',
+        ...(panCardUrl && {
+          panCardUrl,
         }),
-        ...(parsedValues.data.citizenshipUrl && {
-          citizenshipUrl: parsedValues.data.citizenshipUrl,
+        ...(citizenshipUrl && {
+          citizenshipUrl,
         }),
       } as any)
       .returning({
@@ -335,19 +314,10 @@ const logoutServiceProvider = asyncHandler(
 
 const verifyServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
-    console.log('tokens ', req.body);
-    const { otpToken, userId: serviceProviderId } = req.body;
-
-    if (!otpToken) {
-      throw new ApiError(400, 'Please provide OTP');
-    }
-
-    if (!serviceProviderId) {
-      throw new ApiError(400, 'Please provide serviceProvider ID');
-    }
+    const { otpToken, providerId } = req.body;
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.id, serviceProviderId),
+      where: eq(serviceProvider.id, providerId),
       columns: {
         password: false,
       },
@@ -424,37 +394,43 @@ const updateServiceProvider = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    const updateData = req.body;
+    const { name, age, email, phoneNumber, primaryAddress, profilePicture, serviceArea, vehicleInformation } = req.body;
 
-    if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No data to update');
-    }
-
-    const invalidKeys = Object.keys(updateData).filter(
-      key => !Object.keys(serviceProvider).includes(key)
-    );
-
-    if (invalidKeys.length > 0) {
-      throw new ApiError(
-        400,
-        `Invalid data to update. Invalid keys: ${invalidKeys}`
-      );
-    }
+    const updateData: Record<string, unknown> = {};
+    if (name !== undefined) updateData.name = name;
+    if (age !== undefined) updateData.age = age;
+    if (email !== undefined) updateData.email = email;
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (primaryAddress !== undefined) updateData.primaryAddress = primaryAddress;
+    if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
+    if (serviceArea !== undefined) updateData.serviceArea = serviceArea;
+    if (vehicleInformation !== undefined) updateData.vehicleInformation = vehicleInformation;
 
     const updatedServiceProvider = await db
       .update(serviceProvider)
       .set(updateData)
       .where(eq(serviceProvider.id, existingServiceProvider.id))
-      .returning();
+      .returning({
+        id: serviceProvider.id,
+        name: serviceProvider.name,
+        age: serviceProvider.age,
+        email: serviceProvider.email,
+        phoneNumber: serviceProvider.phoneNumber,
+        primaryAddress: serviceProvider.primaryAddress,
+        profilePicture: serviceProvider.profilePicture,
+        serviceArea: serviceProvider.serviceArea,
+        serviceType: serviceProvider.serviceType,
+        isVerified: serviceProvider.isVerified,
+        vehicleInformation: serviceProvider.vehicleInformation,
+      });
 
     if (!updatedServiceProvider.length) {
       throw new ApiError(500, 'Failed to update serviceProvider');
     }
 
-    const { password, ...safeProvider } = updatedServiceProvider[0];
     res.status(200).json(
       new ApiResponse(200, 'ServiceProvider updated successfully', {
-        serviceProvider: safeProvider,
+        serviceProvider: updatedServiceProvider[0],
       })
     );
   }
@@ -468,20 +444,16 @@ const deleteServiceProvider = asyncHandler(
 
 const forgotServiceProviderPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { phoneNumber } = req.body;
-
-    if (!phoneNumber) {
-      throw new ApiError(400, 'Please provide phone number');
-    }
+    const { email } = req.body;
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.phoneNumber, phoneNumber),
+      where: eq(serviceProvider.email, email),
     });
 
     if (!existingServiceProvider) {
       throw new ApiError(
         404,
-        'ServiceProvider not found with given phone number'
+        'ServiceProvider not found with given email'
       );
     }
 
@@ -513,22 +485,10 @@ const forgotServiceProviderPassword = asyncHandler(
 
 const resetServiceProviderPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { otpToken, serviceProviderId, password } = req.body;
-
-    if (!otpToken) {
-      throw new ApiError(400, 'Please provide OTP');
-    }
-
-    if (!serviceProviderId) {
-      throw new ApiError(400, 'Please provide serviceProvider ID');
-    }
-
-    if (!password) {
-      throw new ApiError(400, 'Please provide password');
-    }
+    const { otpToken, providerId, password } = req.body;
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.id, serviceProviderId),
+      where: eq(serviceProvider.id, providerId),
       columns: {
         password: false,
       },
@@ -651,20 +611,10 @@ const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
 const updateServiceProviderStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInUser = req.user;
-    const { status, emergencyResponseId } = req.body;
+    const { serviceStatus } = req.body;
 
     if (!loggedInUser || !loggedInUser.id) {
       throw new ApiError(400, 'Please login to perform this action');
-    }
-
-    if (!status) {
-      throw new ApiError(400, 'Status is required');
-    }
-
-    // Validate status value
-    const validStatuses = ['available', 'assigned', 'off_duty'];
-    if (!validStatuses.includes(status)) {
-      throw new ApiError(400, 'Invalid status value');
     }
 
     // Check for cooldown (30 seconds)
@@ -683,7 +633,7 @@ const updateServiceProviderStatus = asyncHandler(
     }
 
     // If same status, no need to update
-    if (existingProvider.serviceStatus === status) {
+    if (existingProvider.serviceStatus === serviceStatus) {
       return res.status(200).json(
         new ApiResponse(200, 'Status unchanged', {
           serviceProvider: existingProvider,
@@ -712,7 +662,7 @@ const updateServiceProviderStatus = asyncHandler(
     const updatedProvider = await db
       .update(serviceProvider)
       .set({
-        serviceStatus: status,
+        serviceStatus,
         statusUpdatedAt: new Date().toISOString(),
       })
       .where(eq(serviceProvider.id, loggedInUser.id))
@@ -732,110 +682,6 @@ const updateServiceProviderStatus = asyncHandler(
           status: updatedProvider[0].serviceStatus,
         }
       );
-    }
-
-    // If there's an emergency response ID and status is "off_duty" or "unavailable"
-    if (
-      emergencyResponseId &&
-      (status === 'off_duty' || status === 'unavailable')
-    ) {
-      // Get the emergency response details
-      const emergencyResponseDetails =
-        await db.query.emergencyResponse.findFirst({
-          where: eq(emergencyResponse.id, emergencyResponseId),
-        });
-
-      if (
-        emergencyResponseDetails &&
-        emergencyResponseDetails.emergencyRequestId
-      ) {
-        // Get the emergency request details
-        const emergencyRequestDetails =
-          await db.query.emergencyRequest.findFirst({
-            where: eq(
-              emergencyRequest.id,
-              emergencyResponseDetails.emergencyRequestId
-            ),
-          });
-
-        if (emergencyRequestDetails && emergencyRequestDetails.location) {
-          // Location is already number type from model
-          const location = {
-            latitude: emergencyRequestDetails.location.latitude,
-            longitude: emergencyRequestDetails.location.longitude,
-          };
-
-          // Find the next best service provider
-          const nextBestProvider = await getBestServiceProvider(
-            location,
-            emergencyRequestDetails.serviceType
-          );
-
-          if (nextBestProvider && nextBestProvider.id) {
-            // Update the emergency response with the new provider
-            const updatedResponse = await db
-              .update(emergencyResponse)
-              .set({
-                serviceProviderId: nextBestProvider.id,
-                statusUpdate: 'on_route' as const,
-                updateDescription: `Reassigned to ${nextBestProvider.name} due to previous provider being ${status}`,
-              })
-              .where(eq(emergencyResponse.id, emergencyResponseId))
-              .returning();
-
-            // Update the new provider's status
-            await db
-              .update(serviceProvider)
-              .set({
-                serviceStatus: 'assigned',
-              })
-              .where(eq(serviceProvider.id, nextBestProvider.id));
-
-            // Notify the new provider using notification service
-            await notifyServiceProvider(nextBestProvider.id, {
-              title: 'New Emergency Assignment',
-              body: 'New emergency request assigned to you',
-              data: {
-                type: 'emergency',
-                emergencyResponseId: updatedResponse[0]?.id,
-              },
-              priority: 'high',
-            });
-
-            // Notify the user about the reassignment
-            await notifyUser(emergencyRequestDetails.userId, {
-              title: 'Provider Reassigned',
-              body: 'Service provider has been reassigned',
-              data: {
-                type: 'reassignment',
-                emergencyResponseId: updatedResponse[0]?.id,
-              },
-            });
-          } else {
-            // If no other provider is available, update the emergency request status
-            await db
-              .update(emergencyRequest)
-              .set({
-                requestStatus: 'pending',
-              })
-              .where(
-                eq(
-                  emergencyRequest.id,
-                  emergencyResponseDetails.emergencyRequestId
-                )
-              );
-
-            // Notify the user that no provider is available
-            await notifyUser(emergencyRequestDetails.userId, {
-              title: 'No Provider Available',
-              body: 'No service provider is currently available. Please try again later.',
-              data: {
-                type: 'no_provider',
-              },
-            });
-          }
-        }
-      }
     }
 
     res.status(200).json(
@@ -916,16 +762,6 @@ const changeProviderPassword = asyncHandler(
 
     const { oldPassword, newPassword } = req.body;
 
-    if (!oldPassword || !newPassword) {
-      console.log('Please provide old and new password');
-      throw new ApiError(400, 'Please provide old and new password');
-    }
-
-    if (!loggedInProvider || !loggedInProvider.id) {
-      console.log('Unauthorized');
-      throw new ApiError(401, 'Unauthorized');
-    }
-
     const existingProvider = await db.query.serviceProvider.findFirst({
       where: eq(serviceProvider.id, loggedInProvider.id),
       columns: {
@@ -993,32 +829,7 @@ const updateServiceProviderLocation = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    const { currentLocation } = req.body;
-
-    if (
-      !currentLocation ||
-      !currentLocation.latitude ||
-      !currentLocation.longitude
-    ) {
-      throw new ApiError(
-        400,
-        'Invalid location data. Provide latitude and longitude'
-      );
-    }
-
-    const { latitude, longitude } = currentLocation;
-
-    // Validate coordinates
-    if (
-      typeof latitude !== 'number' ||
-      typeof longitude !== 'number' ||
-      latitude < -90 ||
-      latitude > 90 ||
-      longitude < -180 ||
-      longitude > 180
-    ) {
-      throw new ApiError(400, 'Invalid coordinates');
-    }
+    const { latitude, longitude } = req.body;
 
     // Create PostGIS POINT geometry string
     const locationPoint = `POINT(${longitude} ${latitude})`;
