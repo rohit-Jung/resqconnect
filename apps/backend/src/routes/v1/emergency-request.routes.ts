@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { UserRoles } from '@/constants/enums.constants';
+import { emergencyLimiter } from '@/config/rate-limit.config';
 import {
   acceptEmergencyRequest,
   cancelEmergencyRequest,
@@ -37,6 +38,7 @@ emergencyRequestRouter
     getUsersEmergencyRequests
   )
   .post(
+    emergencyLimiter,
     validateRoleAuth([UserRoles.USER]),
     validateRequestBody(CreateNewRequestSchema),
     requireAuthenticatedUser,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { UserRoles } from '@/constants';
+import { authLimiter, otpLimiter } from '@/config';
 import {
   deleteOrgServiceProvider,
   deleteOrganization,
@@ -59,15 +60,27 @@ organizationRouter.route('/list').get(listOrganizationsPublic);
 
 organizationRouter
   .route('/register')
-  .post(validateRequestBody(registerOrganizationSchema), registerOrganization);
+  .post(
+    authLimiter,
+    validateRequestBody(registerOrganizationSchema),
+    registerOrganization
+  );
 
 organizationRouter
   .route('/login')
-  .post(validateRequestBody(loginOrganizationSchema), loginOrganization);
+  .post(
+    authLimiter,
+    validateRequestBody(loginOrganizationSchema),
+    loginOrganization
+  );
 
 organizationRouter
   .route('/verify')
-  .post(validateRequestBody(verifyOrgOTPSchema), verifyOrgOTP);
+  .post(
+    otpLimiter,
+    validateRequestBody(verifyOrgOTPSchema),
+    verifyOrgOTP
+  );
 
 //Service Provider Management Routes
 organizationRouter
