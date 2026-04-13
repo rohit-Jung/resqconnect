@@ -1,15 +1,14 @@
 import bcrypt from 'bcryptjs';
 import { and, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
+import { latLngToCell } from 'h3-js';
 
+import { H3_RESOLUTION } from '@/constants';
 import db from '@/db';
 import {
   type TOrganization,
   emergencyRequest,
   emergencyResponse,
-  loginUserSchema,
-  newOrganizationSchema,
-  newServiceProviderSchema,
   organization,
   serviceProvider,
   user,
@@ -22,24 +21,12 @@ import { generateJWT } from '@/utils/tokens/jwtTokens';
 
 const registerOrganization = asyncHandler(
   async (req: Request, res: Response) => {
-    const parsedValues = newOrganizationSchema.safeParse(req.body);
-
-    if (!parsedValues.success) {
-      const validationError = new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${issue.path.join('.')} : ${issue.message}`
-        )
-      );
-
-      return res.status(400).json(validationError);
-    }
+    const { name, email, serviceCategory, generalNumber, password } = req.body;
 
     const existingOrganization = await db.query.organization.findFirst({
       where: and(
-        eq(organization.name, parsedValues.data.name),
-        eq(organization.serviceCategory, parsedValues.data.serviceCategory)
+        eq(organization.name, name),
+        eq(organization.serviceCategory, serviceCategory)
       ),
     });
 
@@ -47,10 +34,16 @@ const registerOrganization = asyncHandler(
       throw new ApiError(400, 'Organization already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const newOrganization = await db
       .insert(organization)
-      .values({ ...parsedValues.data, password: hashedPassword })
+      .values({
+        name,
+        email,
+        serviceCategory,
+        generalNumber,
+        password: hashedPassword,
+      })
       .returning({
         id: organization.id,
         name: organization.name,
@@ -223,21 +216,8 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
-  const parsedValues = loginUserSchema.safeParse(req.body);
-
-  if (!parsedValues.success) {
-    const validationError = new ApiError(
-      400,
-      'Error validating data',
-      parsedValues.error.issues.map(
-        issue => `${issue.path.join('.')} : ${issue.message}`
-      )
-    );
-
-    return res.status(400).json(validationError);
-  }
-
-  const { email, password } = parsedValues.data;
+  const { email, password } = req.body;
+  
   const existingOrg = await db.query.organization.findFirst({
     where: eq(organization.email, email),
     columns: {
@@ -315,20 +295,10 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
-  const { otpToken, userId } = req.body;
-
-  if (!otpToken) {
-    console.log('Please provide OTP');
-    throw new ApiError(400, 'Please provide OTP');
-  }
-
-  if (!userId) {
-    console.log('Please provide user ID');
-    throw new ApiError(400, 'Please provide user ID');
-  }
+  const { otpToken, organizationId } = req.body;
 
   const existingUser = await db.query.organization.findFirst({
-    where: eq(organization.id, userId),
+    where: eq(organization.id, organizationId),
     columns: {
       password: false,
     },
@@ -337,11 +307,6 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
   if (!existingUser) {
     console.log('User not found');
     throw new ApiError(400, 'User not found');
-  }
-
-  if (!organization.verificationToken || !organization.tokenExpiry) {
-    console.log('Verification token not found');
-    throw new ApiError(400, 'Verification token not found');
   }
 
   if (!existingUser.tokenExpiry) {
@@ -431,14 +396,12 @@ const updateOrgProfile = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const { name, generalNumber } = req.body;
-
-  if (!name && !generalNumber) {
-    throw new ApiError(400, 'At least one field is required to update');
-  }
+  const { name, email, serviceCategory, generalNumber } = req.body;
 
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
+  if (email) updateData.email = email;
+  if (serviceCategory) updateData.serviceCategory = serviceCategory;
   if (generalNumber) updateData.generalNumber = generalNumber;
 
   const updatedOrg = await db
@@ -554,20 +517,17 @@ const registerOrgServiceProvider = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    const parsedValues = newServiceProviderSchema.safeParse({
-      ...req.body,
-      organizationId: loggedInOrg.id,
-    });
-
-    if (!parsedValues.success) {
-      throw new ApiError(
-        400,
-        'Error validating data',
-        parsedValues.error.issues.map(
-          issue => `${issue.path.join('.')} : ${issue.message}`
-        )
-      );
-    }
+    const {
+      name,
+      age,
+      email,
+      phoneNumber,
+      primaryAddress,
+      password,
+      serviceType,
+      currentLocation,
+      vehicleInformation,
+    } = req.body;
 
     // Validate service type matches organization category
     const org = await db.query.organization.findFirst({
@@ -578,7 +538,7 @@ const registerOrgServiceProvider = asyncHandler(
       throw new ApiError(404, 'Organization not found');
     }
 
-    if (org.serviceCategory !== parsedValues.data.serviceType) {
+    if (org.serviceCategory !== serviceType) {
       throw new ApiError(
         400,
         `Service type must match organization category: ${org.serviceCategory}`
@@ -588,8 +548,8 @@ const registerOrgServiceProvider = asyncHandler(
     // Check for existing provider
     const existingProvider = await db.query.serviceProvider.findFirst({
       where: or(
-        eq(serviceProvider.phoneNumber, parsedValues.data.phoneNumber),
-        eq(serviceProvider.email, parsedValues.data.email)
+        eq(serviceProvider.phoneNumber, phoneNumber),
+        eq(serviceProvider.email, email)
       ),
     });
 
@@ -600,17 +560,35 @@ const registerOrgServiceProvider = asyncHandler(
       );
     }
 
-    const hashedPassword = await bcrypt.hash(parsedValues.data.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { latitude, longitude } = currentLocation;
+    const h3Index = latLngToCell(latitude, longitude, H3_RESOLUTION);
+    const h3IndexBigInt = BigInt(`0x${h3Index}`);
+    const locationPoint = `POINT(${longitude} ${latitude})`;
 
     const newProvider = await db
       .insert(serviceProvider)
       .values({
-        ...parsedValues.data,
+        name,
+        age,
+        email,
+        phoneNumber,
+        primaryAddress,
         password: hashedPassword,
+        serviceType,
         organizationId: loggedInOrg.id,
-        // Default location values - will be updated when provider logs in from mobile
-        lastLocation: sql`ST_SetSRID(ST_MakePoint(85.3240, 27.7172), 4326)`,
-        h3Index: BigInt(0),
+        lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
+        h3Index: h3IndexBigInt,
+        currentLocation: {
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+        },
+        vehicleInformation: vehicleInformation || {
+          type: 'Not filled',
+          number: 'Not filled',
+          model: 'Not filled',
+          color: 'Not filled',
+        },
       })
       .returning({
         id: serviceProvider.id,

@@ -1,7 +1,6 @@
 import z from 'zod';
 
 import { ServiceTypeEnum } from '@/constants';
-import { EVENT_TYPES } from '@/constants/kafka.constants';
 
 export const CreateNewRequestSchema = z.object({
   emergencyType: z.enum(ServiceTypeEnum),

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { validateBody, validateRequest } from 'twilio';
 
 import { uploadDocuments } from '@/config/cloudinary.config';
 import {
@@ -25,6 +24,15 @@ import {
   validateServiceProvider,
 } from '@/middlewares/auth.middleware';
 import { loginServiceProviderSchema } from '@/models';
+import {
+  updateServiceProviderSchema,
+  updateServiceProviderLocationSchema,
+  updateServiceProviderStatusSchema,
+  forgotServiceProviderPasswordSchema,
+  resetServiceProviderPasswordSchema,
+  changeProviderPasswordSchema,
+  verifyServiceProviderSchema,
+} from '@/validations/service-provider.validations';
 
 const serviceProviderRouter = Router();
 
@@ -35,19 +43,43 @@ serviceProviderRouter.post(
   validateRequestBody(loginServiceProviderSchema),
   loginServiceProvider
 );
-serviceProviderRouter.post('/verify', verifyServiceProvider);
-serviceProviderRouter.post('/forgot-password', forgotServiceProviderPassword);
-serviceProviderRouter.post('/reset-password', resetServiceProviderPassword);
+serviceProviderRouter.post(
+  '/verify',
+  validateRequestBody(verifyServiceProviderSchema),
+  verifyServiceProvider
+);
+serviceProviderRouter.post(
+  '/forgot-password',
+  validateRequestBody(forgotServiceProviderPasswordSchema),
+  forgotServiceProviderPassword
+);
+serviceProviderRouter.post(
+  '/reset-password',
+  validateRequestBody(resetServiceProviderPasswordSchema),
+  resetServiceProviderPassword
+);
 serviceProviderRouter.get('/nearby', getNearbyProviders);
 
 // Protected routes
 serviceProviderRouter.use(validateServiceProvider);
 serviceProviderRouter.post('/logout', logoutServiceProvider);
 serviceProviderRouter.get('/profile', getServiceProviderProfile);
-serviceProviderRouter.patch('/update', updateServiceProvider);
-serviceProviderRouter.patch('/update-location', updateServiceProviderLocation);
+serviceProviderRouter.patch(
+  '/update',
+  validateRequestBody(updateServiceProviderSchema),
+  updateServiceProvider
+);
+serviceProviderRouter.patch(
+  '/update-location',
+  validateRequestBody(updateServiceProviderLocationSchema),
+  updateServiceProviderLocation
+);
 serviceProviderRouter.delete('/delete', deleteServiceProvider);
-serviceProviderRouter.post('/change-password', changeProviderPassword);
+serviceProviderRouter.post(
+  '/change-password',
+  validateRequestBody(changeProviderPasswordSchema),
+  changeProviderPassword
+);
 
 // Document verification routes (provider uploads documents)
 serviceProviderRouter.post(
@@ -58,6 +90,10 @@ serviceProviderRouter.post(
 serviceProviderRouter.get('/documents/status', getDocumentStatus);
 
 serviceProviderRouter.get('/:id', getServiceProvider);
-serviceProviderRouter.patch('/status', updateServiceProviderStatus);
+serviceProviderRouter.patch(
+  '/status',
+  validateRequestBody(updateServiceProviderStatusSchema),
+  updateServiceProviderStatus
+);
 
 export default serviceProviderRouter;
