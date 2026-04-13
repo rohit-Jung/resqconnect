@@ -2,6 +2,11 @@ import { Router } from 'express';
 
 import { uploadDocuments } from '@/config/cloudinary.config';
 import {
+  authLimiter,
+  otpLimiter,
+  passwordResetLimiter,
+} from '@/config/rate-limit.config';
+import {
   changeProviderPassword,
   deleteServiceProvider,
   forgotServiceProviderPassword,
@@ -37,24 +42,28 @@ import {
 const serviceProviderRouter = Router();
 
 // Public routes
-serviceProviderRouter.post('/register', registerServiceProvider);
+serviceProviderRouter.post('/register', authLimiter, registerServiceProvider);
 serviceProviderRouter.post(
   '/login',
+  authLimiter,
   validateRequestBody(loginServiceProviderSchema),
   loginServiceProvider
 );
 serviceProviderRouter.post(
   '/verify',
+  otpLimiter,
   validateRequestBody(verifyServiceProviderSchema),
   verifyServiceProvider
 );
 serviceProviderRouter.post(
   '/forgot-password',
+  passwordResetLimiter,
   validateRequestBody(forgotServiceProviderPasswordSchema),
   forgotServiceProviderPassword
 );
 serviceProviderRouter.post(
   '/reset-password',
+  passwordResetLimiter,
   validateRequestBody(resetServiceProviderPasswordSchema),
   resetServiceProviderPassword
 );

@@ -2,6 +2,11 @@ import express from 'express';
 
 import { UserRoles } from '@/constants';
 import {
+  authLimiter,
+  otpLimiter,
+  passwordResetLimiter,
+} from '@/config';
+import {
   changePassword,
   forgotPassword,
   getEmergencySettings,
@@ -35,10 +40,10 @@ const validateUser = validateRoleAuth([UserRoles.USER]);
 
 userRouter
   .route('/register')
-  .post(validateRequestBody(newUserSchema), registerUser);
+  .post(authLimiter, validateRequestBody(newUserSchema), registerUser);
 userRouter
   .route('/login')
-  .post(validateRequestBody(loginUserSchema), loginUser);
+  .post(authLimiter, validateRequestBody(loginUserSchema), loginUser);
 userRouter
   .route('/logout')
   .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), logoutUser);
@@ -49,14 +54,22 @@ userRouter
 
 userRouter
   .route('/verify')
-  .post(validateRequestBody(verifyUserSchema), verifyUser);
+  .post(otpLimiter, validateRequestBody(verifyUserSchema), verifyUser);
 
 userRouter
   .route('/forgot-password')
-  .post(validateRequestBody(forgotPasswordSchema), forgotPassword);
+  .post(
+    passwordResetLimiter,
+    validateRequestBody(forgotPasswordSchema),
+    forgotPassword
+  );
 userRouter
   .route('/reset-password')
-  .post(validateRequestBody(resetPasswordSchema), resetPassword);
+  .post(
+    passwordResetLimiter,
+    validateRequestBody(resetPasswordSchema),
+    resetPassword
+  );
 userRouter
   .route('/change-password')
   .post(
