@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HttpStatusCode } from 'axios';
 import bcrypt from 'bcryptjs';
 import { eq, or, sql } from 'drizzle-orm';
