@@ -15,6 +15,7 @@ import {
   loginOrganization,
   registerOrgServiceProvider,
   registerOrganization,
+  updateOrgProfile,
   updateOrgServiceProvider,
   updateOrganization,
   verifyOrgOTP,
@@ -27,6 +28,7 @@ const validateAdmin = validateRoleAuth([UserRoles.ADMIN]);
 
 organizationRouter.route('/').get(validateAdmin, getAllOrganizations);
 organizationRouter.route('/profile').get(validateOrg, getOrgProfile);
+organizationRouter.route('/profile').patch(validateOrg, updateOrgProfile);
 
 // Dashboard analytics for organization
 organizationRouter
