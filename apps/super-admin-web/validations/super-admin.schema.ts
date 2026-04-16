@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const superAdminLoginSchema = z.object({
-  role: z.enum(['user', 'admin']).default('admin'),
+  role: z.enum(['user', 'admin']),
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });

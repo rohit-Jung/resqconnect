@@ -48,6 +48,7 @@ export default function SuperAdminLoginPage() {
     defaultValues: {
       email: '',
       password: '',
+      role: 'admin',
     },
   });
 
