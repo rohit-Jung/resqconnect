@@ -1,5 +1,5 @@
 // Generic API Response wrapper
-declare interface ApiResponse<T> {
+export interface ApiResponse<T> {
   statusCode: number;
   message: string;
   data: T;
