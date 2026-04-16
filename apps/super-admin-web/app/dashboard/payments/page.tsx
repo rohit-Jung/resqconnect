@@ -69,9 +69,9 @@ export default function PaymentsPage() {
   });
   const { data: plansData } = useGetSubscriptionPlans();
 
-  const payments = paymentsData?.data?.payments ?? [];
-  const pagination = paymentsData?.data?.pagination;
-  const plans = plansData?.data ?? [];
+  const payments = paymentsData?.data?.data?.payments ?? [];
+  const pagination = paymentsData?.data?.data?.pagination;
+  const plans = plansData?.data?.data ?? [];
 
   // Calculate stats
   const stats = {
