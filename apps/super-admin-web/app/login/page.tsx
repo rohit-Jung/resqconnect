@@ -19,6 +19,8 @@ import {
   superAdminLoginSchema,
 } from '@/validations/super-admin.schema';
 
+export const dynamic = 'force-dynamic';
+
 function parseApiError(err: unknown): string {
   const axiosErr = err as {
     response?: {
