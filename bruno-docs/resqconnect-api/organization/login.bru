@@ -1,0 +1,32 @@
+meta {
+  name: login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{server}}/organization/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "ambulance@example.com",
+    "password": "password123"
+  }
+}
+
+docs {
+  # Organization Login
+  
+  Authenticate an organization and receive a JWT token.
+  
+  ## Request Body
+  - email: Organization email
+  - password: Organization password
+  
+  ## Response
+  - token: JWT token for authenticated requests
+  - organization: Organization details
+}

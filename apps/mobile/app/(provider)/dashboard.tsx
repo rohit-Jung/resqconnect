@@ -168,11 +168,6 @@ export default function ProviderDashboardScreen() {
           TEST_CORDS.latitude,
           TEST_CORDS.longitude
         );
-        // TODO: USING Test coordinates
-        // await serviceProviderApi.updateLocation(
-        //   location.coords.latitude,
-        //   location.coords.longitude,
-        // );
 
         await serviceProviderApi.updateLocation(
           TEST_CORDS.latitude,
@@ -511,8 +506,6 @@ export default function ProviderDashboardScreen() {
               className="text-sm text-red-600"
               style={{ fontFamily: 'Inter' }}
             >
-              {/* FIX: Add ETA */}
-              {/* {request.distance.toFixed(1)} km away */}
               20 km away
             </Text>
           </View>
@@ -522,8 +515,6 @@ export default function ProviderDashboardScreen() {
             className="text-xs text-gray-500"
             style={{ fontFamily: 'Inter' }}
           >
-            {/* {new Date(request.createdAt).toLocaleTimeString()} */}
-            {/* FIX: Add created at */}
             {new Date(Date.now()).toLocaleTimeString()}
           </Text>
         </View>

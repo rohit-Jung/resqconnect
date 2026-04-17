@@ -1,0 +1,60 @@
+meta {
+  name: Get Service Provider By ID
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{server}}/organization/service-providers/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: provider-uuid-here
+}
+
+headers {
+  Authorization: Bearer {{orgToken}}
+}
+
+docs {
+  # Get Service Provider By ID
+
+  Retrieves a specific service provider by ID that belongs to the authenticated organization.
+
+  ## Authentication
+  Requires organization JWT token in Authorization header.
+
+  ## Path Parameters
+  - `id` (required): The UUID of the service provider
+
+  ## Success Response (200)
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Service provider retrieved",
+    "data": {
+      "id": "uuid",
+      "name": "Provider Name",
+      "email": "provider@example.com",
+      "phoneNumber": "9800000000",
+      "serviceType": "ambulance",
+      "serviceStatus": "available",
+      "isVerified": true,
+      "organizationId": "org-uuid",
+      "age": 30,
+      "primaryAddress": "Address",
+      "serviceArea": "Area",
+      "vehicleInformation": "Vehicle details",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    "success": true
+  }
+  ```
+
+  ## Error Responses
+  - `401 Unauthorized` - Missing or invalid token
+  - `404 Not Found` - Service provider not found or doesn't belong to organization
+}

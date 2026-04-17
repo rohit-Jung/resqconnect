@@ -8,7 +8,8 @@ import {
 import { useAuthStore } from '@/store/authStore';
 
 export default function UserProfileScreen() {
-  const { isAuthenticated, user, logout, isLoading } = useAuthStore();
+  const { isAuthenticated, user, logout, isLoading, updateProfilePicture } =
+    useAuthStore();
 
   // Show loading while checking auth
   if (isLoading) {
@@ -51,13 +52,19 @@ export default function UserProfileScreen() {
     },
   ];
 
+  const handleProfilePictureChange = (newUrl: string | null) => {
+    updateProfilePicture(newUrl);
+  };
+
   return (
     <ProfileScreenContent
       name={user?.name || 'User'}
       email={user?.email || ''}
       role={user?.role}
+      profilePicture={user?.profilePicture}
       profileInfoItems={profileInfoItems}
       onLogout={logout}
+      onProfilePictureChange={handleProfilePictureChange}
     />
   );
 }

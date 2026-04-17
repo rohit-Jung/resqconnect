@@ -1,0 +1,49 @@
+meta {
+  name: Delete Service Provider
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{server}}/organization/service-providers/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: provider-uuid-here
+}
+
+headers {
+  Authorization: Bearer {{orgToken}}
+}
+
+docs {
+  # Delete Service Provider
+
+  Permanently deletes a service provider that belongs to the authenticated organization.
+
+  ## Authentication
+  Requires organization JWT token in Authorization header.
+
+  ## Path Parameters
+  - `id` (required): The UUID of the service provider to delete
+
+  ## Success Response (200)
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Service provider deleted successfully",
+    "data": {},
+    "success": true
+  }
+  ```
+
+  ## Error Responses
+  - `400 Bad Request` - Provider ID is required
+  - `401 Unauthorized` - Missing or invalid token
+  - `404 Not Found` - Service provider not found or doesn't belong to organization
+
+  ## Warning
+  This action is irreversible. The service provider and all associated data will be permanently deleted.
+}

@@ -12,6 +12,12 @@ export const userEndpoints = {
   updateLocation: `/user/update-location`,
 };
 
+export const uploadEndpoints = {
+  getSignature: `/upload/signature`,
+  updateProfilePicture: `/upload/profile-picture`,
+  deleteProfilePicture: `/upload/profile-picture`,
+};
+
 export const serviceProviderEndpoints = {
   login: `/service-provider/login`,
   verify: `/service-provider/verify`,

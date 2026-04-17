@@ -1,0 +1,76 @@
+meta {
+  name: Update Service Provider
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{server}}/organization/service-providers/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: provider-uuid-here
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{orgToken}}
+}
+
+body:json {
+  {
+    "name": "Updated Provider Name",
+    "age": 35,
+    "primaryAddress": "New Address, City",
+    "serviceArea": "Updated Service Area",
+    "vehicleInformation": "Updated Vehicle Info"
+  }
+}
+
+docs {
+  # Update Service Provider
+
+  Updates an existing service provider that belongs to the authenticated organization.
+
+  ## Authentication
+  Requires organization JWT token in Authorization header.
+
+  ## Path Parameters
+  - `id` (required): The UUID of the service provider to update
+
+  ## Request Body (all fields optional)
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | name | string | Provider's full name |
+  | age | number | Provider's age |
+  | primaryAddress | string | Primary address |
+  | serviceArea | string | Service coverage area |
+  | vehicleInformation | string | Vehicle details |
+
+  **Note:** Email, phone number, and service type cannot be updated through this endpoint.
+
+  ## Success Response (200)
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Service provider updated successfully",
+    "data": {
+      "provider": {
+        "id": "uuid",
+        "name": "Updated Provider Name",
+        "email": "provider@example.com",
+        "phoneNumber": "9800000000",
+        "serviceType": "ambulance"
+      }
+    },
+    "success": true
+  }
+  ```
+
+  ## Error Responses
+  - `400 Bad Request` - Provider ID is required
+  - `401 Unauthorized` - Missing or invalid token
+  - `404 Not Found` - Service provider not found or doesn't belong to organization
+}

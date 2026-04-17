@@ -1,5 +1,9 @@
 import { eq, sql } from 'drizzle-orm';
-import jwt, { type JwtPayload } from 'jsonwebtoken';
+import jwt, {
+  JsonWebTokenError,
+  type JwtPayload,
+  TokenExpiredError,
+} from 'jsonwebtoken';
 
 import { envConfig } from '@/config/env.config';
 import { OtherRoles, UserRoles } from '@/constants';
@@ -63,13 +67,29 @@ const verifyJWT = (token: string): IJWTToken => {
     throw new Error('JWT secret not found in environment variables');
   }
 
-  const decoded = jwt.verify(token, envConfig.jwt_secret!) as IJWTToken;
+  try {
+    const decoded = jwt.verify(token, envConfig.jwt_secret!) as IJWTToken;
 
-  if (!decoded.id) {
-    throw new ApiError(401, 'Invalid token');
+    if (!decoded.id) {
+      throw new ApiError(401, 'Invalid token');
+    }
+
+    return decoded;
+  } catch (error) {
+    // Handle specific JWT errors
+    if (error instanceof TokenExpiredError) {
+      throw new ApiError(401, 'Token expired');
+    }
+    if (error instanceof JsonWebTokenError) {
+      throw new ApiError(401, 'Invalid token');
+    }
+    // Re-throw ApiError as is
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    // Unknown error
+    throw new ApiError(401, 'Token verification failed');
   }
-
-  return decoded;
 };
 
 const verifyAndDecodeToken = async (

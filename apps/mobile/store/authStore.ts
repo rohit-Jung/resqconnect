@@ -16,6 +16,7 @@ export interface User {
   phoneNumber?: number;
   age?: number;
   primaryAddress?: string;
+  profilePicture?: string | null;
   role?: string;
 }
 
@@ -33,6 +34,7 @@ interface AuthState {
   login: (user: User, token: string, userType: UserType) => void;
   logout: () => Promise<void>;
   setLoading: (loading: boolean) => void;
+  updateProfilePicture: (profilePicture: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -75,6 +77,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setLoading: isLoading => set({ isLoading }),
+
+      updateProfilePicture: profilePicture =>
+        set(state => ({
+          user: state.user ? { ...state.user, profilePicture } : null,
+        })),
     }),
     {
       name: 'auth-storage',

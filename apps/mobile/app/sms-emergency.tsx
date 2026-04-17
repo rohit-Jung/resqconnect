@@ -115,6 +115,7 @@ export default function SMSEmergencyScreen() {
         description: description.trim() || undefined,
         userName: user?.name,
         userPhone: user?.phoneNumber?.toString(),
+        userId: user?.id, // Include userId for backend identification
       };
 
       const message = formatEmergencyMessage(emergencyData);
