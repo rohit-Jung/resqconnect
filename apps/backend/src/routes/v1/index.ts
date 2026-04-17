@@ -9,6 +9,7 @@ import emergencyRequestRouter from './emergency-request.routes';
 import emergencyResponseRouter from './emergency-response.routes';
 import mapsRouter from './maps.routes';
 import organizationRouter from './organization.routes';
+import paymentRouter from './payment.routes';
 import serviceProviderRouter from './service-provider.routes';
 import uploadRouter from './upload.routes';
 
@@ -23,6 +24,7 @@ v1Router.use('/emergency-contacts', emergencyContactsRouter);
 v1Router.use('/service-provider', serviceProviderRouter);
 v1Router.use('/maps', mapsRouter);
 v1Router.use('/admin', adminRouter);
+v1Router.use('/payments', paymentRouter);
 v1Router.use('/upload', uploadRouter);
 
 export { v1Router };

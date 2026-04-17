@@ -2,7 +2,6 @@ import { useMutation } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-// Import response types
 import {
   IChangePasswordResponse,
   IForgotPasswordResponse,
@@ -12,7 +11,6 @@ import {
   IResetPasswordResponse,
   IVerifyResponse,
 } from '@/types/auth.types';
-// Import request types from schemas
 import {
   TChangePassword,
   TForgotPassword,

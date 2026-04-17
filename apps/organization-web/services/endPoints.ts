@@ -12,6 +12,7 @@ export const orgEndpoints = {
   register: `/organization/register`,
   verify: `/organization/verify`,
   profile: `/organization/profile`,
+  updateProfile: `/organization/profile`,
   list: `/organization/list`,
   // Dashboard analytics
   dashboardAnalytics: `/organization/dashboard-analytics`,
@@ -22,6 +23,14 @@ export const orgEndpoints = {
   deleteProvider: (id: string) => `/organization/service-providers/${id}`,
   verifyProvider: (id: string) =>
     `/organization/service-providers/${id}/verify`,
+};
+
+export const paymentEndpoints = {
+  plans: `/payments/plans`,
+  subscribe: `/payments/subscribe`,
+  status: (paymentId: string) => `/payments/status/${paymentId}`,
+  history: `/payments/history`,
+  subscription: `/payments/subscription`,
 };
 
 export const superAdminEndpoints = {

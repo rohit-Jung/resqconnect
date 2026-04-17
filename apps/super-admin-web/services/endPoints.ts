@@ -35,3 +35,12 @@ export const emergencyEndpoints = {
   responses: `/emergency-response`,
   getResponse: (id: string) => `/emergency-response/${id}`,
 };
+
+export const paymentEndpoints = {
+  plans: `/payments/plans`,
+  planById: (id: string) => `/payments/plans/${id}`,
+  getAllPayments: `/payments/history`,
+  getPaymentById: (id: string) => `/payments/status/${id}`,
+  subscribe: `/payments/subscribe`,
+  subscription: `/payments/subscription`,
+};

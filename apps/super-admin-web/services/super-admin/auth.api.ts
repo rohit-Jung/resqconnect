@@ -74,3 +74,21 @@ export const useAdminLogout = () => {
     },
   });
 };
+
+// Update admin profile
+export const useAdminUpdateProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    AxiosResponse<ApiResponse<{ user: IAdminProfileResponse }>>,
+    AxiosError,
+    { name?: string; email?: string }
+  >({
+    mutationFn: data => {
+      return api.put('/user/update', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
+    },
+  });
+};

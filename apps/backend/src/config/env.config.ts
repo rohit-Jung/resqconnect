@@ -19,6 +19,11 @@ const envSchema = z.object({
   TO_NUMBER: z.string(),
   EMERGENCY_PHONE_NUMBER: z.string().default('112'),
 
+  // Khalti Payment Configuration
+  KHALTI_SECRET_KEY: z.string(),
+  KHALTI_BASE_URL: z.string().default('https://dev.khalti.com/api/v2'),
+  KHALTI_RETURN_URL: z.string(),
+  KHALTI_WEBSITE_URL: z.string(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
@@ -51,6 +56,11 @@ function createEnvConfig() {
     to_number: parsedEnv.data.TO_NUMBER,
     emergency_phone_number: parsedEnv.data.EMERGENCY_PHONE_NUMBER,
 
+    // Khalti Payment Configuration
+    khalti_secret_key: parsedEnv.data.KHALTI_SECRET_KEY,
+    khalti_base_url: parsedEnv.data.KHALTI_BASE_URL,
+    khalti_return_url: parsedEnv.data.KHALTI_RETURN_URL,
+    khalti_website_url: parsedEnv.data.KHALTI_WEBSITE_URL,
     cloudinary_cloud_name: parsedEnv.data.CLOUDINARY_CLOUD_NAME,
     cloudinary_api_key: parsedEnv.data.CLOUDINARY_API_KEY,
     cloudinary_api_secret: parsedEnv.data.CLOUDINARY_API_SECRET,
