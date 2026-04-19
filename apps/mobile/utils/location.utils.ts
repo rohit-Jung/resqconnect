@@ -98,18 +98,135 @@ export function formatDistance(km: number): string {
 }
 
 /**
- * Get center point between two coordinates
+ * Get remaining route coordinates after a certain progress point
+ * Useful for trimming polyline as provider moves along route
  */
-export function getCenterPoint(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): { latitude: number; longitude: number } {
-  return {
-    latitude: (lat1 + lat2) / 2,
-    longitude: (lng1 + lng2) / 2,
-  };
+export function getRemainingRouteAfterProgress(
+  coordinates: { latitude: number; longitude: number }[],
+  progress: number // 0 to 1
+): { latitude: number; longitude: number }[] {
+  if (coordinates.length < 2) return coordinates;
+
+  // Clamp progress to 0-1
+  const p = Math.max(0, Math.min(1, progress));
+
+  // Calculate total distance
+  let totalDistance = 0;
+  const distances: number[] = [0];
+
+  for (let i = 1; i < coordinates.length; i++) {
+    const dist = haversineDistance(
+      coordinates[i - 1].latitude,
+      coordinates[i - 1].longitude,
+      coordinates[i].latitude,
+      coordinates[i].longitude
+    );
+    totalDistance += dist;
+    distances.push(totalDistance);
+  }
+
+  // Find target distance based on progress
+  const targetDistance = totalDistance * p;
+
+  // Find the segment we're on
+  let segmentIndex = 0;
+  for (let i = 1; i < distances.length; i++) {
+    if (distances[i] >= targetDistance) {
+      segmentIndex = i - 1;
+      break;
+    }
+  }
+
+  // Get the point at progress
+  const prevDist = distances[segmentIndex];
+  const currDist = distances[segmentIndex + 1];
+  const segmentDist = currDist - prevDist;
+
+  const remaining: { latitude: number; longitude: number }[] = [];
+
+  if (segmentDist > 0) {
+    const ratio = (targetDistance - prevDist) / segmentDist;
+    const lat1 = coordinates[segmentIndex].latitude;
+    const lng1 = coordinates[segmentIndex].longitude;
+    const lat2 = coordinates[segmentIndex + 1].latitude;
+    const lng2 = coordinates[segmentIndex + 1].longitude;
+
+    // Add interpolated point (current location)
+    remaining.push({
+      latitude: lat1 + (lat2 - lat1) * ratio,
+      longitude: lng1 + (lng2 - lng1) * ratio,
+    });
+  } else if (segmentIndex < coordinates.length) {
+    remaining.push(coordinates[segmentIndex]);
+  }
+
+  // Add remaining coordinates after current segment
+  for (let i = segmentIndex + 1; i < coordinates.length; i++) {
+    remaining.push(coordinates[i]);
+  }
+
+  return remaining;
+}
+
+/**
+ * Calculate a point along a route at a specific progress (0-1)
+ * Used for simulating location movement along a calculated route
+ */
+export function getPointAtProgress(
+  coordinates: { latitude: number; longitude: number }[],
+  progress: number // 0 to 1
+): { latitude: number; longitude: number } | null {
+  if (coordinates.length < 2) return null;
+
+  // Clamp progress to 0-1
+  const p = Math.max(0, Math.min(1, progress));
+
+  // Calculate total distance
+  let totalDistance = 0;
+  const distances: number[] = [0];
+
+  for (let i = 1; i < coordinates.length; i++) {
+    const dist = haversineDistance(
+      coordinates[i - 1].latitude,
+      coordinates[i - 1].longitude,
+      coordinates[i].latitude,
+      coordinates[i].longitude
+    );
+    totalDistance += dist;
+    distances.push(totalDistance);
+  }
+
+  // Find target distance based on progress
+  const targetDistance = totalDistance * p;
+
+  // Find the segment we're on
+  for (let i = 1; i < distances.length; i++) {
+    if (distances[i] >= targetDistance) {
+      const prevDist = distances[i - 1];
+      const currDist = distances[i];
+      const segmentDist = currDist - prevDist;
+
+      if (segmentDist === 0) {
+        // Points are the same, return current
+        return coordinates[i];
+      }
+
+      // Interpolate between points
+      const ratio = (targetDistance - prevDist) / segmentDist;
+      const lat1 = coordinates[i - 1].latitude;
+      const lng1 = coordinates[i - 1].longitude;
+      const lat2 = coordinates[i].latitude;
+      const lng2 = coordinates[i].longitude;
+
+      return {
+        latitude: lat1 + (lat2 - lat1) * ratio,
+        longitude: lng1 + (lng2 - lng1) * ratio,
+      };
+    }
+  }
+
+  // Return end point
+  return coordinates[coordinates.length - 1];
 }
 
 /**
