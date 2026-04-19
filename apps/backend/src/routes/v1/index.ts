@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import webHookRouter from '@/controllers/webhook.controller';
 import healthCheckRouter from '@/routes/healthcheck.routes';
 import userRouter from '@/routes/v1/user.routes';
 
@@ -26,5 +27,6 @@ v1Router.use('/maps', mapsRouter);
 v1Router.use('/admin', adminRouter);
 v1Router.use('/payments', paymentRouter);
 v1Router.use('/upload', uploadRouter);
+v1Router.use('/webhooks', webHookRouter);
 
 export { v1Router };
