@@ -12,6 +12,10 @@ node_modules
 .env.test.local
 .env.production.local
 
+# Deploy env files
+deploy/**/silo.env
+deploy/**/control-plane.env
+
 # Testing
 coverage
 
@@ -36,3 +40,5 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+apps/backend/docker/postgres_data/
