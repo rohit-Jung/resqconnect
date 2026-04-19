@@ -31,13 +31,33 @@ function calculateDistance(
 
 export function setupLocationHandlers(io: Server, socket: Socket) {
   socket.on(SocketEvents.LOCATION_UPDATE, async data => {
-    const { requestId, providerId, userId, latitude, longitude, timestamp } =
-      data;
+    // Handle both nested and flat location formats
+    let latitude: number | undefined;
+    let longitude: number | undefined;
+
+    if (data.location && typeof data.location === 'object') {
+      // Nested format: location: { lat, lng } or location: { latitude, longitude }
+      latitude = data.location.lat || data.location.latitude;
+      longitude = data.location.lng || data.location.longitude;
+    } else {
+      // Flat format: top-level latitude, longitude
+      latitude = data.latitude;
+      longitude = data.longitude;
+    }
+
+    const { requestId, providerId, userId, timestamp } = data;
 
     logger.debug(`Location update for request ${requestId}`);
 
     if (!requestId || (!providerId && !userId)) {
       logger.error('Invalid location update data');
+      return;
+    }
+
+    if (!latitude || !longitude) {
+      logger.error(
+        `Invalid location coordinates - lat: ${latitude}, lng: ${longitude}`
+      );
       return;
     }
 
