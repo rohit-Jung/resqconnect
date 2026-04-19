@@ -1,10 +1,11 @@
-CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE TYPE "public"."audit_actor_type" AS ENUM('user', 'service_provider', 'organization', 'admin', 'internal', 'anonymous');--> statement-breakpoint
 CREATE TYPE "public"."request_status" AS ENUM('pending', 'accepted', 'assigned', 'rejected', 'in_progress', 'completed', 'cancelled', 'no_providers_available');--> statement-breakpoint
 CREATE TYPE "public"."status_update" AS ENUM('accepted', 'arrived', 'on_route', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."service_type" AS ENUM('ambulance', 'police', 'rescue_team', 'fire_truck');--> statement-breakpoint
 CREATE TYPE "public"."document_status" AS ENUM('not_submitted', 'pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."service_status" AS ENUM('available', 'assigned', 'off_duty');--> statement-breakpoint
 CREATE TYPE "public"."role" AS ENUM('user', 'admin');--> statement-breakpoint
+CREATE TYPE "public"."org_lifecycle_status" AS ENUM('pending_approval', 'active', 'suspended', 'trial_expired');--> statement-breakpoint
 CREATE TYPE "public"."org_status" AS ENUM('not_active', 'active', 'not_verified');--> statement-breakpoint
 CREATE TYPE "public"."priority" AS ENUM('low', 'medium', 'high');--> statement-breakpoint
 CREATE TYPE "public"."kafka_topic_enum" AS ENUM('fire_events', 'medical_events', 'rescue_events', 'police_events');--> statement-breakpoint
@@ -12,6 +13,20 @@ CREATE TYPE "public"."outbox_status" AS ENUM('pending', 'published', 'failed');-
 CREATE TYPE "public"."payment_method" AS ENUM('khalti', 'esewa', 'bank_transfer', 'cash');--> statement-breakpoint
 CREATE TYPE "public"."payment_status" AS ENUM('pending', 'completed', 'failed', 'refunded');--> statement-breakpoint
 CREATE TYPE "public"."subscription_status" AS ENUM('active', 'expired', 'cancelled');--> statement-breakpoint
+CREATE TABLE "audit_log" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"actor_type" "audit_actor_type" DEFAULT 'anonymous' NOT NULL,
+	"actor_id" uuid,
+	"method" varchar(16) NOT NULL,
+	"path" text NOT NULL,
+	"status_code" varchar(8) NOT NULL,
+	"ip" varchar(64),
+	"user_agent" text,
+	"organization_id" uuid,
+	"metadata" jsonb DEFAULT '{}'::jsonb,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "emergency_contact" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(50) NOT NULL,
@@ -142,6 +157,7 @@ CREATE TABLE "organization" (
 	"password" varchar(255) NOT NULL,
 	"is_verified" boolean DEFAULT false,
 	"org_status" "org_status" DEFAULT 'not_verified' NOT NULL,
+	"lifecycle_status" "org_lifecycle_status" DEFAULT 'pending_approval' NOT NULL,
 	"verification_token" varchar(255),
 	"token_expiry" timestamp,
 	"reset_password_token" varchar(255),
@@ -226,6 +242,14 @@ CREATE TABLE "subscription_plans" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "organization_entitlements_snapshot" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" uuid NOT NULL,
+	"version" integer NOT NULL,
+	"entitlements" jsonb NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "emergency_request" ADD CONSTRAINT "emergency_request_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "emergency_response" ADD CONSTRAINT "emergency_response_emergency_request_id_emergency_request_id_fk" FOREIGN KEY ("emergency_request_id") REFERENCES "public"."emergency_request"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "emergency_response" ADD CONSTRAINT "emergency_response_service_provider_id_service_provider_id_fk" FOREIGN KEY ("service_provider_id") REFERENCES "public"."service_provider"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -241,5 +265,10 @@ ALTER TABLE "organization_subscriptions" ADD CONSTRAINT "organization_subscripti
 ALTER TABLE "organization_subscriptions" ADD CONSTRAINT "organization_subscriptions_plan_id_subscription_plans_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."subscription_plans"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_subscription_id_organization_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."organization_subscriptions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organization_entitlements_snapshot" ADD CONSTRAINT "organization_entitlements_snapshot_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "audit_log_actor_idx" ON "audit_log" USING btree ("actor_type","actor_id");--> statement-breakpoint
+CREATE INDEX "audit_log_created_idx" ON "audit_log" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "audit_log_org_idx" ON "audit_log" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "spatial_idx" ON "service_provider" USING btree ("last_location");--> statement-breakpoint
-CREATE INDEX "h3_idx" ON "service_provider" USING btree ("h3_index");
+CREATE INDEX "h3_idx" ON "service_provider" USING btree ("h3_index");--> statement-breakpoint
+CREATE UNIQUE INDEX "org_entitlements_org_version_uq" ON "organization_entitlements_snapshot" USING btree ("organization_id","version");

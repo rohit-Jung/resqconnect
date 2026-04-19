@@ -2,8 +2,22 @@
   "name": "@repo/ui",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "exports": {
-    "./*": "./src/*.tsx"
+    "./utils": "./src/utils.ts",
+    "./button": "./src/button.tsx",
+    "./badge": "./src/badge.tsx",
+    "./card": "./src/card.tsx",
+    "./alert-dialog": "./src/alert-dialog.tsx",
+    "./input": "./src/input.tsx",
+    "./label": "./src/label.tsx",
+    "./checkbox": "./src/checkbox.tsx",
+    "./avatar": "./src/avatar.tsx",
+    "./select": "./src/select.tsx",
+    "./dropdown-menu": "./src/dropdown-menu.tsx",
+    "./chart": "./src/chart.tsx",
+    "./skeleton": "./src/skeleton.tsx",
+    "./code": "./src/code.tsx"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -16,11 +30,23 @@
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "eslint": "^9.39.1",
+    "lucide-react": "^0.575.0",
+    "radix-ui": "^1.4.3",
+    "recharts": "^3.7.0",
+    "tailwind-merge": "^3.5.0",
     "typescript": "5.9.2"
   },
-  "dependencies": {
+  "peerDependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "recharts": "*",
+    "tailwind-merge": "^3.5.0"
   }
 }
