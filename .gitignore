@@ -42,3 +42,4 @@ yarn-error.log*
 *.pem
 
 apps/backend/docker/postgres_data/
+logs/

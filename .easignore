@@ -3,10 +3,6 @@ apps/backend/docker/
 **/postgres_data/
 node_modules/.cache/
 
-# Other apps
-apps/backend/
-apps/organization-web/
-
 # Or if running from monorepo root
 packages/*/node_modules/
 
@@ -17,12 +13,6 @@ packages/*/node_modules/
 **/postgres_data/
 **/.turbo/
 
-apps/backend/
-apps/organization-web/
-apps/super-admin-backend/
-apps/super-admin-web/
-apps/mobile-user/
-apps/mobile-responder/
 **/.next/
 **/postgres_data/
 **/.turbo/
