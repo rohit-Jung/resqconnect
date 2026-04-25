@@ -283,11 +283,12 @@ Platform ↔ Silo communication via internal HTTP:
 
 | Event Type | Transport | Reason |
 |-----------|----------|--------|
-| Request dispatch | HTTP | Immediate, synchronous dispatch |
-| Provider matching | Kafka | Async processing, queue-based |
-| Location updates | HTTP | Low latency, high frequency |
-| Accept/Complete | HTTP | Requires immediate ACK |
-| Provider alerts | Kafka | Broadcast to all providers in area |
+| Request dispatch | HTTP | Fast ACK, creates request row in Silo DB |
+| Provider matching | Kafka | Async queue, broadcasts to all providers in area |
+| Location updates | HTTP | Fire-and-forget, high frequency |
+| Accept/Complete | HTTP | Immediate ACK required |
+
+**Note:** HTTP dispatch endpoints do minimal work (insert row + ACK) and won't block other calls. Kafka is still used for provider matching (finding nearby providers asynchronously).
 
 ### Route Caching
 
