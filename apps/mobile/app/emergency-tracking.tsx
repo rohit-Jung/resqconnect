@@ -22,18 +22,26 @@ import MapView, {
 } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  COLORS,
+  EMERGENCY_ICONS,
+  LOCATION_TRACKING,
+  MAP_CONFIG,
+  MARKER_SIZES,
+  STATUS_MESSAGES,
+  UI_CONFIG,
+} from '@/constants/emergency-tracking.constants';
 import { SocketEvents } from '@/constants/socket.constants';
 import { TEST_CORDS } from '@/constants/test.constants';
+import { usePulseAnimation } from '@/hooks/usePulseAnimation';
+import { useSocketHandlers } from '@/hooks/useSocketHandlers';
 import {
   useCancelEmergencyRequest,
-  useConfirmProviderArrival,
   useGetEmergencyRequest,
   useGetNearbyProviders,
-  useProviderConfirmArrival,
 } from '@/services/emergency/emergency.api';
 import { fetchRoute } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
-import { useProviderStore } from '@/store/providerStore';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
 import {
@@ -45,51 +53,10 @@ import {
   mapboxToLatLng,
 } from '@/utils/location.utils';
 
-const SIGNAL_RED = '#E63329';
-const PRIMARY = '#E63946';
-const OFF_WHITE = '#F5F4F0';
-const MID_GRAY = '#888888';
-const LIGHT_GRAY = '#E8E6E1';
-const BLACK = '#000000';
-
 interface LocationCoords {
   latitude: number;
   longitude: number;
 }
-
-const EMERGENCY_ICONS: Record<
-  string,
-  { icon: string; color: string; label: string }
-> = {
-  ambulance: { icon: 'ambulance', color: SIGNAL_RED, label: 'Medical' },
-  police: { icon: 'shield-account', color: '#3B82F6', label: 'Police' },
-  fire_truck: { icon: 'fire-truck', color: '#F97316', label: 'Fire' },
-  rescue_team: { icon: 'lifebuoy', color: '#10B981', label: 'Rescue' },
-};
-
-const STATUS_MESSAGES = (
-  role: 'user' | 'provider' = 'user'
-): Record<string, { message: string; color: string }> => {
-  return {
-    pending: { message: 'FINDING NEARBY RESPONDERS...', color: '#F59E0B' },
-    accepted: {
-      message: `${role === 'user' ? 'RESPONDER IS' : 'YOU ARE'} ON THE WAY`,
-      color: '#10B981',
-    },
-    in_progress: { message: 'HELP IS ARRIVING', color: '#3B82F6' },
-    completed: { message: 'EMERGENCY RESOLVED', color: '#10B981' },
-    cancelled: { message: 'REQUEST CANCELLED', color: MID_GRAY },
-    no_providers_available: {
-      message: 'NO RESPONDERS AVAILABLE NEARBY',
-      color: SIGNAL_RED,
-    },
-  };
-};
-
-// Route refetch threshold (meters)
-const ROUTE_REFETCH_THRESHOLD = 50;
-// Location update broadcast interval (ms)
-const LOCATION_BROADCAST_INTERVAL = 3000;
 
 export default function EmergencyTrackingScreen() {
   const router = useRouter();
@@ -104,22 +71,17 @@ export default function EmergencyTrackingScreen() {
   }>();
 
   const mapRef = useRef<MapView>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const lastRouteFetchLocation = useRef<LocationCoords | null>(null);
   const locationBroadcastTimer = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
   const isRouteRefetchingRef = useRef(false);
-  const simulationProgressRef = useRef(0); // For simulated location movement (0-1)
+  const simulationProgressRef = useRef(0);
   const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
 
-  // Determine if current user is provider or user
   const isProvider = role === 'provider';
-
-  // FIX: For testing: Both user and provider see user at TEST_CORDS location
-  // In production, this would come from the emergency request data
   const initialUserLocation = TEST_CORDS;
 
   const [userLocation, setUserLocation] =
@@ -140,17 +102,15 @@ export default function EmergencyTrackingScreen() {
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
-  // Provider starts with ACCEPTED status since they've already accepted
-  // User starts with PENDING and waits for socket update
   const [localStatus, setLocalStatus] = useState<EmergencyStatus>(
     isProvider ? EmergencyStatus.ACCEPTED : EmergencyStatus.PENDING
   );
 
-  // Track if confirmation is in progress (prevent accidental navigation)
   const [isProcessingConfirmation, setIsProcessingConfirmation] =
     useState(false);
 
   const { socket, isConnected } = useSocketStore();
+  const pulseAnim = usePulseAnimation(localStatus);
 
   // Fetch emergency request status
   const { data: requestData, isLoading: isLoadingRequest } =
@@ -182,6 +142,28 @@ export default function EmergencyTrackingScreen() {
 
   // Use local status that can be updated from socket events
   const currentStatus = localStatus;
+
+  // Get status message based on current status and role
+  const getStatusMessage = useCallback(() => {
+    switch (currentStatus) {
+      case EmergencyStatus.PENDING:
+        return STATUS_MESSAGES.pending;
+      case EmergencyStatus.ACCEPTED:
+        return isProvider
+          ? STATUS_MESSAGES.acceptedProvider
+          : STATUS_MESSAGES.acceptedUser;
+      case EmergencyStatus.IN_PROGRESS:
+        return STATUS_MESSAGES.in_progress;
+      case EmergencyStatus.COMPLETED:
+        return STATUS_MESSAGES.completed;
+      case 'cancelled' as any:
+        return STATUS_MESSAGES.cancelled;
+      case 'no_providers_available' as any:
+        return STATUS_MESSAGES.no_providers_available;
+      default:
+        return STATUS_MESSAGES.pending;
+    }
+  }, [currentStatus, isProvider]);
 
   // Sync local status with server data on initial load
   useEffect(() => {
@@ -221,7 +203,7 @@ export default function EmergencyTrackingScreen() {
         routeOrigin.lat,
         routeOrigin.lng
       );
-      if (moved < ROUTE_REFETCH_THRESHOLD) {
+      if (moved < LOCATION_TRACKING.ROUTE_REFETCH_THRESHOLD) {
         return; // Don't refetch, movement too small
       }
     }
@@ -259,27 +241,8 @@ export default function EmergencyTrackingScreen() {
     }
   }, [routeOrigin, routeDestination]);
 
-  // Pulse animation for searching state
-  useEffect(() => {
-    if (currentStatus === EmergencyStatus.PENDING) {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      return () => pulse.stop();
-    }
-  }, [currentStatus, pulseAnim]);
+  // Pulse animation is now handled by usePulseAnimation hook
+  // No need for separate useEffect
 
   // Simulated location movement along route (for testing)
   // Moves the provider/user location along the calculated route every 1 second
@@ -299,7 +262,7 @@ export default function EmergencyTrackingScreen() {
 
     // Start simulation
     simulationTimerRef.current = setInterval(() => {
-      simulationProgressRef.current += 0.01; // Move 1% of route per second
+      simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
 
       // Stop when reached destination
       if (simulationProgressRef.current >= 1) {
@@ -338,7 +301,7 @@ export default function EmergencyTrackingScreen() {
         );
         setRemainingRouteCoordinates(remaining);
       }
-    }, 1000); // Update every 1 second
+    }, LOCATION_TRACKING.SIMULATION_INTERVAL);
 
     return () => {
       if (simulationTimerRef.current) {
@@ -378,8 +341,8 @@ export default function EmergencyTrackingScreen() {
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 3000, // Update every 3 seconds
-            distanceInterval: 5, // Or when moved 5 meters
+            timeInterval: LOCATION_TRACKING.LOCATION_UPDATE_INTERVAL,
+            distanceInterval: LOCATION_TRACKING.LOCATION_DISTANCE_INTERVAL,
           },
           location => {
             const newLocation = {
@@ -432,7 +395,7 @@ export default function EmergencyTrackingScreen() {
     // Set up interval for periodic broadcasts
     locationBroadcastTimer.current = setInterval(
       broadcastLocation,
-      LOCATION_BROADCAST_INTERVAL
+      LOCATION_TRACKING.LOCATION_BROADCAST_INTERVAL
     );
 
     return () => {
@@ -443,233 +406,28 @@ export default function EmergencyTrackingScreen() {
   }, [requestId, myLocation, socket, isConnected, isProvider]);
 
   // Socket listeners for real-time updates
+  const { setupSocketListeners } = useSocketHandlers({
+    requestId: requestId || '',
+    isProvider,
+    socket,
+    onProviderLocationUpdate: setProviderLocation,
+    onUserLocationUpdate: setUserLocation,
+    onProviderAccepted: provider => {
+      setLocalStatus(EmergencyStatus.ACCEPTED);
+      setAssignedProvider(provider);
+    },
+    onEmergencyCompleted: () => {
+      setIsProcessingConfirmation(false);
+    },
+    onRouteCoordinatesUpdate: setRouteCoordinates,
+    onRouteInfoUpdate: setRouteInfo,
+  });
+
   useEffect(() => {
     if (!requestId) return;
-
-    // Join the emergency room
-    socketManager.emit(SocketEvents.USER_JOIN_ROOM, {
-      requestId,
-      userId: socket?.id,
-    });
-
-    // Listen for provider location updates
-    const handleProviderLocation = (data: any) => {
-      console.log('Provider location update:', data);
-      if (data.location && !isProvider) {
-        const lat =
-          typeof data.location.latitude === 'string'
-            ? parseFloat(data.location.latitude)
-            : data.location.latitude;
-        const lng =
-          typeof data.location.longitude === 'string'
-            ? parseFloat(data.location.longitude)
-            : data.location.longitude;
-
-        if (!isNaN(lat) && !isNaN(lng)) {
-          setProviderLocation({
-            latitude: lat,
-            longitude: lng,
-          });
-        }
-      }
-    };
-
-    // Listen for user location updates (for provider)
-    const handleUserLocation = (data: any) => {
-      console.log('User location update:', data);
-      if (data.location && isProvider) {
-        setUserLocation({
-          latitude: parseFloat(data.location.latitude),
-          longitude: parseFloat(data.location.longitude),
-        });
-      }
-    };
-
-    // Listen for provider acceptance
-    const handleProviderAccepted = (data: any) => {
-      console.log(
-        'Provider accepted - full data:',
-        JSON.stringify(data, null, 2)
-      );
-
-      // Update local status immediately
-      setLocalStatus(EmergencyStatus.ACCEPTED);
-
-      if (data.provider) {
-        setAssignedProvider({
-          id: data.provider.id,
-          name: data.provider.name,
-          serviceType: data.provider.serviceType,
-          currentLocation: data.provider.location,
-          distance: 0,
-          phoneNumber: data.provider.phone,
-          vehicleNumber: data.provider.vehicleNumber,
-          estimatedArrival: data.route?.duration,
-        });
-
-        // Set provider location if available
-        if (
-          data.provider.location?.latitude &&
-          data.provider.location?.longitude
-        ) {
-          const lat =
-            typeof data.provider.location.latitude === 'string'
-              ? parseFloat(data.provider.location.latitude)
-              : data.provider.location.latitude;
-          const lng =
-            typeof data.provider.location.longitude === 'string'
-              ? parseFloat(data.provider.location.longitude)
-              : data.provider.location.longitude;
-
-          if (!isNaN(lat) && !isNaN(lng)) {
-            console.log('Setting provider location:', { lat, lng });
-            setProviderLocation({ latitude: lat, longitude: lng });
-          } else {
-            console.warn(
-              'Invalid provider location coordinates:',
-              data.provider.location
-            );
-          }
-        } else {
-          console.warn('Provider location not available in acceptance data');
-        }
-
-        // Set initial route from acceptance response
-        if (
-          data.route?.coordinates &&
-          Array.isArray(data.route.coordinates) &&
-          data.route.coordinates.length > 0
-        ) {
-          console.log(
-            'Setting route from acceptance - coordinates count:',
-            data.route.coordinates.length
-          );
-          const coords = mapboxToLatLng(data.route.coordinates);
-          setRouteCoordinates(coords);
-          setRouteInfo({
-            distance: data.route.distance,
-            duration: data.route.duration,
-          });
-        } else {
-          console.warn(
-            'Route coordinates not available in acceptance data - will fetch when provider location updates'
-          );
-        }
-      }
-    };
-
-    // Listen for emergency completion
-    const handleEmergencyCompleted = () => {
-      // Clear confirmation processing flag
-      setIsProcessingConfirmation(false);
-
-      // Remove request from incoming requests state (only for provider)
-      if (isProvider && requestId) {
-        useProviderStore.getState().removeIncomingRequest(requestId);
-      }
-
-      Alert.alert(
-        'Emergency Resolved',
-        'The emergency has been marked as completed.',
-        [
-          {
-            text: 'OK',
-            onPress: async () => {
-              // Wait a tick to ensure cleanup completes and socket listeners
-              // are properly detached before navigation to dashboard
-              await new Promise(resolve => setTimeout(resolve, 50));
-
-              router.replace(isProvider ? '/(provider)/dashboard' : '/(tabs)');
-            },
-          },
-        ]
-      );
-    };
-
-    // Listen for request cancellation (for provider when user cancels)
-    const handleRequestCancelled = (data: any) => {
-      console.log('Request cancelled:', data);
-      // Clear confirmation processing flag
-      setIsProcessingConfirmation(false);
-
-      // Remove request from incoming requests state (only for provider)
-      if (isProvider && data.requestId) {
-        useProviderStore.getState().removeIncomingRequest(data.requestId);
-      }
-
-      if (data.requestId === requestId) {
-        Alert.alert(
-          'Request Cancelled',
-          data.message || 'The user has cancelled this emergency request.',
-          [
-            {
-              text: 'OK',
-              onPress: () =>
-                router.replace(
-                  isProvider ? '/(provider)/dashboard' : '/(tabs)'
-                ),
-            },
-          ]
-        );
-      }
-    };
-
-    // handle confirmation
-    const handleProviderConfirmed = (data: any) => {
-      if (isProvider) return;
-      Alert.alert(
-        'Confirm Arrival',
-        data.message || 'The provider has confimed his arrival',
-        [
-          {
-            text: 'YES',
-            onPress: () =>
-              router.replace(isProvider ? '/(provider)/dashboard' : '/(tabs)'),
-          },
-        ]
-      );
-    };
-
-    socketManager.on(
-      SocketEvents.PROVIDER_LOCATION_UPDATED,
-      handleProviderLocation
-    );
-    socketManager.on(SocketEvents.USER_LOCATION_UPDATED, handleUserLocation);
-    socketManager.on(SocketEvents.REQUEST_ACCEPTED, handleProviderAccepted);
-    socketManager.on(SocketEvents.REQUEST_COMPLETED, handleEmergencyCompleted);
-    socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
-    socketManager.on(
-      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-      handleRequestCancelled
-    );
-    socketManager.on(
-      SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
-      handleProviderConfirmed
-    );
-
-    return () => {
-      socketManager.off(
-        SocketEvents.PROVIDER_LOCATION_UPDATED,
-        handleProviderLocation
-      );
-      socketManager.off(SocketEvents.USER_LOCATION_UPDATED, handleUserLocation);
-      socketManager.off(SocketEvents.REQUEST_ACCEPTED, handleProviderAccepted);
-      socketManager.off(
-        SocketEvents.REQUEST_COMPLETED,
-        handleEmergencyCompleted
-      );
-      socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
-      socketManager.off(
-        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-        handleRequestCancelled
-      );
-      socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
-      socketManager.off(
-        SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
-        handleProviderConfirmed
-      );
-    };
-  }, [requestId, socket?.id, isProvider, router]);
+    const cleanup = setupSocketListeners();
+    return cleanup;
+  }, [requestId, setupSocketListeners]);
 
   // Fetch route when status changes or when locations become available
   // For user: Only fetch if route wasn't already set from acceptance event
@@ -728,14 +486,14 @@ export default function EmergencyTrackingScreen() {
 
     if (coordinates.length > 1) {
       mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
+        edgePadding: MAP_CONFIG.FIT_TO_COORDINATES_PADDING,
         animated: true,
       });
     } else if (coordinates.length === 1) {
       mapRef.current.animateToRegion({
         ...coordinates[0],
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
+        latitudeDelta: MAP_CONFIG.INITIAL_DELTA.latitudeDelta,
+        longitudeDelta: MAP_CONFIG.INITIAL_DELTA.longitudeDelta,
       });
     }
   }, [mapReady, userLocation, providerLocation]);
@@ -767,7 +525,7 @@ export default function EmergencyTrackingScreen() {
                 const timeout = setTimeout(() => {
                   console.log(`CANCEL_REQUEST_SOCKET timeout`);
                   reject(new Error('Timeout'));
-                }, 5000);
+                }, LOCATION_TRACKING.SOCKET_TIMEOUT);
 
                 socketInstance.emit(
                   SocketEvents.CANCEL_REQUEST_SOCKET,
@@ -839,7 +597,7 @@ export default function EmergencyTrackingScreen() {
                 const timeout = setTimeout(() => {
                   console.log(`CONFIRM_ARRIVAL timeout`);
                   reject(new Error('Timeout'));
-                }, 5000);
+                }, LOCATION_TRACKING.SOCKET_TIMEOUT);
 
                 socketInstance.emit(
                   SocketEvents.CONFIRM_ARRIVAL,
@@ -894,30 +652,29 @@ export default function EmergencyTrackingScreen() {
 
     if (coordinates.length > 1) {
       mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
+        edgePadding: MAP_CONFIG.FIT_TO_COORDINATES_PADDING,
         animated: true,
       });
     } else if (myLocation) {
       mapRef.current.animateToRegion({
         ...myLocation,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: MAP_CONFIG.RECENTER_DELTA.latitudeDelta,
+        longitudeDelta: MAP_CONFIG.RECENTER_DELTA.longitudeDelta,
       });
     }
   };
 
-  const emergencyInfo = EMERGENCY_ICONS[emergencyType || 'ambulance'];
-  const statusInfo =
-    STATUS_MESSAGES(role)[currentStatus] || STATUS_MESSAGES(role)['pending'];
-
   if (isLoadingRequest) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={SIGNAL_RED} />
+        <ActivityIndicator size="large" color={COLORS.SIGNAL_RED} />
         <Text style={styles.loadingText}>LOADING EMERGENCY DETAILS...</Text>
       </SafeAreaView>
     );
   }
+
+  const emergencyInfo = EMERGENCY_ICONS[emergencyType || 'ambulance'];
+  const statusInfo = getStatusMessage();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -947,8 +704,8 @@ export default function EmergencyTrackingScreen() {
         provider={PROVIDER_GOOGLE}
         initialRegion={{
           ...userLocation,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
+          latitudeDelta: MAP_CONFIG.INITIAL_DELTA.latitudeDelta,
+          longitudeDelta: MAP_CONFIG.INITIAL_DELTA.longitudeDelta,
         }}
         onMapReady={() => setMapReady(true)}
         showsUserLocation={false}
@@ -1253,34 +1010,37 @@ export default function EmergencyTrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OFF_WHITE,
+    backgroundColor: COLORS.OFF_WHITE,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: OFF_WHITE,
+    backgroundColor: COLORS.OFF_WHITE,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 12,
-    color: MID_GRAY,
+    color: COLORS.MID_GRAY,
     letterSpacing: 2,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop:
+      Platform.OS === 'ios'
+        ? UI_CONFIG.HEADER_PADDING_TOP_IOS
+        : UI_CONFIG.HEADER_PADDING_TOP_ANDROID,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: LIGHT_GRAY,
-    backgroundColor: OFF_WHITE,
+    borderBottomColor: COLORS.LIGHT_GRAY,
+    backgroundColor: COLORS.OFF_WHITE,
   },
   backButton: {
     padding: 8,
     marginRight: 16,
-    backgroundColor: LIGHT_GRAY,
+    backgroundColor: COLORS.LIGHT_GRAY,
   },
   headerContent: {},
   brandRow: {
@@ -1290,64 +1050,58 @@ const styles = StyleSheet.create({
   brandMark: {
     fontSize: 22,
     fontWeight: '900',
-    color: BLACK,
+    color: COLORS.BLACK,
     letterSpacing: 4,
   },
   brandDot: {
     fontSize: 22,
     fontWeight: '900',
-    color: SIGNAL_RED,
+    color: COLORS.SIGNAL_RED,
     lineHeight: 26,
   },
   headerLine: {
     width: 30,
     height: 2,
-    backgroundColor: SIGNAL_RED,
+    backgroundColor: COLORS.SIGNAL_RED,
     marginTop: 4,
     marginBottom: 4,
   },
   tagline: {
     fontSize: 9,
     fontWeight: '500',
-    color: MID_GRAY,
+    color: COLORS.MID_GRAY,
     letterSpacing: 2,
   },
   map: {
     flex: 1,
   },
   userMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: OFF_WHITE,
+    ...MARKER_SIZES.USER_MARKER,
+    backgroundColor: COLORS.OFF_WHITE,
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
+    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
+    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
+    elevation: UI_CONFIG.ELEVATION,
   },
   providerMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: MID_GRAY,
+    ...MARKER_SIZES.PROVIDER_MARKER,
+    backgroundColor: COLORS.MID_GRAY,
     justifyContent: 'center',
     alignItems: 'center',
   },
   assignedProviderMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    ...MARKER_SIZES.ASSIGNED_PROVIDER_MARKER,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
+    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
+    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
+    elevation: UI_CONFIG.ELEVATION,
   },
   recenterButton: {
     position: 'absolute',
@@ -1356,11 +1110,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: OFF_WHITE,
+    backgroundColor: COLORS.OFF_WHITE,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
@@ -1371,12 +1125,12 @@ const styles = StyleSheet.create({
     left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: OFF_WHITE,
+    backgroundColor: COLORS.OFF_WHITE,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
@@ -1388,14 +1142,14 @@ const styles = StyleSheet.create({
   routeInfoText: {
     fontSize: 12,
     fontWeight: '600',
-    color: BLACK,
+    color: COLORS.BLACK,
     marginLeft: 4,
     letterSpacing: 1,
   },
   routeInfoDivider: {
     width: 1,
     height: 16,
-    backgroundColor: LIGHT_GRAY,
+    backgroundColor: COLORS.LIGHT_GRAY,
     marginHorizontal: 10,
   },
   statusCard: {
@@ -1403,9 +1157,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: OFF_WHITE,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: COLORS.OFF_WHITE,
+    borderTopLeftRadius: UI_CONFIG.BORDER_RADIUS_XLARGE,
+    borderTopRightRadius: UI_CONFIG.BORDER_RADIUS_XLARGE,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -1420,11 +1174,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_LARGE,
     marginBottom: 16,
   },
   typeBadgeText: {
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
     fontSize: 12,
     fontWeight: '700',
     marginLeft: 8,
@@ -1438,7 +1192,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   roleBadgeText: {
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1,
@@ -1453,11 +1207,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 12,
     letterSpacing: 1,
-    color: BLACK,
+    color: COLORS.BLACK,
   },
   providersCount: {
     fontSize: 12,
-    color: MID_GRAY,
+    color: COLORS.MID_GRAY,
     marginBottom: 16,
     letterSpacing: 1,
   },
@@ -1466,17 +1220,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   etaBox: {
-    backgroundColor: '#10B981',
+    backgroundColor: COLORS.GREEN,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     alignItems: 'center',
     marginRight: 12,
   },
   etaValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
   },
   etaLabel: {
     fontSize: 10,
@@ -1484,16 +1238,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   distanceBox: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.BLUE,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     alignItems: 'center',
   },
   distanceValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
   },
   distanceLabel: {
     fontSize: 10,
@@ -1501,7 +1255,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   providerInfo: {
-    backgroundColor: LIGHT_GRAY,
+    backgroundColor: COLORS.LIGHT_GRAY,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -1514,7 +1268,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.BLUE,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1525,23 +1279,23 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: BLACK,
+    color: COLORS.BLACK,
   },
   providerVehicle: {
     fontSize: 12,
-    color: MID_GRAY,
+    color: COLORS.MID_GRAY,
   },
   callButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
+    backgroundColor: COLORS.GREEN,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     marginTop: 12,
   },
   callButtonText: {
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 8,
@@ -1553,12 +1307,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: SIGNAL_RED,
-    borderRadius: 12,
+    borderColor: COLORS.SIGNAL_RED,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     marginBottom: 12,
   },
   cancelButtonText: {
-    color: SIGNAL_RED,
+    color: COLORS.SIGNAL_RED,
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
@@ -1569,12 +1323,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#10B981',
-    borderRadius: 12,
+    backgroundColor: COLORS.GREEN,
+    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     marginBottom: 12,
   },
   confirmArrivalButtonText: {
-    color: OFF_WHITE,
+    color: COLORS.OFF_WHITE,
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 8,
@@ -1593,7 +1347,7 @@ const styles = StyleSheet.create({
   },
   connectionText: {
     fontSize: 10,
-    color: MID_GRAY,
+    color: COLORS.MID_GRAY,
     letterSpacing: 1,
   },
 });

@@ -1,5 +1,8 @@
 'use client';
 
+import { Badge } from '@repo/ui/badge';
+import { Button } from '@repo/ui/button';
+
 import {
   Ambulance,
   CheckCircle,
@@ -17,8 +20,6 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   usePendingVerifications,
   useVerifyDocuments,
@@ -59,7 +60,7 @@ export default function VerificationsPage() {
   const { data: verificationsData, isLoading } = usePendingVerifications();
   const verifyMutation = useVerifyDocuments();
 
-  const providers = verificationsData?.data?.data?.providers || [];
+  const responders = verificationsData?.data?.data?.providers || [];
   const pendingCount = verificationsData?.data?.data?.count || 0;
 
   const handleApprove = async (providerId: string) => {
@@ -123,7 +124,7 @@ export default function VerificationsPage() {
             Document Verification
           </h1>
           <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
-            Review and verify service provider documents
+            Review and verify responder documents
           </p>
         </div>
       </div>
@@ -181,14 +182,14 @@ export default function VerificationsPage() {
 
         {/* Pending Verifications List */}
         <div className="bg-card overflow-hidden rounded-xl border">
-          {providers.length === 0 ? (
+          {responders.length === 0 ? (
             <div className="p-8 text-center">
               <FileCheck className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
               <h3 className="mb-2 text-lg font-medium text-foreground dark:text-foreground">
                 No pending verifications
               </h3>
               <p className="text-muted-foreground dark:text-muted-foreground">
-                All service provider documents have been reviewed.
+                All responder documents have been reviewed.
               </p>
             </div>
           ) : (
@@ -197,7 +198,7 @@ export default function VerificationsPage() {
                 <thead className="border-b border-border">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                      Provider
+                      Responder
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                       Contact
@@ -217,25 +218,25 @@ export default function VerificationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {providers.map(provider => {
+                  {responders.map(responder => {
                     const typeConfig =
-                      SERVICE_TYPE_CONFIG[provider.serviceType];
+                      SERVICE_TYPE_CONFIG[responder.serviceType];
 
                     return (
-                      <tr key={provider.id} className="hover:bg-muted/50">
+                      <tr key={responder.id} className="hover:bg-muted/50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-primary/10 flex h-10 w-10 items-center justify-center">
                               <span className="text-primary font-medium">
-                                {provider.name.charAt(0).toUpperCase()}
+                                {responder.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div>
                               <p className="font-medium text-foreground dark:text-foreground">
-                                {provider.name}
+                                {responder.name}
                               </p>
                               <p className="text-muted-foreground text-xs dark:text-muted-foreground">
-                                ID: {provider.id.slice(0, 8)}...
+                                ID: {responder.id.slice(0, 8)}...
                               </p>
                             </div>
                           </div>
@@ -244,11 +245,11 @@ export default function VerificationsPage() {
                           <div className="space-y-1">
                             <p className="flex items-center gap-1 text-sm text-foreground dark:text-foreground">
                               <Mail className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
-                              {provider.email}
+                              {responder.email}
                             </p>
                             <p className="flex items-center gap-1 text-sm text-foreground dark:text-foreground">
                               <Phone className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
-                              {provider.phoneNumber}
+                              {responder.phoneNumber}
                             </p>
                           </div>
                         </td>
@@ -265,7 +266,7 @@ export default function VerificationsPage() {
                         <td className="px-4 py-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-1">
-                              {provider.panCardUrl ? (
+                              {responder.panCardUrl ? (
                                 <CheckCircle className="h-3 w-3 text-green-500" />
                               ) : (
                                 <XCircle className="h-3 w-3 text-red-500" />
@@ -275,7 +276,7 @@ export default function VerificationsPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
-                              {provider.citizenshipUrl ? (
+                              {responder.citizenshipUrl ? (
                                 <CheckCircle className="h-3 w-3 text-green-500" />
                               ) : (
                                 <XCircle className="h-3 w-3 text-red-500" />
@@ -288,13 +289,13 @@ export default function VerificationsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-muted-foreground text-sm dark:text-muted-foreground">
-                            {new Date(provider.createdAt).toLocaleDateString()}
+                            {new Date(responder.createdAt).toLocaleDateString()}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Link
-                              href={`/dashboard/verifications/${provider.id}`}
+                              href={`/dashboard/verifications/${responder.id}`}
                             >
                               <Button
                                 variant="outline"
@@ -308,7 +309,7 @@ export default function VerificationsPage() {
                             <Button
                               variant="default"
                               size="sm"
-                              onClick={() => handleApprove(provider.id)}
+                              onClick={() => handleApprove(responder.id)}
                               disabled={verifyMutation.isPending}
                               className="bg-green-600 hover:bg-green-700 text-white rounded-none"
                             >
@@ -319,7 +320,7 @@ export default function VerificationsPage() {
                               variant="destructive"
                               size="sm"
                               className="rounded-none"
-                              onClick={() => openRejectModal(provider.id)}
+                              onClick={() => openRejectModal(responder.id)}
                               disabled={verifyMutation.isPending}
                             >
                               <XCircle className="mr-1 h-4 w-4" />
@@ -345,7 +346,7 @@ export default function VerificationsPage() {
               </h3>
               <p className="text-muted-foreground mb-4 text-sm dark:text-muted-foreground">
                 Please provide a reason for rejecting the documents. This will
-                be shared with the service provider.
+                be shared with the responder.
               </p>
               <textarea
                 value={rejectionReason}

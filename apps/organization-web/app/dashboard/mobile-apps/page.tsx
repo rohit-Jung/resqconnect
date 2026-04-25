@@ -1,9 +1,10 @@
 'use client';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import { Skeleton } from '@repo/ui/skeleton';
+
 import { Apple, Info, Loader2, Monitor, Smartphone } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import { useOrgServiceProviders } from '@/services/organization/providers.api';
 
@@ -20,21 +21,20 @@ export default function MobileAppsPage() {
     useOrgServiceProviders();
 
   const analytics = analyticsResponse?.data?.data;
-  const providers = providersResponse?.data?.data ?? [];
+  const responders = providersResponse?.data?.data ?? [];
   const isLoading = analyticsLoading || providersLoading;
 
   const totalProviders = analytics?.providers.total ?? 0;
-  const verifiedProviders = providers.filter(p => p.isVerified).length;
+  const verifiedProviders = responders.filter(p => p.isVerified).length;
   const totalEmergencyRequests = analytics?.emergencyRequests.total ?? 0;
 
   const apps = [
     {
-      name: 'Service Provider App',
+      name: 'Responder App',
       version: APP_CONFIG.android.version,
-      description:
-        'For service providers to receive and respond to emergencies',
+      description: 'For responders to receive and respond to emergencies',
       users: totalProviders,
-      userLabel: 'Registered Providers',
+      userLabel: 'Registered Responders',
       status: 'ACTIVE',
       icon: <Smartphone className="h-4 w-4" />,
     },
@@ -50,9 +50,9 @@ export default function MobileAppsPage() {
     {
       name: 'Organization Dashboard',
       version: APP_CONFIG.web.version,
-      description: 'For managing service providers and monitoring requests',
+      description: 'For managing responders and monitoring requests',
       users: verifiedProviders,
-      userLabel: 'Verified Providers',
+      userLabel: 'Verified Responders',
       status: 'ACTIVE',
       icon: <Monitor className="h-4 w-4" />,
     },
@@ -188,11 +188,11 @@ export default function MobileAppsPage() {
             <div className="flex gap-3">
               <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Service providers should download the ResQ Connect mobile app to
-                receive emergency requests and update their location in
+                Service responders should download the ResQ Connect mobile app
+                to receive emergency requests and update their location in
                 real-time. Users can request emergency services through the user
                 app, which will automatically find and dispatch the nearest
-                available service provider.
+                available responder.
               </p>
             </div>
           </CardContent>

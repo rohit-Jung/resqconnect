@@ -57,6 +57,18 @@ const useOrgVerify = () => {
   });
 };
 
+const useOrgResendVerificationOTP = () => {
+  return useMutation<
+    AxiosResponse<ApiResponse<{ organizationId?: string }>>,
+    AxiosError,
+    { email: string }
+  >({
+    mutationFn: ({ email }) => {
+      return api.post(orgEndpoints.resendOtp, { email });
+    },
+  });
+};
+
 const useOrgProfile = (enabled: boolean = true) => {
   return useQuery<AxiosResponse<ApiResponse<IOrgProfileResponse>>, AxiosError>({
     queryKey: ['orgProfile'],
@@ -82,7 +94,6 @@ const useOrgList = (enabled: boolean = true) => {
   });
 };
 
-
 const useOrgUpdateProfile = () => {
   const queryClient = useQueryClient();
 
@@ -100,5 +111,12 @@ const useOrgUpdateProfile = () => {
   });
 };
 
-
-export { useOrgLogin, useOrgRegister, useOrgVerify, useOrgProfile, useOrgList, useOrgUpdateProfile };
+export {
+  useOrgLogin,
+  useOrgRegister,
+  useOrgVerify,
+  useOrgResendVerificationOTP,
+  useOrgProfile,
+  useOrgList,
+  useOrgUpdateProfile,
+};

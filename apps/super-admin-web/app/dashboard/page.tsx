@@ -1,5 +1,15 @@
 'use client';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@repo/ui/chart';
+
 import {
   Activity,
   AlertTriangle,
@@ -8,27 +18,18 @@ import {
   Building2,
   Loader2,
   Smartphone,
-  TrendingUp,
   Users,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from 'recharts';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
 import { useDashboardAnalytics } from '@/services/super-admin/dashboard.api';
 import { IDashboardEntity } from '@/types/auth.types';
 
 const chartConfig = {
-  orgs: { label: 'Organizations', color: 'hsl(221.2 83.2% 53.3%)' },
-  users: { label: 'Users', color: 'hsl(142.1 76.2% 36.3%)' },
-  providers: { label: 'Service Providers', color: 'hsl(262.1 83.3% 57.8%)' },
+  Orgs: { label: 'Orgs', color: 'hsl(221.2 83.2% 53.3%)' },
+  Users: { label: 'Users', color: 'hsl(142.1 76.2% 36.3%)' },
+  Responders: { label: 'Responders', color: 'hsl(262.1 83.3% 57.8%)' },
 } satisfies ChartConfig;
 
 const barChartConfig = {
@@ -78,7 +79,7 @@ export default function SuperAdminDashboardPage() {
       bgColor: 'bg-green-100 dark:bg-green-950',
     },
     {
-      title: 'Service Providers',
+      title: 'Responders',
       total: analytics?.providers.total ?? 0,
       thisMonth: analytics?.providers.thisMonth ?? 0,
       growth: providersGrowth,
@@ -88,41 +89,47 @@ export default function SuperAdminDashboardPage() {
     },
   ];
 
-  const monthlyComparisonData = [
-    {
-      category: 'Orgs',
-      thisMonth: analytics?.orgs.thisMonth ?? 0,
-      lastMonth: analytics?.orgs.lastMonth ?? 0,
-    },
-    {
-      category: 'Users',
-      thisMonth: analytics?.users.thisMonth ?? 0,
-      lastMonth: analytics?.users.lastMonth ?? 0,
-    },
-    {
-      category: 'Providers',
-      thisMonth: analytics?.providers.thisMonth ?? 0,
-      lastMonth: analytics?.providers.lastMonth ?? 0,
-    },
-  ];
+  const monthlyComparisonData = useMemo(
+    () => [
+      {
+        category: 'Orgs',
+        thisMonth: analytics?.orgs.thisMonth ?? 0,
+        lastMonth: analytics?.orgs.lastMonth ?? 0,
+      },
+      {
+        category: 'Users',
+        thisMonth: analytics?.users.thisMonth ?? 0,
+        lastMonth: analytics?.users.lastMonth ?? 0,
+      },
+      {
+        category: 'Responders',
+        thisMonth: analytics?.providers.thisMonth ?? 0,
+        lastMonth: analytics?.providers.lastMonth ?? 0,
+      },
+    ],
+    [analytics]
+  );
 
-  const distributionData = [
-    {
-      name: 'orgs',
-      value: analytics?.orgs.total ?? 0,
-      fill: 'hsl(221.2 83.2% 53.3%)',
-    },
-    {
-      name: 'users',
-      value: analytics?.users.total ?? 0,
-      fill: 'hsl(142.1 76.2% 36.3%)',
-    },
-    {
-      name: 'providers',
-      value: analytics?.providers.total ?? 0,
-      fill: 'hsl(262.1 83.3% 57.8%)',
-    },
-  ];
+  const distributionData = useMemo(
+    () => [
+      {
+        name: 'Orgs',
+        value: analytics?.orgs.total ?? 0,
+        fill: 'hsl(221.2 83.2% 53.3%)',
+      },
+      {
+        name: 'Users',
+        value: analytics?.users.total ?? 0,
+        fill: 'hsl(142.1 76.2% 36.3%)',
+      },
+      {
+        name: 'Responders',
+        value: analytics?.providers.total ?? 0,
+        fill: 'hsl(262.1 83.3% 57.8%)',
+      },
+    ],
+    [analytics]
+  );
 
   const recentOrgs = analytics?.orgs.info ?? [];
   const recentUsers = analytics?.users.info ?? [];
@@ -240,6 +247,7 @@ export default function SuperAdminDashboardPage() {
               <ChartContainer
                 config={barChartConfig}
                 className="h-[300px] w-full"
+                style={{ overflow: 'visible' }}
               >
                 <BarChart data={monthlyComparisonData}>
                   <XAxis
@@ -249,15 +257,7 @@ export default function SuperAdminDashboardPage() {
                     tickMargin={8}
                   />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                  <ChartTooltip
-                    content={<ChartTooltipContent />}
-                    wrapperStyle={{
-                      background: '#fff',
-                      border: '1px solid #e5e5e5',
-                      padding: '8px 12px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    }}
-                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
                   <ChartLegend content={<ChartLegendContent />} />
                   <Bar
                     dataKey="thisMonth"
@@ -280,17 +280,15 @@ export default function SuperAdminDashboardPage() {
                 Entity Distribution
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+            <CardContent className="pt-4 overflow-visible">
+              <ChartContainer
+                config={chartConfig}
+                className="h-[300px] w-full"
+                style={{ overflow: 'visible' }}
+              >
                 <PieChart>
                   <ChartTooltip
-                    content={<ChartTooltipContent hideLabel />}
-                    wrapperStyle={{
-                      background: '#fff',
-                      border: '1px solid #e5e5e5',
-                      padding: '8px 12px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    }}
+                    content={<ChartTooltipContent nameKey="name" />}
                   />
                   <Pie
                     data={distributionData}
@@ -302,8 +300,8 @@ export default function SuperAdminDashboardPage() {
                     outerRadius={100}
                     paddingAngle={2}
                   >
-                    {distributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    {distributionData.map(entry => (
+                      <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Pie>
                   <ChartLegend
@@ -331,7 +329,7 @@ export default function SuperAdminDashboardPage() {
               iconColor: 'text-green-600',
             },
             {
-              title: 'Recent Providers',
+              title: 'Recent Responders',
               data: recentProviders,
               icon: Smartphone,
               iconColor: 'text-purple-600',

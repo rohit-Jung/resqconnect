@@ -1,21 +1,29 @@
 import express from 'express';
 
 import { UserRoles } from '@/constants';
-import {
-  deleteProfilePicture,
-  getUploadSignature,
-  updateProfilePicture,
-} from '@/controllers/upload.controller';
+import uploadController from '@/controllers/upload.controller';
 import { validateRoleAuth } from '@/middlewares/auth.middleware';
 
 const uploadRouter = express.Router();
 const validateUser = validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]);
 
-// Get signed URL
-uploadRouter.get('/signature', validateUser, getUploadSignature);
+// get signed url
+uploadRouter.get(
+  '/signature',
+  validateUser,
+  uploadController.getUploadSignature
+);
 
-// Update profile picture URL after successful upload
-uploadRouter.put('/profile-picture', validateUser, updateProfilePicture);
-uploadRouter.delete('/profile-picture', validateUser, deleteProfilePicture);
+// update profile picture url after successful upload
+uploadRouter.put(
+  '/profile-picture',
+  validateUser,
+  uploadController.updateProfilePicture
+);
+uploadRouter.delete(
+  '/profile-picture',
+  validateUser,
+  uploadController.deleteProfilePicture
+);
 
 export default uploadRouter;

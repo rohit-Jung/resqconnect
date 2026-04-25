@@ -1,3 +1,11 @@
+import {
+  emergencyContact,
+  emergencyResponse,
+  notifications,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
+
 import { eq } from 'drizzle-orm';
 import {
   Expo,
@@ -8,12 +16,7 @@ import {
 import { logger } from '@/config/logger/winston.config';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyContact,
-  notifications,
-  serviceProvider,
-  user,
-} from '@/models';
+import { sendSMS as sendTwilioSMS } from '@/services/twilio.service';
 import { getIo } from '@/socket';
 
 // Initialize Expo SDK for push notifications
@@ -31,6 +34,7 @@ interface NotificationPayload {
 interface SMSPayload {
   to: string;
   message: string;
+  organizationId?: string;
 }
 
 interface EmergencyNotificationData {
@@ -91,11 +95,12 @@ export async function sendPushNotification(
 
 /**
  * Send SMS notification using Twilio or another SMS provider
- * Currently a placeholder that logs the SMS - integrate with Twilio when ready
  */
 export async function sendSMS(payload: SMSPayload): Promise<boolean> {
-  logger.debug(`[SMS] SMS to ${payload.to}: ${payload.message}`);
-  return true;
+  const result = await sendTwilioSMS(payload.to, payload.message, {
+    organizationId: payload.organizationId,
+  });
+  return result.success;
 }
 
 /**
@@ -210,6 +215,26 @@ export async function notifyEmergencyContacts(
   data: EmergencyNotificationData
 ): Promise<void> {
   try {
+    // Best-effort org attribution for SMS metering:
+    // resolve org from the assigned provider (if the request is already assigned).
+    let organizationId: string | undefined;
+    try {
+      const resp = await db.query.emergencyResponse.findFirst({
+        where: eq(emergencyResponse.emergencyRequestId, data.requestId as any),
+        columns: { serviceProviderId: true },
+      });
+
+      if (resp?.serviceProviderId) {
+        const provider = await db.query.serviceProvider.findFirst({
+          where: eq(serviceProvider.id, resp.serviceProviderId as any),
+          columns: { organizationId: true },
+        });
+        organizationId = provider?.organizationId;
+      }
+    } catch {
+      // ignore; send unmetered if org context isn't available
+    }
+
     // Get user's settings
     const userRecord = await db.query.user.findFirst({
       where: eq(user.id, data.userId),
@@ -269,6 +294,7 @@ export async function notifyEmergencyContacts(
         await sendSMS({
           to: contact.phoneNumber,
           message: smsMessage,
+          organizationId,
         });
       }
 

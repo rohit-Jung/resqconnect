@@ -7,17 +7,30 @@ meta {
 post {
   url: {{server}}/organization/verify
   body: json
-  auth: inherit
+  auth: none
 }
 
 body:json {
   {
-    "userId": "eeb1160a-aa71-46d2-a8b6-a691c954a005",
-      "otpToken": "883957"
+    organizationId: "ab5363e7-5583-4a2e-b689-91d3d27d5167",
+    otpToken: "734716"
   }
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+docs {
+  # Verify Organization OTP
+  
+  Verify organization email with OTP code.
+  
+  ## Request Body
+  - email: Organization email
+  - otp: One-time password received via email
+  
+  ## Response
+  Returns success message and verification status.
 }

@@ -1,6 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import { ArrowLeft, CheckCircle, KeyRound, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -9,13 +12,12 @@ import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
-import { useOrgVerify } from '@/services/organization/auth.api';
-import { useVerifyUser } from '@/services/user/auth.api';
-import { TVerifyUser, verifyUserSchema } from '@/validations/auth.schema';
+import {
+  useOrgResendVerificationOTP,
+  useOrgVerify,
+} from '@/services/organization/auth.api';
+import { TOrgVerify, orgVerifySchema } from '@/validations/org.schema';
 
 function parseApiError(err: unknown): string {
   const axiosErr = err as {
@@ -36,29 +38,32 @@ function VerifyPageContent() {
   const [isSuccess, setIsSuccess] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const userId = searchParams.get('userId');
+  const organizationId = searchParams.get('organizationId');
   const verifyMutation = useOrgVerify();
+  const resendMutation = useOrgResendVerificationOTP();
+
+  const email = searchParams.get('email');
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm<TVerifyUser>({
-    resolver: zodResolver(verifyUserSchema),
+  } = useForm<TOrgVerify>({
+    resolver: zodResolver(orgVerifySchema),
     defaultValues: {
-      userId: userId || '',
+      organizationId: organizationId || '',
       otpToken: '',
     },
   });
 
   useEffect(() => {
-    if (userId) {
-      setValue('userId', userId);
+    if (organizationId) {
+      setValue('organizationId', organizationId);
     }
-  }, [userId, setValue]);
+  }, [organizationId, setValue]);
 
-  const onSubmit = (data: TVerifyUser) => {
+  const onSubmit = (data: TOrgVerify) => {
     verifyMutation.mutate(data, {
       onSuccess: response => {
         setIsSuccess(true);
@@ -143,7 +148,7 @@ function VerifyPageContent() {
                 </div>
               )}
 
-              {!userId && (
+              {!organizationId && (
                 <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700">
                   Invalid verification link. Please{' '}
                   <Link href="/signup" className="font-medium underline">
@@ -158,7 +163,7 @@ function VerifyPageContent() {
               )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                <input type="hidden" {...register('userId')} />
+                <input type="hidden" {...register('organizationId')} />
 
                 <div className="space-y-2">
                   <Label htmlFor="otpToken">Verification Code</Label>
@@ -178,9 +183,9 @@ function VerifyPageContent() {
                       {errors.otpToken.message}
                     </p>
                   )}
-                  {errors.userId && (
+                  {errors.organizationId && (
                     <p className="text-sm text-red-500">
-                      {errors.userId.message}
+                      {errors.organizationId.message}
                     </p>
                   )}
                 </div>
@@ -189,7 +194,7 @@ function VerifyPageContent() {
                   type="submit"
                   className="h-12 w-full text-base"
                   size="lg"
-                  disabled={verifyMutation.isPending || !userId}
+                  disabled={verifyMutation.isPending || !organizationId}
                 >
                   {verifyMutation.isPending ? (
                     <>
@@ -209,8 +214,26 @@ function VerifyPageContent() {
                     type="button"
                     className="text-primary hover:underline"
                     onClick={() => {
-                      console.log('Resend OTP');
+                      if (!email) {
+                        toast.error(
+                          'Missing email in verification link. Please log in again.'
+                        );
+                        return;
+                      }
+
+                      resendMutation.mutate(
+                        { email },
+                        {
+                          onSuccess: () => {
+                            toast.success('OTP sent to your email');
+                          },
+                          onError: error => {
+                            toast.error(parseApiError(error));
+                          },
+                        }
+                      );
                     }}
+                    disabled={resendMutation.isPending}
                   >
                     Resend code
                   </button>

@@ -1,58 +1,19 @@
 'use client';
 
-import {
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Mail,
-  Search,
-  Users,
-} from 'lucide-react';
-import { useState } from 'react';
+import { Button } from '@repo/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { AlertTriangle, Loader2, Users } from 'lucide-react';
+
 import { useDashboardAnalytics } from '@/services/super-admin/dashboard.api';
-import { IDashboardEntity } from '@/types/auth.types';
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [sortField, setSortField] = useState<'createdAt' | 'name' | 'email'>(
-    'createdAt'
-  );
-  const [sortBy, setSortBy] = useState<'asc' | 'desc'>('desc');
-
-  const { data, isLoading, isError, error } = useDashboardAnalytics({
-    page,
-    limit,
-    sortBy,
-    sortField,
-  });
+  const { data, isLoading, isError, error } = useDashboardAnalytics();
 
   const analytics = data?.data?.data;
-  const users = analytics?.users?.info ?? [];
   const totalUsers = analytics?.users?.total ?? 0;
   const thisMonthUsers = analytics?.users?.thisMonth ?? 0;
   const lastMonthUsers = analytics?.users?.lastMonth ?? 0;
-
-  const totalPages = Math.ceil(totalUsers / limit);
-
-  const filteredUsers = users.filter(
-    (user: IDashboardEntity) =>
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const growthPercentage =
     lastMonthUsers > 0
@@ -167,180 +128,20 @@ export default function UsersPage() {
           </Card>
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative max-w-md flex-1">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 border-border focus:border-primary rounded-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Select
-              value={sortField}
-              onValueChange={v =>
-                setSortField(v as 'createdAt' | 'name' | 'email')
-              }
-            >
-              <SelectTrigger className="w-[140px] rounded-none border-border">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt">Date Joined</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sortBy}
-              onValueChange={v => setSortBy(v as 'asc' | 'desc')}
-            >
-              <SelectTrigger className="w-[120px] rounded-none border-border">
-                <SelectValue placeholder="Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desc">Newest</SelectItem>
-                <SelectItem value="asc">Oldest</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={String(limit)}
-              onValueChange={v => {
-                setLimit(Number(v));
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[100px] rounded-none border-border">
-                <SelectValue placeholder="Per page" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Users Table */}
         <Card className="rounded-xl">
           <CardHeader className="border-b border-border pb-3">
             <CardTitle className="text-base font-semibold text-foreground">
-              All Users
+              User Listing
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredUsers.length === 0 ? (
-              <p className="text-muted-foreground py-8 text-center">
-                {searchQuery ? 'No users match your search' : 'No users found'}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                        User
-                      </th>
-                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                        Email
-                      </th>
-                      <th className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground px-6 py-3">
-                        Joined
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map(
-                      (user: IDashboardEntity, index: number) => (
-                        <tr
-                          key={`${user.email}-${index}`}
-                          className="border-b border-border last:border-0 hover:bg-muted/50"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center">
-                                <span className="text-primary text-sm font-medium">
-                                  {user.name
-                                    .split(' ')
-                                    .map(n => n[0])
-                                    .join('')
-                                    .toUpperCase()
-                                    .slice(0, 2)}
-                                </span>
-                              </div>
-                              <span className="font-medium text-foreground">
-                                {user.name}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-muted-foreground flex items-center gap-2">
-                              <Mail className="h-4 w-4" />
-                              <span className="text-foreground">
-                                {user.email}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="text-muted-foreground px-6 py-4">
-                            {new Date(user.createdAt).toLocaleDateString(
-                              'en-US',
-                              {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              }
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-6 flex items-center justify-between">
-                <p className="text-muted-foreground text-sm">
-                  Showing {(page - 1) * limit + 1} to{' '}
-                  {Math.min(page * limit, totalUsers)} of {totalUsers} users
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-none border-border text-foreground hover:bg-muted"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <span className="text-muted-foreground px-2 text-sm">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-none border-border text-foreground hover:bg-muted"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <p className="text-muted-foreground py-6 text-sm">
+              The control plane currently only ingests aggregate user counts
+              (via silo metrics). Detailed user lists are not replicated.
+            </p>
+            <Button variant="outline" disabled>
+              Export Users (not implemented)
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -2,45 +2,46 @@
 // Super admin uses the user/admin role for authentication
 
 export const authEndpoints = {
-  login: `/user/login`,
-  logout: `/user/logout`,
-  profile: `/user/profile`,
-  verify: `/user/verify`,
+  login: `/auth/login`,
+  me: `/auth/me`,
 };
 
 export const organizationEndpoints = {
-  getAll: `/organization`,
-  getById: (id: string) => `/organization/${id}`,
-  update: (id: string) => `/organization/${id}`,
-  delete: (id: string) => `/organization/${id}`,
-  register: `/organization/register`,
+  getAll: `/orgs`,
+  getById: (id: string) => `/orgs/${id}`,
+  deleteById: (id: string) => `/orgs/${id}`,
+  provision: `/orgs/provision`,
+  updateStatus: (id: string) => `/orgs/${id}/status`,
+  entitlements: (id: string) => `/orgs/${id}/entitlements`,
 };
 
 export const userEndpoints = {
-  getById: (id: string) => `/user/${id}`,
+  // todo: control plane doesn't implement per-user detail endpoint yet
+  getById: (_id: string) => {
+    void _id;
+    return '';
+  },
 };
 
 export const serviceProviderEndpoints = {
-  getNearby: `/service-provider/nearby`,
-  getById: (id: string) => `/service-provider/${id}`,
+  // TODO: control plane doesn't implement per-provider endpoints yet
+  getNearby: '',
+  getById: (_id: string) => {
+    void _id;
+    return '';
+  },
 };
 
 export const adminEndpoints = {
-  dashboardAnalytics: `/admin/dashboard-analytics`,
+  dashboard: `/admin/dashboard-analytics`,
 };
 
-export const emergencyEndpoints = {
-  requests: `/emergency-request`,
-  getRequest: (id: string) => `/emergency-request/${id}`,
-  responses: `/emergency-response`,
-  getResponse: (id: string) => `/emergency-response/${id}`,
-};
+export const emergencyEndpoints = {};
 
 export const paymentEndpoints = {
-  plans: `/payments/plans`,
-  planById: (id: string) => `/payments/plans/${id}`,
-  getAllPayments: `/payments/history`,
-  getPaymentById: (id: string) => `/payments/status/${id}`,
-  subscribe: `/payments/subscribe`,
-  subscription: `/payments/subscription`,
+  plans: `/plans`,
+  checkout: `/billing/checkout`,
+  planById: (id: string) => `/plans/${id}`,
+  payments: `/billing/payments`,
+  paymentById: (id: string) => `/billing/payments/${id}`,
 };

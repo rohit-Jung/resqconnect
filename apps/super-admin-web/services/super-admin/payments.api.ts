@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import type { ApiResponse } from '@/types/auth.types';
+import type { CpPlansListResponse } from '@/types/control-plane.types';
 
 import api from '../axiosInstance';
 import { paymentEndpoints } from '../endPoints';
@@ -69,7 +69,7 @@ export const paymentKeys = {
 
 // Get subscription plans
 export const useGetSubscriptionPlans = (enabled: boolean = true) => {
-  return useQuery<AxiosResponse<ApiResponse<ISubscriptionPlan[]>>, AxiosError>({
+  return useQuery<AxiosResponse<CpPlansListResponse>, AxiosError>({
     queryKey: paymentKeys.plans(),
     queryFn: () => api.get(paymentEndpoints.plans),
     enabled,
@@ -88,11 +88,11 @@ export const useGetAllPayments = (
 
   const queryString = queryParams.toString();
   const url = queryString
-    ? `${paymentEndpoints.getAllPayments}?${queryString}`
-    : paymentEndpoints.getAllPayments;
+    ? `${paymentEndpoints.payments}?${queryString}`
+    : paymentEndpoints.payments;
 
   return useQuery<
-    AxiosResponse<ApiResponse<IPaymentHistoryResponse>>,
+    AxiosResponse<{ ok: true } & IPaymentHistoryResponse>,
     AxiosError
   >({
     queryKey: paymentKeys.list(params),
@@ -103,9 +103,9 @@ export const useGetAllPayments = (
 
 // Get payment by ID
 export const useGetPaymentById = (id: string, enabled: boolean = true) => {
-  return useQuery<AxiosResponse<ApiResponse<IPayment>>, AxiosError>({
+  return useQuery<AxiosResponse<{ ok: true; payment: IPayment }>, AxiosError>({
     queryKey: paymentKeys.detail(id),
-    queryFn: () => api.get(paymentEndpoints.getPaymentById(id)),
+    queryFn: () => api.get(paymentEndpoints.paymentById(id)),
     enabled: enabled && !!id,
   });
 };
@@ -115,7 +115,7 @@ export const useCreateSubscriptionPlan = () => {
   const queryClient = useQueryClient();
 
   return useMutation<
-    AxiosResponse<ApiResponse<ISubscriptionPlan>>,
+    AxiosResponse,
     AxiosError,
     { name: string; price: number; durationMonths: number; features: string[] }
   >({
@@ -131,7 +131,7 @@ export const useUpdateSubscriptionPlan = () => {
   const queryClient = useQueryClient();
 
   return useMutation<
-    AxiosResponse<ApiResponse<ISubscriptionPlan>>,
+    AxiosResponse,
     AxiosError,
     {
       id: string;
@@ -154,7 +154,7 @@ export const useUpdateSubscriptionPlan = () => {
 export const useDeleteSubscriptionPlan = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<AxiosResponse<ApiResponse<{}>>, AxiosError, string>({
+  return useMutation<AxiosResponse, AxiosError, string>({
     mutationFn: id => api.delete(paymentEndpoints.planById(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: paymentKeys.plans() });

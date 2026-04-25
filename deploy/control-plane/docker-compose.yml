@@ -1,0 +1,34 @@
+services:
+  control_plane_db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_control_plane
+    ports:
+      - '127.0.0.1:5550:5432'
+    volumes:
+      - control_plane_postgres_data:/var/lib/postgresql/data
+
+  # control_plane_backend:
+  #   build:
+  #     context: ../..
+  #     dockerfile: apps/super-admin-backend/Dockerfile
+  #   restart: unless-stopped
+  #   environment:
+  #     PORT: 4000
+  #     DEV_IP: 0.0.0.0
+  #     DATABASE_URL: postgresql://root:admin123@control_plane_db:5432/resq_control_plane
+  #     INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+  #   env_file:
+  #     - ./control-plane.env
+  #   depends_on:
+  #     - control_plane_db
+  #   ports:
+  #     - '127.0.0.1:7500:4000'
+
+    # Poller runs inside this service once per hour.
+
+volumes:
+  control_plane_postgres_data:

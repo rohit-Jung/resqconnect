@@ -94,7 +94,7 @@ export const serviceProviderApi = {
     cooldownRemaining?: number;
   }> => {
     const response = await api.patch(serviceProviderEndpoints.updateStatus, {
-      status,
+      serviceStatus: status,
     });
     return response.data.data;
   },

@@ -41,6 +41,12 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.anonymous.resqmobile"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f28bc5f5-0ba0-473b-a5bb-f1adedd7394e"
+      }
     }
   }
 }

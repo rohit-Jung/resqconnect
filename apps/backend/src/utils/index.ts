@@ -1,9 +1,9 @@
 import { faker } from '@faker-js/faker';
+import { serviceProvider } from '@repo/db/schemas';
 
 import { ServiceTypeEnum } from '@/constants';
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import db from '@/db';
-import { serviceProvider } from '@/models';
 
 export const capitalizeFirstLetter = (str: string) => {
   if (!str) return str;

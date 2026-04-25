@@ -1,9 +1,9 @@
+import type * as models from '@repo/db/schemas';
+
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 import { type DeepMockProxy, mockDeep, mockReset } from 'vitest-mock-extended';
-
-import type * as models from '@/models';
 
 export type MockDb = DeepMockProxy<NodePgDatabase<typeof models>>;
 
@@ -12,21 +12,47 @@ export const mockDb = mockDeep<NodePgDatabase<typeof models>>();
 vi.mock('@/config', () => ({
   envConfig: {
     port: 3000,
+    dev_ip: '0.0.0.0',
+    allowed_origins: ['*'],
     database_url: 'postgresql://test:test@localhost:5432/test',
     jwt_secret: 'test-jwt-secret',
     jwt_expiry: 3600,
+    jwt_restricted_expiry: 900,
     otp_secret: 'test-otp-secret',
-    twilio_account_sid: 'test-twilio-sid',
+
+    twilio_account_sid: 'AC00000000000000000000000000000000',
     twilio_auth_token: 'test-twilio-token',
     twilio_from_number: '+1234567890',
+
     galli_maps_token: 'test-galli-token',
     mailtrap_user: 'test-mailtrap-user',
     mailtrap_pass: 'test-mailtrap-pass',
+    mapbox_token: 'test-mapbox-token',
+
     google_mail: 'test@gmail.com',
     google_pass: 'test-google-pass',
-    mapbox_token: 'test-mapbox-token',
     to_number: '+1234567890',
     emergency_phone_number: '112',
+
+    khalti_secret_key: 'test-khalti-secret',
+    khalti_base_url: 'https://dev.khalti.com/api/v2',
+    khalti_return_url: 'http://localhost:3000/return',
+    khalti_website_url: 'http://localhost:3000',
+
+    sms_uri_base: 'http://localhost:1401',
+    sms_username: 'test-sms-user',
+    sms_password: 'test-sms-pass',
+    backend_base_path: 'http://localhost:3000',
+
+    cloudinary_cloud_name: undefined,
+    cloudinary_api_key: undefined,
+    cloudinary_api_secret: undefined,
+
+    // Infra
+    redis_host: 'localhost',
+    redis_port: 6379,
+    kafka_brokers: 'localhost:9092',
+    internal_api_key: 'test-internal-key',
   },
   logger: {
     error: vi.fn(),
@@ -45,11 +71,66 @@ vi.mock('@/config', () => ({
   },
 }));
 
+// Some modules import envConfig directly from this file path; mock it too.
+vi.mock('@/config/env.config', () => ({
+  envConfig: {
+    port: 3000,
+    dev_ip: '0.0.0.0',
+    allowed_origins: ['*'],
+    database_url: 'postgresql://test:test@localhost:5432/test',
+    jwt_secret: 'test-jwt-secret',
+    jwt_expiry: 3600,
+    jwt_restricted_expiry: 900,
+    otp_secret: 'test-otp-secret',
+    twilio_account_sid: 'AC00000000000000000000000000000000',
+    twilio_auth_token: 'test-twilio-token',
+    twilio_from_number: '+1234567890',
+    galli_maps_token: 'test-galli-token',
+    mailtrap_user: 'test-mailtrap-user',
+    mailtrap_pass: 'test-mailtrap-pass',
+    google_mail: 'test@gmail.com',
+    google_pass: 'test-google-pass',
+    mapbox_token: 'test-mapbox-token',
+    to_number: '+1234567890',
+    emergency_phone_number: '112',
+    khalti_secret_key: 'test-khalti-secret',
+    khalti_base_url: 'https://dev.khalti.com/api/v2',
+    khalti_return_url: 'http://localhost:3000/return',
+    khalti_website_url: 'http://localhost:3000',
+    sms_uri_base: 'http://localhost:1401',
+    sms_username: 'test-sms-user',
+    sms_password: 'test-sms-pass',
+    backend_base_path: 'http://localhost:3000',
+    cloudinary_cloud_name: undefined,
+    cloudinary_api_key: undefined,
+    cloudinary_api_secret: undefined,
+
+    // Infra
+    redis_host: 'localhost',
+    redis_port: 6379,
+    kafka_brokers: 'localhost:9092',
+    internal_api_key: 'test-internal-key',
+  },
+}));
+
 vi.mock('@/db', () => ({
   default: mockDb,
 }));
 
 vi.mock('@/services/redis.service', () => ({
+  redis: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue('OK'),
+    del: vi.fn().mockResolvedValue(1),
+    exists: vi.fn().mockResolvedValue(0),
+    incr: vi.fn().mockResolvedValue(1),
+    incrby: vi.fn().mockResolvedValue(1),
+    decr: vi.fn().mockResolvedValue(1),
+    pexpire: vi.fn().mockResolvedValue(1),
+    pttl: vi.fn().mockResolvedValue(15 * 60 * 1000),
+    expire: vi.fn().mockResolvedValue(1),
+    eval: vi.fn().mockResolvedValue([1, 1]),
+  },
   acquireLock: vi.fn().mockResolvedValue(true),
   releaseLock: vi.fn().mockResolvedValue(true),
   getEmergencyProviders: vi.fn().mockResolvedValue([]),

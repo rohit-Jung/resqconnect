@@ -1,13 +1,19 @@
+import {
+  organizationSubscriptions,
+  payments,
+  subscriptionPlans,
+} from '@repo/db/schemas';
+import {
+  initiateSubscriptionSchema,
+  khaltiCallbackSchema,
+  paymentHistoryQuerySchema,
+} from '@repo/types/validations';
+
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import { envConfig } from '@/config';
 import db from '@/db';
-import {
-  organizationSubscriptions,
-  payments,
-  subscriptionPlans,
-} from '@/models';
 import {
   type CallbackParams,
   handleCallback,
@@ -16,24 +22,17 @@ import {
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import {
-  initiateSubscriptionSchema,
-  khaltiCallbackSchema,
-  paymentHistoryQuerySchema,
-} from '@/validations/payment.validations';
 
-const getSubscriptionPlans = asyncHandler(
-  async (req: Request, res: Response) => {
-    const plans = await db.query.subscriptionPlans.findMany({
-      where: eq(subscriptionPlans.isActive, true),
-      orderBy: [subscriptionPlans.price],
-    });
+const getSubscriptionPlans = asyncHandler(async (_, res: Response) => {
+  const plans = await db.query.subscriptionPlans.findMany({
+    where: eq(subscriptionPlans.isActive, true),
+    orderBy: [subscriptionPlans.price],
+  });
 
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Subscription plans retrieved', plans));
-  }
-);
+  res
+    .status(200)
+    .json(new ApiResponse(200, 'Subscription plans retrieved', plans));
+});
 
 const initiateSubscription = asyncHandler(
   async (req: Request, res: Response) => {
@@ -112,7 +111,7 @@ const getPaymentStatus = asyncHandler(async (req: Request, res: Response) => {
 
   const { paymentId } = req.params;
 
-  if (!paymentId) {
+  if (!paymentId || typeof paymentId !== 'string') {
     throw new ApiError(400, 'Payment ID is required');
   }
 
@@ -160,10 +159,12 @@ const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => {
     whereConditions.push(eq(payments.status, status));
   }
 
-  const [{ count }] = await db
+  const [payment] = await db
     .select({ count: sql<number>`count(*)` })
     .from(payments)
     .where(and(...whereConditions));
+
+  const count = payment ? payment.count : 0;
 
   const paymentHistory = await db.query.payments.findMany({
     where: and(...whereConditions),
@@ -273,6 +274,10 @@ const updateSubscriptionPlan = asyncHandler(
     }
 
     const { id } = req.params;
+    if (!id || typeof id !== 'string') {
+      throw new ApiError(400, 'ID should be passed and should be string');
+    }
+
     const { name, price, durationMonths, features, isActive } = req.body;
 
     const existingPlan = await db.query.subscriptionPlans.findFirst({
@@ -316,6 +321,9 @@ const deleteSubscriptionPlan = asyncHandler(
     }
 
     const { id } = req.params;
+    if (!id || typeof id !== 'string') {
+      throw new ApiError(400, 'ID should be passed and should be string');
+    }
 
     const existingPlan = await db.query.subscriptionPlans.findFirst({
       where: eq(subscriptionPlans.id, id),

@@ -1,0 +1,70 @@
+services:
+  fire_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_fire
+    ports:
+      - '127.0.0.1:5541:5432'
+    volumes:
+      - fire_postgres_data:/var/lib/postgresql/data
+
+  fire_redis:
+    image: valkey/valkey
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6381:6379'
+
+  fire_backend:
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      SECTOR: fire
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@fire_db:5432/resq_fire
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_HOST: fire_redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: fire_kafka:29092
+      # You must provide the rest via env_file.
+    env_file:
+      - ./silo.env
+    depends_on:
+      - fire_db
+      - fire_redis
+      - fire_kafka
+    ports:
+      - '127.0.0.1:7401:3000'
+
+    # Redis is used by OTP/MFA/locks.
+
+  fire_kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:9094:9092'
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@fire_kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9094,PLAINTEXT_INTERNAL://fire_kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - fire_kafka_data:/var/lib/kafka/data
+
+volumes:
+  fire_postgres_data:
+  fire_kafka_data:

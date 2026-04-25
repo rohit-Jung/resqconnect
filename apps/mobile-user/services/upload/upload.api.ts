@@ -1,5 +1,7 @@
+import { useProviderStore } from '@/store/providerStore';
+
 import api from '../axiosInstance';
-import { uploadEndpoints } from '../endPoints';
+import { providerUploadEndpoints, uploadEndpoints } from '../endPoints';
 
 export interface CloudinarySignature {
   signature: string;
@@ -24,12 +26,17 @@ export interface UpdateProfilePictureResponse {
   name: string;
   email: string;
   phoneNumber: number;
-  profilePicture: string;
+  profilePicture: string | null;
 }
 
 export const uploadApi = {
   getUploadSignature: async (): Promise<CloudinarySignature> => {
-    const response = await api.get(uploadEndpoints.getSignature);
+    const isProvider = !!useProviderStore.getState().provider;
+    const response = await api.get(
+      isProvider
+        ? providerUploadEndpoints.getSignature
+        : uploadEndpoints.getSignature
+    );
     return response.data.data;
   },
 
@@ -41,7 +48,8 @@ export const uploadApi = {
 
     // Get the file extension from URI
     const uriParts = imageUri.split('.');
-    const fileType = uriParts[uriParts.length - 1];
+    const ext = (uriParts[uriParts.length - 1] || '').toLowerCase();
+    const fileType = ext === 'jpg' ? 'jpeg' : ext;
 
     // Create file object for upload
     const file = {
@@ -76,15 +84,28 @@ export const uploadApi = {
   updateProfilePicture: async (
     profilePictureUrl: string
   ): Promise<UpdateProfilePictureResponse> => {
-    const response = await api.put(uploadEndpoints.updateProfilePicture, {
-      profilePictureUrl,
-    });
-    return response.data.data.user;
+    const isProvider = !!useProviderStore.getState().provider;
+    const response = await api.put(
+      isProvider
+        ? providerUploadEndpoints.updateProfilePicture
+        : uploadEndpoints.updateProfilePicture,
+      { profilePictureUrl }
+    );
+    return isProvider
+      ? response.data.data.serviceProvider
+      : response.data.data.user;
   },
 
   deleteProfilePicture: async (): Promise<UpdateProfilePictureResponse> => {
-    const response = await api.delete(uploadEndpoints.deleteProfilePicture);
-    return response.data.data.user;
+    const isProvider = !!useProviderStore.getState().provider;
+    const response = await api.delete(
+      isProvider
+        ? providerUploadEndpoints.deleteProfilePicture
+        : uploadEndpoints.deleteProfilePicture
+    );
+    return isProvider
+      ? response.data.data.serviceProvider
+      : response.data.data.user;
   },
 
   /**

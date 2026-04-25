@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+
 import {
   AlertTriangle,
   Check,
@@ -13,8 +16,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   useGetActiveSubscription,
   useGetPaymentHistory,
@@ -62,9 +63,9 @@ export default function PlansPage() {
   );
   const subscribeMutation = useSubscribeToPlan();
 
-  const plans = plansData?.data?.data ?? [];
-  const activeSubscription = subscriptionData?.data?.data ?? null;
-  const history = historyData?.data?.data;
+  const plans = plansData?.data?.plans ?? [];
+  const activeSubscription = subscriptionData?.data?.subscription ?? null;
+  const history = historyData?.data;
   const payments = history?.payments ?? [];
   const pagination = history?.pagination;
 
@@ -77,9 +78,10 @@ export default function PlansPage() {
     try {
       const response = await subscribeMutation.mutateAsync({
         planId,
+        returnUrl: `${window.location.origin}/payment/success`,
       });
-      const { paymentUrl } = response.data.data;
-      window.location.href = paymentUrl;
+      const paymentUrl = response.data.data.payment_url;
+      window.location.assign(paymentUrl);
     } catch {
       setSubscribingPlanId(null);
     }

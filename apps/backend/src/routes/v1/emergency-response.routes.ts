@@ -1,13 +1,7 @@
 import { Router } from 'express';
 
 import { UserRoles } from '@/constants';
-import {
-  createEmergencyResponse,
-  deleteEmergencyResponse,
-  getEmergencyResponse,
-  getProviderResponses,
-  updateEmergencyResponse,
-} from '@/controllers/emergency-response.controller';
+import emergencyResponseController from '@/controllers/emergency-response.controller';
 import {
   validateRoleAuth,
   validateServiceProvider,
@@ -18,16 +12,25 @@ const emergencyResponseRouter = Router();
 emergencyResponseRouter
   .route('/')
   // .get(validateRoleAuth(["user"]), getEmergencyResponse)
-  .post(validateRoleAuth([UserRoles.USER]), createEmergencyResponse);
+  .post(
+    validateRoleAuth([UserRoles.USER]),
+    emergencyResponseController.createEmergencyResponse
+  );
 
 emergencyResponseRouter
   .route('/provider-responses')
-  .get(validateServiceProvider, getProviderResponses);
+  .get(
+    validateServiceProvider,
+    emergencyResponseController.getProviderResponses
+  );
 
 emergencyResponseRouter
   .route('/:id')
-  .get(getEmergencyResponse)
-  .put(updateEmergencyResponse)
-  .delete(validateRoleAuth([UserRoles.ADMIN]), deleteEmergencyResponse);
+  .get(emergencyResponseController.getEmergencyResponse)
+  .put(emergencyResponseController.updateEmergencyResponse)
+  .delete(
+    validateRoleAuth([UserRoles.ADMIN]),
+    emergencyResponseController.deleteEmergencyResponse
+  );
 
 export default emergencyResponseRouter;

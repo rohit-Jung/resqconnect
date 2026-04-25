@@ -1,5 +1,9 @@
 'use client';
 
+import { Badge } from '@repo/ui/badge';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+
 import {
   Ambulance,
   CheckCircle,
@@ -22,9 +26,6 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   useOrgDeleteProvider,
   useOrgServiceProviders,
@@ -86,22 +87,22 @@ export default function ServiceProvidersPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  const { data: providersData, isLoading, refetch } = useOrgServiceProviders();
+  const { data: providersData, isLoading } = useOrgServiceProviders();
   const deleteMutation = useOrgDeleteProvider();
   const verifyMutation = useOrgVerifyProvider();
 
-  const providers = providersData?.data?.data || [];
+  const responders = providersData?.data?.data || [];
 
-  // Filter providers
-  const filteredProviders = providers.filter(provider => {
+  // Filter responders
+  const filteredProviders = responders.filter(responder => {
     const matchesSearch =
-      provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.phoneNumber.toString().includes(searchQuery);
+      responder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      responder.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      responder.phoneNumber.toString().includes(searchQuery);
     const matchesStatus =
-      filterStatus === 'all' || provider.serviceStatus === filterStatus;
+      filterStatus === 'all' || responder.serviceStatus === filterStatus;
     const matchesType =
-      filterType === 'all' || provider.serviceType === filterType;
+      filterType === 'all' || responder.serviceType === filterType;
     return matchesSearch && matchesStatus && matchesType;
   });
 
@@ -143,17 +144,17 @@ export default function ServiceProvidersPage() {
           <Link href="/dashboard/service-providers/new">
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
               <Plus className="h-4 w-4" />
-              Add Provider
+              Add Responder
             </Button>
           </Link>
         </div>
         <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
         <div className="mt-4">
           <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
-            Service Providers
+            Responders
           </h1>
           <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
-            Manage your organization&apos;s service providers
+            Manage your organization&apos;s responders
           </p>
         </div>
       </div>
@@ -169,10 +170,10 @@ export default function ServiceProvidersPage() {
               </div>
               <div>
                 <p className="text-muted-foreground text-sm dark:text-muted-foreground">
-                  Total Providers
+                  Total Responders
                 </p>
                 <p className="text-2xl font-bold text-foreground dark:text-foreground">
-                  {providers.length}
+                  {responders.length}
                 </p>
               </div>
             </div>
@@ -188,7 +189,7 @@ export default function ServiceProvidersPage() {
                 </p>
                 <p className="text-2xl font-bold text-foreground dark:text-foreground">
                   {
-                    providers.filter(p => p.serviceStatus === 'available')
+                    responders.filter(p => p.serviceStatus === 'available')
                       .length
                   }
                 </p>
@@ -205,7 +206,10 @@ export default function ServiceProvidersPage() {
                   On Assignment
                 </p>
                 <p className="text-2xl font-bold text-foreground dark:text-foreground">
-                  {providers.filter(p => p.serviceStatus === 'assigned').length}
+                  {
+                    responders.filter(p => p.serviceStatus === 'assigned')
+                      .length
+                  }
                 </p>
               </div>
             </div>
@@ -220,7 +224,10 @@ export default function ServiceProvidersPage() {
                   Off Duty
                 </p>
                 <p className="text-2xl font-bold text-foreground dark:text-foreground">
-                  {providers.filter(p => p.serviceStatus === 'off_duty').length}
+                  {
+                    responders.filter(p => p.serviceStatus === 'off_duty')
+                      .length
+                  }
                 </p>
               </div>
             </div>
@@ -261,18 +268,18 @@ export default function ServiceProvidersPage() {
           </select>
         </div>
 
-        {/* Providers List */}
+        {/* Responders List */}
         <div className="bg-card overflow-hidden rounded-xl border">
           {filteredProviders.length === 0 ? (
             <div className="p-8 text-center">
               <Users className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
               <h3 className="mb-2 text-lg font-medium text-foreground">
-                No service providers found
+                No responders found
               </h3>
               <p className="text-muted-foreground mb-4 dark:text-muted-foreground">
                 {searchQuery || filterStatus !== 'all' || filterType !== 'all'
                   ? 'Try adjusting your filters'
-                  : 'Get started by adding your first service provider'}
+                  : 'Get started by adding your first responder'}
               </p>
               {!searchQuery &&
                 filterStatus === 'all' &&
@@ -280,7 +287,7 @@ export default function ServiceProvidersPage() {
                   <Link href="/dashboard/service-providers/new">
                     <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none">
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Provider
+                      Add Responder
                     </Button>
                   </Link>
                 )}
@@ -291,7 +298,7 @@ export default function ServiceProvidersPage() {
                 <thead className="border-b border-border">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                      Provider
+                      Responder
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                       Contact
@@ -311,27 +318,27 @@ export default function ServiceProvidersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredProviders.map(provider => {
+                  {filteredProviders.map(responder => {
                     const typeConfig =
-                      SERVICE_TYPE_CONFIG[provider.serviceType];
-                    const statusConfig = STATUS_CONFIG[provider.serviceStatus];
+                      SERVICE_TYPE_CONFIG[responder.serviceType];
+                    const statusConfig = STATUS_CONFIG[responder.serviceStatus];
 
                     return (
-                      <tr key={provider.id} className="hover:bg-muted/50">
+                      <tr key={responder.id} className="hover:bg-muted/50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-primary/10 flex h-10 w-10 items-center justify-center">
                               <span className="text-primary font-medium">
-                                {provider.name.charAt(0).toUpperCase()}
+                                {responder.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div>
                               <p className="font-medium text-foreground">
-                                {provider.name}
+                                {responder.name}
                               </p>
                               <p className="text-muted-foreground flex items-center gap-1 text-sm dark:text-muted-foreground">
                                 <MapPin className="h-3 w-3" />
-                                {provider.primaryAddress}
+                                {responder.primaryAddress}
                               </p>
                             </div>
                           </div>
@@ -340,11 +347,11 @@ export default function ServiceProvidersPage() {
                           <div className="space-y-1">
                             <p className="flex items-center gap-1 text-sm text-foreground">
                               <Mail className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
-                              {provider.email}
+                              {responder.email}
                             </p>
                             <p className="flex items-center gap-1 text-sm text-foreground">
                               <Phone className="text-muted-foreground h-3 w-3 dark:text-muted-foreground" />
-                              {provider.phoneNumber}
+                              {responder.phoneNumber}
                             </p>
                           </div>
                         </td>
@@ -367,7 +374,7 @@ export default function ServiceProvidersPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          {provider.isVerified ? (
+                          {responder.isVerified ? (
                             <CheckCircle className="h-5 w-5 text-green-500" />
                           ) : (
                             <XCircle className="h-5 w-5 text-yellow-500" />
@@ -381,33 +388,33 @@ export default function ServiceProvidersPage() {
                               className="rounded-none"
                               onClick={() =>
                                 setActiveDropdown(
-                                  activeDropdown === provider.id
+                                  activeDropdown === responder.id
                                     ? null
-                                    : provider.id
+                                    : responder.id
                                 )
                               }
                             >
                               <MoreVertical className="h-4 w-4 text-foreground" />
                             </Button>
-                            {activeDropdown === provider.id && (
+                            {activeDropdown === responder.id && (
                               <div className="bg-popover absolute right-0 z-10 mt-1 w-48 rounded-lg border shadow-lg">
                                 <Link
-                                  href={`/dashboard/service-providers/${provider.id}`}
+                                  href={`/dashboard/service-providers/${responder.id}`}
                                   className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm text-foreground"
                                 >
                                   <Eye className="h-4 w-4" />
                                   View Details
                                 </Link>
                                 <Link
-                                  href={`/dashboard/service-providers/${provider.id}/edit`}
+                                  href={`/dashboard/service-providers/${responder.id}/edit`}
                                   className="hover:bg-muted flex items-center gap-2 px-4 py-2 text-sm text-foreground"
                                 >
                                   <Edit className="h-4 w-4" />
                                   Edit
                                 </Link>
-                                {!provider.isVerified && (
+                                {!responder.isVerified && (
                                   <button
-                                    onClick={() => handleVerify(provider.id)}
+                                    onClick={() => handleVerify(responder.id)}
                                     className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-green-600"
                                     disabled={verifyMutation.isPending}
                                   >
@@ -418,11 +425,11 @@ export default function ServiceProvidersPage() {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => handleDelete(provider.id)}
+                                  onClick={() => handleDelete(responder.id)}
                                   className="hover:bg-muted flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600"
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  {deleteId === provider.id
+                                  {deleteId === responder.id
                                     ? 'Confirm Delete'
                                     : 'Delete'}
                                 </button>

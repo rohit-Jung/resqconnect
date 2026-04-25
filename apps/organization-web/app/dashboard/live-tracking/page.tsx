@@ -1,5 +1,8 @@
 'use client';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import { Skeleton } from '@repo/ui/skeleton';
+
 import {
   Activity,
   Flame,
@@ -14,8 +17,6 @@ import {
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import {
   IServiceProvider,
@@ -89,21 +90,21 @@ export default function LiveTrackingPage() {
   const { data: analyticsResponse, isLoading: analyticsLoading } =
     useOrgDashboardAnalytics();
 
-  const providers = providersResponse?.data?.data ?? [];
+  const responders = providersResponse?.data?.data ?? [];
   const analytics = analyticsResponse?.data?.data;
   const isLoading = providersLoading || analyticsLoading;
 
-  const totalProviders = providers.length;
-  const activeProviders = providers.filter(
+  const totalProviders = responders.length;
+  const activeProviders = responders.filter(
     p => p.serviceStatus !== 'off_duty'
   ).length;
-  const availableProviders = providers.filter(
+  const availableProviders = responders.filter(
     p => p.serviceStatus === 'available'
   ).length;
-  const assignedProviders = providers.filter(
+  const assignedProviders = responders.filter(
     p => p.serviceStatus === 'assigned'
   ).length;
-  const activeUnits = providers.filter(p => p.serviceStatus !== 'off_duty');
+  const activeUnits = responders.filter(p => p.serviceStatus !== 'off_duty');
 
   const stats = [
     {
@@ -181,12 +182,12 @@ export default function LiveTrackingPage() {
         <Card className="bg-card dark:bg-card">
           <CardHeader className="border-b border-border pb-3">
             <CardTitle className="text-base font-semibold text-foreground dark:text-foreground">
-              Provider Locations
+              Responder Locations
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <ProviderMap
-              providers={providers}
+              responders={responders}
               selectedProviderId={selectedProviderId}
               onSelectProvider={setSelectedProviderId}
             />
@@ -208,23 +209,23 @@ export default function LiveTrackingPage() {
                   No active response teams
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
-                  All providers are currently off duty
+                  All responders are currently off duty
                 </p>
               </div>
             ) : (
               <div>
-                {activeUnits.map((provider: IServiceProvider) => {
-                  const statusInfo = getStatusInfo(provider.serviceStatus);
+                {activeUnits.map((responder: IServiceProvider) => {
+                  const statusInfo = getStatusInfo(responder.serviceStatus);
                   const hasLocation =
-                    provider.currentLocation?.latitude &&
-                    provider.currentLocation?.longitude;
-                  const isSelected = selectedProviderId === provider.id;
+                    responder.currentLocation?.latitude &&
+                    responder.currentLocation?.longitude;
+                  const isSelected = selectedProviderId === responder.id;
 
                   return (
                     <div
-                      key={provider.id}
+                      key={responder.id}
                       onClick={() =>
-                        setSelectedProviderId(isSelected ? null : provider.id)
+                        setSelectedProviderId(isSelected ? null : responder.id)
                       }
                       className={`flex cursor-pointer items-center gap-4 border-b border-border p-4 transition-colors last:border-0 ${
                         isSelected
@@ -234,35 +235,35 @@ export default function LiveTrackingPage() {
                     >
                       <div
                         className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
-                          provider.serviceStatus === 'available'
+                          responder.serviceStatus === 'available'
                             ? 'border-green-200 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-950 dark:text-green-400'
-                            : provider.serviceStatus === 'assigned'
+                            : responder.serviceStatus === 'assigned'
                               ? 'border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400'
                               : 'border-border bg-muted text-muted-foreground dark:text-muted-foreground'
                         }`}
                       >
-                        {getServiceTypeIcon(provider.serviceType)}
+                        {getServiceTypeIcon(responder.serviceType)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate text-foreground dark:text-foreground">
-                          {provider.name}
+                          {responder.name}
                         </p>
                         <p className="text-muted-foreground dark:text-muted-foreground flex items-center gap-1 text-sm truncate">
                           <MapPin className="h-3 w-3 shrink-0" />
-                          {provider.serviceArea || provider.primaryAddress}
+                          {responder.serviceArea || responder.primaryAddress}
                         </p>
-                        {provider.vehicleInformation &&
-                          provider.vehicleInformation.number !==
+                        {responder.vehicleInformation &&
+                          responder.vehicleInformation.number !==
                             'Not filled' && (
                             <p className="mt-0.5 text-xs text-muted-foreground dark:text-muted-foreground">
-                              {provider.vehicleInformation.type} —{' '}
-                              {provider.vehicleInformation.number}
+                              {responder.vehicleInformation.type} —{' '}
+                              {responder.vehicleInformation.number}
                             </p>
                           )}
                       </div>
                       <div className="shrink-0 text-right">
                         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground dark:text-muted-foreground">
-                          {getServiceTypeName(provider.serviceType)}
+                          {getServiceTypeName(responder.serviceType)}
                         </span>
                         <div className="mt-1 flex items-center justify-end gap-1">
                           {hasLocation ? (
@@ -292,50 +293,50 @@ export default function LiveTrackingPage() {
           </CardContent>
         </Card>
 
-        {/* All Providers */}
-        {providers.length > 0 && (
+        {/* All Responders */}
+        {responders.length > 0 && (
           <Card className="bg-card dark:bg-card">
             <CardHeader className="border-b border-border pb-3">
               <CardTitle className="text-base font-semibold text-foreground dark:text-foreground">
-                All Service Providers
+                All Responders
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div>
-                {providers.map((provider: IServiceProvider) => {
-                  const statusInfo = getStatusInfo(provider.serviceStatus);
+                {responders.map((responder: IServiceProvider) => {
+                  const statusInfo = getStatusInfo(responder.serviceStatus);
                   return (
                     <div
-                      key={provider.id}
+                      key={responder.id}
                       className="flex items-center gap-4 border-b border-border p-4 last:border-0"
                     >
                       <div
                         className={`flex h-9 w-9 shrink-0 items-center justify-center border ${
-                          provider.isVerified
+                          responder.isVerified
                             ? 'border-primary/30 bg-primary/5 text-primary dark:border-primary/50 dark:bg-primary/10'
                             : 'border-yellow-200 bg-yellow-50 text-yellow-600 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400'
                         }`}
                       >
-                        {getServiceTypeIcon(provider.serviceType)}
+                        {getServiceTypeIcon(responder.serviceType)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium truncate text-foreground dark:text-foreground">
-                            {provider.name}
+                            {responder.name}
                           </p>
-                          {!provider.isVerified && (
+                          {!responder.isVerified && (
                             <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-yellow-600 dark:text-yellow-400">
                               Unverified
                             </span>
                           )}
                         </div>
                         <p className="text-muted-foreground dark:text-muted-foreground text-sm truncate">
-                          {provider.email}
+                          {responder.email}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground dark:text-muted-foreground">
-                          {getServiceTypeName(provider.serviceType)}
+                          {getServiceTypeName(responder.serviceType)}
                         </span>
                         <div
                           className={`mt-1 flex items-center justify-end gap-1 text-xs font-medium ${statusInfo.color}`}

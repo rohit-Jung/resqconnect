@@ -1,7 +1,7 @@
-import { Star } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/avatar';
+import { Card, CardContent } from '@repo/ui/card';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent } from '@/components/ui/card';
+import { Star } from 'lucide-react';
 
 export function Testimonials() {
   const reviews = [
@@ -56,7 +56,7 @@ export function Testimonials() {
                   ))}
                 </div>
                 <p className="leading-relaxed text-muted-foreground italic">
-                  "{review.quote}"
+                  &quot;{review.quote}&quot;
                 </p>
                 <div className="flex items-center gap-4 pt-4">
                   <Avatar>

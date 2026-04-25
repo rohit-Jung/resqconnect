@@ -2,11 +2,12 @@
 
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import {
   getTokenFromStorage,
   removeTokenFromStorage,
+  useTokenFromStorage,
 } from '@/lib/hooks/useLocalStorage';
 import { useAdminProfile } from '@/services/super-admin/auth.api';
 
@@ -16,23 +17,21 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [hasToken, setHasToken] = useState(false);
+  const token = useTokenFromStorage('adminToken');
+  const hasToken = token !== null;
 
-  // Check if token exists in localStorage (client-side only)
+  // Redirect unauthenticated clients.
   useEffect(() => {
-    const token = getTokenFromStorage('adminToken');
-    if (!token) {
+    // Best-effort synchronous read for first paint.
+    const tokenNow = getTokenFromStorage('adminToken');
+    if (!tokenNow) {
       router.replace('/login');
-    } else {
-      setHasToken(true);
     }
-    setIsChecking(false);
   }, [router]);
 
   // Validate token by fetching profile
-  const { isLoading, isError, error } = useAdminProfile({
-    enabled: hasToken,
+  const { isLoading, isError } = useAdminProfile({
+    enabled: hasToken === true,
   });
 
   // Handle authentication errors (invalid/expired token)
@@ -45,7 +44,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [isError, router]);
 
   // Show loading while checking auth
-  if (isChecking || (hasToken && isLoading)) {
+  if (!hasToken || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -58,8 +57,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // If no token or error occurred, don't render children (redirect is happening)
-  if (!hasToken || isError) {
+  // If error occurred, don't render children (redirect is happening)
+  if (isError) {
     return null;
   }
 

@@ -3,7 +3,7 @@ import SMTPPool from 'nodemailer/lib/smtp-pool';
 
 import Mailgen from 'mailgen';
 
-import { envConfig } from '@/config/env.config';
+import { envConfig } from '@/config';
 
 import { generateOtpToken } from '../tokens/otpTokens';
 

@@ -1,11 +1,12 @@
 'use client';
 
+import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/avatar';
+import { Button } from '@repo/ui/button';
+
 import { Bell, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
 
 export function SuperAdminHeader() {

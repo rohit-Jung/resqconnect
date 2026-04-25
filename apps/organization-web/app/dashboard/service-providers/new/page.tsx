@@ -1,6 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
+import { Skeleton } from '@repo/ui/skeleton';
 
 import {
   Ambulance,
@@ -23,10 +27,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import { useOrgRegisterProvider } from '@/services/service-provider/auth.api';
 import { ServiceCategory } from '@/types/auth.types';
@@ -113,7 +113,8 @@ export default function NewServiceProviderPage() {
 
   const onSubmit = async (data: TServiceProviderRegisterForm) => {
     try {
-      const { confirmPassword, ...formData } = data;
+      const { confirmPassword: _confirmPassword, ...formData } = data;
+      void _confirmPassword;
       const apiData = {
         ...formData,
         age: parseInt(data.age, 10),
@@ -131,14 +132,12 @@ export default function NewServiceProviderPage() {
       await createMutation.mutateAsync(apiData);
       router.push('/dashboard/service-providers');
     } catch (error: unknown) {
-      console.error('Error creating service provider:', error);
+      console.error('Error creating responder:', error);
       if (error && typeof error === 'object' && 'response' in error) {
         const err = error as { response?: { data?: { message?: string } } };
-        alert(
-          err.response?.data?.message || 'Failed to register service provider'
-        );
+        alert(err.response?.data?.message || 'Failed to register responder');
       } else {
-        alert('Failed to register service provider');
+        alert('Failed to register responder');
       }
     }
   };
@@ -169,10 +168,10 @@ export default function NewServiceProviderPage() {
         <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
         <div className="mt-4">
           <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
-            Add Provider
+            Add Responder
           </h1>
           <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
-            Register a new service provider for your organization
+            Register a new responder for your organization
           </p>
         </div>
       </div>
@@ -205,7 +204,7 @@ export default function NewServiceProviderPage() {
                       <span className="font-medium">
                         {getCategoryDisplayName(orgServiceCategory!)}
                       </span>
-                      . Service providers can only be created with the matching
+                      . Service responders can only be created with the matching
                       service type.
                     </p>
                   </div>
@@ -244,7 +243,7 @@ export default function NewServiceProviderPage() {
           {/* Personal Information */}
           <div className="bg-card rounded-xl border p-6">
             <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
-              Provider Information
+              Responder Information
             </h2>
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -390,7 +389,7 @@ export default function NewServiceProviderPage() {
               Account Security
             </h2>
             <p className="text-muted-foreground mb-4 text-sm dark:text-muted-foreground">
-              Set a temporary password for the provider. They can change it
+              Set a temporary password for the responder. They can change it
               after logging in.
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -557,7 +556,7 @@ export default function NewServiceProviderPage() {
               {createMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Create Provider
+              Create Responder
             </Button>
           </div>
         </form>

@@ -1,40 +1,41 @@
 'use client';
 
-import { Loader2, Lock, Save } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
-import { Button } from '@/components/ui/button';
+import { Button } from '@repo/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@repo/ui/card';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
+
+import { Loader2, Lock, Save } from 'lucide-react';
+import { useState } from 'react';
+
 import {
   useOrgProfile,
   useOrgUpdateProfile,
 } from '@/services/organization/auth.api';
+import { IOrgProfileResponse } from '@/types/auth.types';
 
 export default function SettingsPage() {
   const { data: profileData, isLoading } = useOrgProfile();
   const updateProfileMutation = useOrgUpdateProfile();
 
-  const profile = profileData?.data?.data as any;
-  const orgData = profile?.user ?? profile;
+  const orgData: IOrgProfileResponse | undefined = profileData?.data?.data;
 
-  const [name, setName] = useState('');
-  const [generalNumber, setGeneralNumber] = useState('');
+  // Keep local edits, but render server values until user changes.
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const [draftGeneralNumber, setDraftGeneralNumber] = useState<string | null>(
+    null
+  );
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  useEffect(() => {
-    if (orgData) {
-      setName(orgData.name || '');
-      setGeneralNumber(orgData.generalNumber?.toString() || '');
-    }
-  }, [orgData]);
+  const name = draftName ?? orgData?.name ?? '';
+  const generalNumber =
+    draftGeneralNumber ?? orgData?.generalNumber?.toString() ?? '';
 
   const handleSave = async () => {
     setSaveSuccess(false);
@@ -46,6 +47,8 @@ export default function SettingsPage() {
             ? generalNumber
             : undefined,
       });
+      setDraftName(null);
+      setDraftGeneralNumber(null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch {
@@ -107,7 +110,7 @@ export default function SettingsPage() {
                   id="orgName"
                   placeholder="Enter organization name"
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => setDraftName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -145,7 +148,7 @@ export default function SettingsPage() {
                   id="phone"
                   placeholder="Enter phone number"
                   value={generalNumber}
-                  onChange={e => setGeneralNumber(e.target.value)}
+                  onChange={e => setDraftGeneralNumber(e.target.value)}
                 />
               </div>
               <div className="flex items-center justify-between pt-2">

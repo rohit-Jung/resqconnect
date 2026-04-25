@@ -1,4 +1,4 @@
-import { envConfig } from './env.config';
+import { envConfig } from '@/config';
 
 export const allowedOrigins = envConfig.allowed_origins;
 

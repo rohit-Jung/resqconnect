@@ -19,6 +19,12 @@ export const uploadEndpoints = {
   deleteProfilePicture: `/upload/profile-picture`,
 };
 
+export const providerUploadEndpoints = {
+  getSignature: `/service-provider/profile-picture/signature`,
+  updateProfilePicture: `/service-provider/profile-picture`,
+  deleteProfilePicture: `/service-provider/profile-picture`,
+};
+
 export const serviceProviderEndpoints = {
   login: `/service-provider/login`,
   verify: `/service-provider/verify`,

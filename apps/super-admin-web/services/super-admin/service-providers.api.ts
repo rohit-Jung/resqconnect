@@ -5,7 +5,6 @@ import { AxiosError, AxiosResponse } from 'axios';
 import type { ApiResponse, IServiceProvider } from '@/types/auth.types';
 
 import api from '../axiosInstance';
-import { serviceProviderEndpoints } from '../endPoints';
 
 // Query keys for cache management
 export const serviceProviderKeys = {
@@ -30,10 +29,15 @@ export const useGetNearbyProviders = (
   params: INearbyProvidersParams,
   enabled: boolean = true
 ) => {
+  void api;
+  void enabled;
   return useQuery<AxiosResponse<ApiResponse<IServiceProvider[]>>, AxiosError>({
     queryKey: serviceProviderKeys.nearby(params),
-    queryFn: () => api.get(serviceProviderEndpoints.getNearby, { params }),
-    enabled: enabled && !!params.latitude && !!params.longitude,
+    queryFn: async () => {
+      // Control plane does not expose this endpoint.
+      throw new Error('Not implemented');
+    },
+    enabled: false,
   });
 };
 
@@ -42,10 +46,15 @@ export const useGetServiceProviderById = (
   id: string,
   enabled: boolean = true
 ) => {
+  void api;
+  void enabled;
   return useQuery<AxiosResponse<ApiResponse<IServiceProvider>>, AxiosError>({
     queryKey: serviceProviderKeys.detail(id),
-    queryFn: () => api.get(serviceProviderEndpoints.getById(id)),
-    enabled: enabled && !!id,
+    queryFn: async () => {
+      // Control plane does not replicate per-provider details yet.
+      throw new Error('Not implemented');
+    },
+    enabled: false,
   });
 };
 

@@ -7,20 +7,40 @@ meta {
 post {
   url: {{server}}/organization/register
   body: json
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijk5NTFmNTE5LWNkY2MtNDhmOC1iMmI3LWQwZjVlMWYxOGI1NyIsIm5hbWUiOiJSb2hpdCBKdW5nIEthdGhldCIsImVtYWlsIjoidGVzdEBhZG1pbi5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzY1MTY3OTMsImV4cCI6MTc3NjUyMDM5M30.-lti9b1jsqqCzglLPex3kTCpxEuYPhsPLhShc9u8srA
 }
 
 body:json {
   {
-    "name": "Ambulance",
+    "name": "City Ambulance Services",
+    "email": "ambulance@example.com",
+    "password": "ambulanceTest@123",
     "serviceCategory": "ambulance",
-    "email": "amb@resqconnect.com",
-    "generalNumber": 102,
-    "password": "ambulance@123"
+    "generalNumber": 9801234567
   }
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+docs {
+  # Register Organization
+  
+  Register a new organization in the system.
+  
+  ## Request Body
+  - name: Organization name (unique)
+  - email: Organization email (unique)
+  - password: Organization password
+  - serviceCategory: ambulance | police | fire_truck | rescue_team
+  - generalNumber: Contact phone number
+  
+  ## Response
+  Returns success message. Organization needs verification before login.
 }

@@ -24,11 +24,11 @@ export function Features() {
     {
       title: 'Organization Dashboard',
       description:
-        'Manage service providers, track analytics, monitor responses, and oversee operations from a single dashboard.',
+        'Manage responders, track analytics, monitor responses, and oversee operations from a single dashboard.',
       icon: Radio,
     },
     {
-      title: 'Live Provider Tracking',
+      title: 'Live Responder Tracking',
       description:
         'Track the real-time location of all emergency response teams on an interactive map.',
       icon: Navigation,

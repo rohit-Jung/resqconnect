@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export function useLocalStorage(key: string, initialValue?: string | null) {
-  const [storedValue, setStoredValue] = useState<string | null>(
-    initialValue ?? null
-  );
-  const [isClient, setIsClient] = useState(false);
+  const [storedValue, setStoredValue] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return initialValue ?? null;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ?? initialValue ?? null;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue ?? null;
+    }
+  });
 
   const setValue = useCallback(
     (value: string | null | ((val: string | null) => string | null)) => {
@@ -28,19 +34,6 @@ export function useLocalStorage(key: string, initialValue?: string | null) {
     [key, storedValue]
   );
 
-  const getValue = useCallback(() => {
-    try {
-      if (typeof window === 'undefined') {
-        return null;
-      }
-      const item = window.localStorage.getItem(key);
-      return item;
-    } catch (error) {
-      console.error(`Error reading localStorage key "${key}":`, error);
-      return null;
-    }
-  }, [key]);
-
   const removeValue = useCallback(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -52,15 +45,20 @@ export function useLocalStorage(key: string, initialValue?: string | null) {
     }
   }, [key]);
 
+  // Keep state in sync with other tabs/windows.
   useEffect(() => {
-    setIsClient(true);
-    const value = getValue();
-    if (value !== null) {
-      setStoredValue(value);
-    }
-  }, [getValue]);
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== window.localStorage) return;
+      if (e.key !== key) return;
+      setStoredValue(e.newValue);
+    };
 
-  return [storedValue, setValue, removeValue, isClient] as const;
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key]);
+
+  // Keep the return signature stable; callers can treat this as "client".
+  return [storedValue, setValue, removeValue, true] as const;
 }
 
 export function getTokenFromStorage(key: string): string | null {

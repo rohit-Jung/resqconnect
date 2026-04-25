@@ -1,6 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Checkbox } from '@repo/ui/checkbox';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import Link from 'next/link';
@@ -10,17 +14,9 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { GuestGuard } from '@/components/guest-guard';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useOrgLogin } from '@/services/organization/auth.api';
-import {
-  ILoginResponse,
-  IOrgLoginResponse,
-  IOtpResponse,
-} from '@/types/auth.types';
+import { IOrgLoginResponse, IOtpResponse } from '@/types/auth.types';
 import { TLoginUser, loginUserSchema } from '@/validations/auth.schema';
 
 export const dynamic = 'force-dynamic';
@@ -62,10 +58,12 @@ export default function LoginPage() {
       onSuccess: response => {
         const responseData = response.data.data;
 
-        if ('otpToken' in responseData) {
+        if ('userId' in responseData) {
           const otpData = responseData as IOtpResponse;
           toast.success('OTP sent to your email');
-          router.push(`/verify?userId=${otpData.userId}`);
+          router.push(
+            `/verify?organizationId=${otpData.userId}&email=${encodeURIComponent(data.email)}`
+          );
         } else {
           const loginData = responseData as IOrgLoginResponse;
           if (loginData.token) {
@@ -223,14 +221,9 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <p className="text-muted-foreground mt-6 text-center text-sm">
-              Don&apos;t have an account?{' '}
-              <Link
-                href="/signup"
-                className="font-medium text-primary hover:underline"
-              >
-                Sign up
-              </Link>
+            <p className="text-muted-foreground mt-6 text-center text-xs">
+              By signing in, you agree to follow your organization&apos;s
+              emergency response protocols.
             </p>
           </div>
         </div>

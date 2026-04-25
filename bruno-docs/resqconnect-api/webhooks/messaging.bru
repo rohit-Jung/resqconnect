@@ -1,0 +1,20 @@
+meta {
+  name: messaging
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{server}}/webhooks/messaging
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

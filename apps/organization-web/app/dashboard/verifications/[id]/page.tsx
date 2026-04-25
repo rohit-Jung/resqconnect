@@ -1,5 +1,8 @@
 'use client';
 
+import { Badge } from '@repo/ui/badge';
+import { Button } from '@repo/ui/button';
+
 import {
   Ambulance,
   ArrowLeft,
@@ -21,8 +24,6 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   DocumentStatus,
   useProviderDocuments,
@@ -102,7 +103,7 @@ export default function VerificationDetailPage() {
   const { data: providerData, isLoading } = useProviderDocuments(providerId);
   const verifyMutation = useVerifyDocuments();
 
-  const provider = providerData?.data?.data?.provider;
+  const responder = providerData?.data?.data?.provider;
 
   const handleApprove = async () => {
     await verifyMutation.mutateAsync({
@@ -133,12 +134,12 @@ export default function VerificationDetailPage() {
     );
   }
 
-  if (!provider) {
+  if (!responder) {
     return (
       <div className="min-h-screen bg-background dark:bg-background flex h-64 flex-col items-center justify-center">
         <XCircle className="text-muted-foreground mb-4 h-12 w-12 dark:text-muted-foreground" />
         <h3 className="mb-2 text-lg font-medium text-foreground dark:text-foreground">
-          Provider not found
+          Responder not found
         </h3>
         <Link href="/dashboard/verifications">
           <Button variant="outline">
@@ -150,8 +151,8 @@ export default function VerificationDetailPage() {
     );
   }
 
-  const typeConfig = SERVICE_TYPE_CONFIG[provider.serviceType];
-  const statusConfig = STATUS_CONFIG[provider.documentStatus];
+  const typeConfig = SERVICE_TYPE_CONFIG[responder.serviceType];
+  const statusConfig = STATUS_CONFIG[responder.documentStatus];
 
   return (
     <div className="min-h-screen bg-background dark:bg-background">
@@ -180,7 +181,7 @@ export default function VerificationDetailPage() {
                 Document Review
               </h1>
               <p className="text-[#888888] dark:text-gray-400">
-                Review and verify provider documents
+                Review and verify responder documents
               </p>
             </div>
           </div>
@@ -196,16 +197,18 @@ export default function VerificationDetailPage() {
       {/* Content */}
       <div className="px-6 pb-8 space-y-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Provider Info */}
+          {/* Responder Info */}
           <div className="bg-card rounded-xl border p-6">
-            <h2 className="mb-4 text-lg font-semibold">Provider Information</h2>
+            <h2 className="mb-4 text-lg font-semibold">
+              Responder Information
+            </h2>
 
             <div className="mb-6 flex items-center gap-4">
               <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
                 <User className="text-primary h-8 w-8" />
               </div>
               <div>
-                <p className="text-lg font-semibold">{provider.name}</p>
+                <p className="text-lg font-semibold">{responder.name}</p>
                 <div className={`flex items-center gap-1 ${typeConfig.color}`}>
                   {typeConfig.icon}
                   <span className="text-sm font-medium">
@@ -218,17 +221,17 @@ export default function VerificationDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Mail className="text-muted-foreground h-4 w-4" />
-                <span className="text-sm">{provider.email}</span>
+                <span className="text-sm">{responder.email}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="text-muted-foreground h-4 w-4" />
-                <span className="text-sm">{provider.phoneNumber}</span>
+                <span className="text-sm">{responder.phoneNumber}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Clock className="text-muted-foreground h-4 w-4" />
                 <span className="text-sm">
                   Submitted:{' '}
-                  {new Date(provider.createdAt).toLocaleDateString('en-US', {
+                  {new Date(responder.createdAt).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -237,34 +240,38 @@ export default function VerificationDetailPage() {
               </div>
             </div>
 
-            {provider.documentStatus === 'rejected' &&
-              provider.rejectionReason && (
+            {responder.documentStatus === 'rejected' &&
+              responder.rejectionReason && (
                 <div className="mt-6 rounded-lg bg-red-50 p-4">
                   <p className="mb-1 text-sm font-medium text-red-800">
                     Rejection Reason
                   </p>
                   <p className="text-sm text-red-700">
-                    {provider.rejectionReason}
+                    {responder.rejectionReason}
                   </p>
                 </div>
               )}
 
-            {provider.documentStatus === 'approved' && provider.verifiedAt && (
-              <div className="mt-6 rounded-lg bg-green-50 p-4">
-                <p className="mb-1 text-sm font-medium text-green-800">
-                  Verified At
-                </p>
-                <p className="text-sm text-green-700">
-                  {new Date(provider.verifiedAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-              </div>
-            )}
+            {responder.documentStatus === 'approved' &&
+              responder.verifiedAt && (
+                <div className="mt-6 rounded-lg bg-green-50 p-4">
+                  <p className="mb-1 text-sm font-medium text-green-800">
+                    Verified At
+                  </p>
+                  <p className="text-sm text-green-700">
+                    {new Date(responder.verifiedAt).toLocaleDateString(
+                      'en-US',
+                      {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }
+                    )}
+                  </p>
+                </div>
+              )}
           </div>
 
           {/* Documents */}
@@ -276,9 +283,9 @@ export default function VerificationDetailPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">PAN Card</h3>
-                  {provider.panCardUrl && (
+                  {responder.panCardUrl && (
                     <a
-                      href={provider.panCardUrl}
+                      href={responder.panCardUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
@@ -288,13 +295,13 @@ export default function VerificationDetailPage() {
                     </a>
                   )}
                 </div>
-                {provider.panCardUrl ? (
+                {responder.panCardUrl ? (
                   <div
                     className="group relative cursor-pointer overflow-hidden rounded-lg border"
-                    onClick={() => setSelectedImage(provider.panCardUrl)}
+                    onClick={() => setSelectedImage(responder.panCardUrl)}
                   >
                     <Image
-                      src={provider.panCardUrl}
+                      src={responder.panCardUrl}
                       alt="PAN Card"
                       width={400}
                       height={250}
@@ -320,9 +327,9 @@ export default function VerificationDetailPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">Citizenship</h3>
-                  {provider.citizenshipUrl && (
+                  {responder.citizenshipUrl && (
                     <a
-                      href={provider.citizenshipUrl}
+                      href={responder.citizenshipUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
@@ -332,13 +339,13 @@ export default function VerificationDetailPage() {
                     </a>
                   )}
                 </div>
-                {provider.citizenshipUrl ? (
+                {responder.citizenshipUrl ? (
                   <div
                     className="group relative cursor-pointer overflow-hidden rounded-lg border"
-                    onClick={() => setSelectedImage(provider.citizenshipUrl)}
+                    onClick={() => setSelectedImage(responder.citizenshipUrl)}
                   >
                     <Image
-                      src={provider.citizenshipUrl}
+                      src={responder.citizenshipUrl}
                       alt="Citizenship"
                       width={400}
                       height={250}
@@ -362,7 +369,7 @@ export default function VerificationDetailPage() {
             </div>
 
             {/* Action Buttons */}
-            {provider.documentStatus === 'pending' && (
+            {responder.documentStatus === 'pending' && (
               <div className="mt-6 flex justify-end gap-3 border-t pt-6">
                 <Button
                   variant="destructive"
@@ -396,8 +403,8 @@ export default function VerificationDetailPage() {
               <h3 className="mb-4 text-lg font-semibold">Reject Documents</h3>
               <p className="text-muted-foreground mb-4 text-sm">
                 Please provide a reason for rejecting the documents. This will
-                be shared with the service provider so they can re-upload
-                correct documents.
+                be shared with the responder so they can re-upload correct
+                documents.
               </p>
               <textarea
                 value={rejectionReason}

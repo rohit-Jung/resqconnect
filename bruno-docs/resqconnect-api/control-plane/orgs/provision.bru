@@ -1,0 +1,20 @@
+meta {
+  name: provision
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{controlPlaneServer}}/orgs/provision
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Demo Org",
+    "sector": "health",
+    "siloUrl": "http://localhost:8000",
+    "adminEmail": "admin@demo.org"
+  }
+}

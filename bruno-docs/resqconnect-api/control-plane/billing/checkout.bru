@@ -1,0 +1,18 @@
+meta {
+  name: checkout
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{controlPlaneServer}}/billing/checkout
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "orgId": "00000000-0000-0000-0000-000000000000",
+    "planId": "00000000-0000-0000-0000-000000000000"
+  }
+}

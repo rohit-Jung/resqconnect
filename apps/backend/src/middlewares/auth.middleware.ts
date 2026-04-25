@@ -1,10 +1,11 @@
+import type { TUserRole } from '@repo/db/schemas';
+import { serviceProvider, user } from '@repo/db/schemas';
+
 import { eq } from 'drizzle-orm';
 import type { NextFunction, Request, Response } from 'express';
 import type { ZodSchema } from 'zod';
 
 import db from '@/db';
-import type { TUserRole } from '@/models';
-import { serviceProvider, user } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { verifyAndDecodeToken } from '@/utils/tokens/jwtTokens';

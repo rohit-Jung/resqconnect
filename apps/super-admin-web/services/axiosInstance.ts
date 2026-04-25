@@ -5,14 +5,13 @@ import {
   removeTokenFromStorage,
 } from '@/lib/hooks/useLocalStorage';
 
-const routerVersion = `v1`;
-
 const api = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BACKEND_URL}/${routerVersion}`,
+  // control-plane backend does not use a /v1 router prefix.
+  baseURL: `${process.env.NEXT_PUBLIC_BACKEND_URL}`,
   withCredentials: true,
 });
 
-// Add request interceptor to attach auth token
+// add request interceptor to attach auth token
 api.interceptors.request.use(
   config => {
     const token = getTokenFromStorage('adminToken');
@@ -26,7 +25,7 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle auth errors
+// add response interceptor to handle auth errors
 api.interceptors.response.use(
   response => response,
   error => {
@@ -34,7 +33,11 @@ api.interceptors.response.use(
       // Clear token and redirect to login
       removeTokenFromStorage('adminToken');
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        // Avoid hard-reloading the login page when a login attempt fails (401).
+        // The login screen should show an error instead.
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

@@ -30,4 +30,8 @@ export const config = [
   {
     ignores: ['dist/**'],
   },
+  {
+    // Generated/docker volumes (can be root-owned).
+    ignores: ['**/docker/postgres_data/**'],
+  },
 ];

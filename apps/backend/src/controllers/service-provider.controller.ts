@@ -1,17 +1,30 @@
-import bcrypt from 'bcryptjs';
-import { and, eq, or, sql } from 'drizzle-orm';
-import type { Request, Response } from 'express';
-import { latLngToCell } from 'h3-js';
-
-import { ServiceTypeEnum } from '@/constants/enums.constants';
-import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
-import db from '@/db';
 import {
   type TServiceProvider,
   organization,
   serviceProvider,
   verifyDocumentsSchema,
-} from '@/models';
+} from '@repo/db/schemas';
+import { organizationEntitlementsSnapshot } from '@repo/db/schemas';
+
+import bcrypt from 'bcryptjs';
+import { and, count, desc, eq, or, sql } from 'drizzle-orm';
+import type { Request, Response } from 'express';
+import { latLngToCell } from 'h3-js';
+
+import {
+  deleteImage,
+  extractPublicIdFromUrl,
+  generateUploadSignature,
+  isCloudinaryConfigured,
+} from '@/config/cloudinary.config';
+import { ServiceTypeEnum } from '@/constants/enums.constants';
+import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
+import db from '@/db';
+import {
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from '@/services/failed-login-lockout.service';
 import { getIo } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
@@ -49,9 +62,37 @@ const registerServiceProvider = asyncHandler(
       citizenshipUrl,
     } = req.body;
 
+    // Validate required fields early so bad requests return 400 before DB lookups.
+    if (
+      !name ||
+      age === undefined ||
+      !email ||
+      !password ||
+      phoneNumber === undefined ||
+      !serviceType ||
+      !organizationId
+    ) {
+      throw new ApiError(400, 'Missing required fields');
+    }
+
+    if (typeof email !== 'string' || !email.includes('@')) {
+      throw new ApiError(400, 'Invalid email format');
+    }
+
+    // Tests sometimes pass phone/serviceType as strings. Normalize/validate.
+    const normalizedPhoneNumber =
+      typeof phoneNumber === 'string' ? Number(phoneNumber) : phoneNumber;
+    if (!Number.isFinite(normalizedPhoneNumber)) {
+      throw new ApiError(400, 'Invalid phone number');
+    }
+
+    if (!Object.values(ServiceTypeEnum).includes(serviceType as any)) {
+      throw new ApiError(400, 'Invalid service type');
+    }
+
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
       where: or(
-        eq(serviceProvider.phoneNumber, phoneNumber),
+        eq(serviceProvider.phoneNumber, normalizedPhoneNumber as any),
         eq(serviceProvider.email, email)
       ),
     });
@@ -78,6 +119,34 @@ const registerServiceProvider = asyncHandler(
       );
     }
 
+    // Enforce provider_count_limit for self-registration flows too.
+    const latestEnt = await db.query.organizationEntitlementsSnapshot.findFirst(
+      {
+        where: eq(
+          organizationEntitlementsSnapshot.organizationId,
+          organizationId
+        ),
+        columns: { entitlements: true },
+        orderBy: [desc(organizationEntitlementsSnapshot.version)],
+      }
+    );
+    const entRaw = (latestEnt?.entitlements ?? {}) as Record<string, unknown>;
+    const limit = Number(entRaw.provider_count_limit ?? 0) || 0;
+    if (limit <= 0) {
+      throw new ApiError(
+        403,
+        'Provider registration is not enabled for this organization'
+      );
+    }
+    const rows = await db
+      .select({ c: count() })
+      .from(serviceProvider)
+      .where(eq(serviceProvider.organizationId, organizationId));
+    const current = rows[0]?.c ?? 0;
+    if (current >= limit) {
+      throw new ApiError(403, `Provider limit reached (${limit})`);
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newServiceProvider = await db
@@ -86,7 +155,7 @@ const registerServiceProvider = asyncHandler(
         name,
         age,
         email,
-        phoneNumber,
+        phoneNumber: normalizedPhoneNumber as any,
         primaryAddress,
         password: hashedPassword,
         serviceType,
@@ -98,7 +167,8 @@ const registerServiceProvider = asyncHandler(
           longitude: '85.3240',
         },
         // Set document status based on whether documents were provided
-        documentStatus: panCardUrl || citizenshipUrl ? 'pending' : 'not_submitted',
+        documentStatus:
+          panCardUrl || citizenshipUrl ? 'pending' : 'not_submitted',
         ...(panCardUrl && {
           panCardUrl,
         }),
@@ -131,11 +201,27 @@ const loginServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const { email, password, currentLocation } = req.body;
 
+    if (!email || !password) {
+      throw new ApiError(400, 'Email and password are required');
+    }
+
+    if (typeof email !== 'string' || !email.includes('@')) {
+      throw new ApiError(400, 'Invalid email format');
+    }
+
+    if (await isLoginLocked(email)) {
+      throw new ApiError(
+        429,
+        'Too many failed login attempts. Try again later.'
+      );
+    }
+
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
       where: eq(serviceProvider.email, email),
     });
 
     if (!existingServiceProvider) {
+      await recordLoginFailure(email);
       throw new ApiError(
         404,
         'ServiceProvider not found with given credentials'
@@ -148,8 +234,11 @@ const loginServiceProvider = asyncHandler(
     );
 
     if (!isPasswordValid) {
+      await recordLoginFailure(email);
       throw new ApiError(400, 'Invalid Credentials Provided');
     }
+
+    await clearLoginFailures(email);
 
     if (existingServiceProvider && !existingServiceProvider.isVerified) {
       const otpToken = await sendOTP(existingServiceProvider.email);
@@ -224,39 +313,79 @@ const loginServiceProvider = asyncHandler(
     }
 
     // documentStatus === 'approved' - allow login
-    // Update location if provided during login
-    const { latitude, longitude } = currentLocation;
-    console.log(latitude, longitude);
-    const locationPoint = `POINT(${longitude} ${latitude})`;
-    const h3Index = latLngToCell(Number(latitude), Number(longitude), 8);
-    const h3IndexBigInt = BigInt(`0x${h3Index}`);
+    // Update location if provided during login (optional).
+    if (
+      currentLocation?.latitude !== undefined ||
+      currentLocation?.longitude !== undefined
+    ) {
+      const latitude = Number(currentLocation?.latitude);
+      const longitude = Number(currentLocation?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new ApiError(400, 'Invalid location');
+      }
+      if (
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        throw new ApiError(400, 'Invalid location');
+      }
 
-    await db
-      .update(serviceProvider)
-      .set({
-        currentLocation: {
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
-        },
-        lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
-        h3Index: h3IndexBigInt,
-      })
-      .where(eq(serviceProvider.id, existingServiceProvider.id));
+      const locationPoint = `POINT(${longitude} ${latitude})`;
+      const h3Index = latLngToCell(latitude, longitude, 8);
+      const h3IndexBigInt = BigInt(`0x${h3Index}`);
 
-    existingServiceProvider.currentLocation = {
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
-    };
+      await db
+        .update(serviceProvider)
+        .set({
+          currentLocation: {
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+          },
+          lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
+          h3Index: h3IndexBigInt,
+        })
+        .where(eq(serviceProvider.id, existingServiceProvider.id));
 
-    const token = generateJWT({
-      ...existingServiceProvider,
-      kind: 'service_provider',
-    } as any);
+      existingServiceProvider.currentLocation = {
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      };
+    }
+
+    // Enforce org lifecycle restrictions: allow login but issue restricted JWT if org isn't active.
+    // If org lookup fails for some reason, default to restrictive.
+    const orgRow = await db.query.organization.findFirst({
+      where: eq(organization.id, existingServiceProvider.organizationId as any),
+      columns: { lifecycleStatus: true },
+    });
+
+    const lifecycle = orgRow?.lifecycleStatus?.toString() ?? 'unknown';
+    const isRestricted = lifecycle !== 'active';
+
+    const token = generateJWT(
+      {
+        ...existingServiceProvider,
+        kind: 'service_provider',
+      } as any,
+      {
+        restricted: isRestricted,
+        orgStatus: lifecycle,
+      }
+    );
 
     const loggedInServiceProvider: Partial<TServiceProvider> = bigIntToString(
       existingServiceProvider
     );
     delete loggedInServiceProvider.password;
+
+    let warnings: string[] = [];
+    if (isRestricted) {
+      warnings = [
+        `Organization status is '${lifecycle}'. Access is restricted until status becomes 'active'.`,
+      ];
+    }
 
     res
       .status(200)
@@ -265,6 +394,7 @@ const loginServiceProvider = asyncHandler(
         new ApiResponse(200, 'ServiceProvider logged in successfully', {
           token,
           user: loggedInServiceProvider,
+          warnings,
         })
       );
   }
@@ -341,10 +471,12 @@ const verifyServiceProvider = asyncHandler(
       );
     }
 
-    const tokenExpiry = new Date(existingServiceProvider.tokenExpiry);
-    const currentTime = new Date(Date.now()).toISOString();
+    const tokenExpiryStr = existingServiceProvider.tokenExpiry;
+    const tokenExpiry = new Date(tokenExpiryStr + 'Z');
+    const currentTime = new Date();
 
-    if (new Date(currentTime) > tokenExpiry) {
+    if (currentTime.getTime() > tokenExpiry.getTime()) {
+      console.log('Verification token expired');
       throw new ApiError(400, 'Verification token expired');
     }
 
@@ -378,12 +510,65 @@ const verifyServiceProvider = asyncHandler(
   }
 );
 
+const resendServiceProviderVerificationOTP = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body as { email: string };
+
+    const existingServiceProvider = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.email, email),
+      columns: {
+        id: true,
+        email: true,
+        isVerified: true,
+      },
+    });
+
+    // Avoid leaking whether an email exists.
+    if (!existingServiceProvider) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'OTP sent if account exists', {}));
+    }
+
+    if (existingServiceProvider.isVerified) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'Account already verified', {}));
+    }
+
+    const otpToken = await sendOTP(existingServiceProvider.email);
+    if (!otpToken) {
+      throw new ApiError(500, 'Error sending OTP token. Please try again');
+    }
+
+    const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await db
+      .update(serviceProvider)
+      .set({
+        verificationToken: otpToken,
+        tokenExpiry: tokenExpiry.toISOString(),
+      })
+      .where(eq(serviceProvider.id, existingServiceProvider.id));
+
+    return res.status(200).json(
+      new ApiResponse(200, 'OTP sent to serviceProvider for verification', {
+        serviceProviderId: existingServiceProvider.id,
+      })
+    );
+  }
+);
+
 const updateServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInServiceProvider = req.user;
 
     if (!loggedInServiceProvider || !loggedInServiceProvider.id) {
       throw new ApiError(401, 'Unauthorized');
+    }
+
+    const body = req.body;
+    if (!body || Object.keys(body).length === 0) {
+      throw new ApiError(400, 'No data to update');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -394,17 +579,33 @@ const updateServiceProvider = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    const { name, age, email, phoneNumber, primaryAddress, profilePicture, serviceArea, vehicleInformation } = req.body;
+    const {
+      name,
+      age,
+      email,
+      phoneNumber,
+      primaryAddress,
+      profilePicture,
+      serviceArea,
+      vehicleInformation,
+    } = body;
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (age !== undefined) updateData.age = age;
     if (email !== undefined) updateData.email = email;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
-    if (primaryAddress !== undefined) updateData.primaryAddress = primaryAddress;
-    if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
+    if (primaryAddress !== undefined)
+      updateData.primaryAddress = primaryAddress;
+    if (profilePicture !== undefined)
+      updateData.profilePicture = profilePicture;
     if (serviceArea !== undefined) updateData.serviceArea = serviceArea;
-    if (vehicleInformation !== undefined) updateData.vehicleInformation = vehicleInformation;
+    if (vehicleInformation !== undefined)
+      updateData.vehicleInformation = vehicleInformation;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new ApiError(400, 'No data to update');
+    }
 
     const updatedServiceProvider = await db
       .update(serviceProvider)
@@ -444,17 +645,23 @@ const deleteServiceProvider = asyncHandler(
 
 const forgotServiceProviderPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { email } = req.body;
+    const { email, phoneNumber } = req.body;
+
+    // Tests expect 400 if missing phone number.
+    if (!email && !phoneNumber) {
+      throw new ApiError(400, 'Phone number or email is required');
+    }
+
+    const whereClause = email
+      ? eq(serviceProvider.email, email)
+      : eq(serviceProvider.phoneNumber, Number(phoneNumber));
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.email, email),
+      where: whereClause,
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(
-        404,
-        'ServiceProvider not found with given email'
-      );
+      throw new ApiError(404, 'ServiceProvider not found with given email');
     }
 
     const otpToken = await sendOTP(existingServiceProvider.email);
@@ -578,7 +785,8 @@ const getServiceProviderProfile = asyncHandler(
 );
 
 const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const rawId = (req.params as any)?.id as unknown;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const loggedInServiceProvider = req.user;
 
   if (
@@ -589,7 +797,7 @@ const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  if (!id) {
+  if (!id || typeof id !== 'string') {
     throw new ApiError(400, 'Service Provider ID is required');
   }
 
@@ -615,6 +823,10 @@ const updateServiceProviderStatus = asyncHandler(
 
     if (!loggedInUser || !loggedInUser.id) {
       throw new ApiError(400, 'Please login to perform this action');
+    }
+
+    if (!serviceStatus) {
+      throw new ApiError(400, 'Status is required');
     }
 
     // Check for cooldown (30 seconds)
@@ -762,6 +974,14 @@ const changeProviderPassword = asyncHandler(
 
     const { oldPassword, newPassword } = req.body;
 
+    if (!oldPassword) {
+      throw new ApiError(400, 'Old password is required');
+    }
+
+    if (!newPassword) {
+      throw new ApiError(400, 'New password is required');
+    }
+
     const existingProvider = await db.query.serviceProvider.findFirst({
       where: eq(serviceProvider.id, loggedInProvider.id),
       columns: {
@@ -829,22 +1049,42 @@ const updateServiceProviderLocation = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    const { latitude, longitude } = req.body;
+    // Tests send `{ currentLocation: { latitude, longitude } }`.
+    const body = req.body || {};
+    const loc = body.currentLocation ?? body;
+    const latitude = loc?.latitude;
+    const longitude = loc?.longitude;
+
+    if (latitude === undefined || longitude === undefined) {
+      throw new ApiError(400, 'Location data is required');
+    }
+
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      throw new ApiError(400, 'Invalid location');
+    }
+    if (latNum < -90 || latNum > 90) {
+      throw new ApiError(400, 'Invalid latitude');
+    }
+    if (lngNum < -180 || lngNum > 180) {
+      throw new ApiError(400, 'Invalid longitude');
+    }
 
     // Create PostGIS POINT geometry string
-    const locationPoint = `POINT(${longitude} ${latitude})`;
+    const locationPoint = `POINT(${lngNum} ${latNum})`;
 
     // Compute H3 index for this location (resolution 8)
     const H3_RESOLUTION = 8;
-    const h3Index = latLngToCell(latitude, longitude, H3_RESOLUTION);
+    const h3Index = latLngToCell(latNum, lngNum, H3_RESOLUTION);
     const h3IndexBigInt = BigInt(`0x${h3Index}`);
 
     const [updatedProvider] = await db
       .update(serviceProvider)
       .set({
         currentLocation: {
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
+          latitude: latNum.toString(),
+          longitude: lngNum.toString(),
         },
         lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
         h3Index: h3IndexBigInt,
@@ -878,20 +1118,27 @@ const uploadVerificationDocuments = asyncHandler(
       throw new ApiError(401, 'Unauthorized');
     }
 
-    // Get the uploaded files from multer
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const { panCardUrl, citizenshipUrl } = (req.body ?? {}) as Partial<{
+      panCardUrl: string;
+      citizenshipUrl: string;
+    }>;
 
-    if (!files?.panCard?.[0] || !files?.citizenship?.[0]) {
-      throw new ApiError(
-        400,
-        'Both PAN card and citizenship documents are required'
-      );
+    if (!panCardUrl || typeof panCardUrl !== 'string') {
+      throw new ApiError(400, 'PAN card URL is required');
+    }
+    if (!citizenshipUrl || typeof citizenshipUrl !== 'string') {
+      throw new ApiError(400, 'Citizenship URL is required');
     }
 
-    const panCardUrl = (files.panCard[0] as any).path;
-    const citizenshipUrl = (files.citizenship[0] as any).path;
+    // Basic sanity check: enforce Cloudinary URLs for documents as well
+    if (!panCardUrl.includes('cloudinary.com')) {
+      throw new ApiError(400, 'Invalid PAN card URL');
+    }
+    if (!citizenshipUrl.includes('cloudinary.com')) {
+      throw new ApiError(400, 'Invalid citizenship URL');
+    }
 
-    // Update provider with document URLs and set status to pending
+    // update provider with document urls and set status to pending
     const [updatedProvider] = await db
       .update(serviceProvider)
       .set({
@@ -917,6 +1164,51 @@ const uploadVerificationDocuments = asyncHandler(
         'Documents uploaded successfully. Pending verification.',
         {
           provider: updatedProvider,
+        }
+      )
+    );
+  }
+);
+
+const getDocumentUploadSignatures = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+
+    if (!loggedInProvider?.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!isCloudinaryConfigured()) {
+      throw new ApiError(503, 'Document upload service is not configured');
+    }
+
+    // Use predictable public IDs so re-uploads replace the same asset.
+    // Provider ID is included to prevent collisions across providers.
+    const panCardPublicId = `provider_${loggedInProvider.id}_panCard`;
+    const citizenshipPublicId = `provider_${loggedInProvider.id}_citizenship`;
+
+    const panCard = generateUploadSignature(
+      'document-verification',
+      panCardPublicId
+    );
+    const citizenship = generateUploadSignature(
+      'document-verification',
+      citizenshipPublicId
+    );
+
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        'Document upload signatures generated successfully',
+        {
+          panCard: {
+            ...panCard,
+            uploadUrl: `https://api.cloudinary.com/v1_1/${panCard.cloudName}/auto/upload`,
+          },
+          citizenship: {
+            ...citizenship,
+            uploadUrl: `https://api.cloudinary.com/v1_1/${citizenship.cloudName}/auto/upload`,
+          },
         }
       )
     );
@@ -953,6 +1245,148 @@ const getDocumentStatus = asyncHandler(async (req: Request, res: Response) => {
     })
   );
 });
+
+// Provider profile picture upload helpers (direct-to-Cloudinary, then confirm URL)
+const getProfilePictureUploadSignature = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+
+    if (!loggedInProvider?.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!isCloudinaryConfigured()) {
+      throw new ApiError(503, 'Image upload service is not configured');
+    }
+
+    // Predictable public ID so new uploads replace the same asset.
+    const publicId = `provider_${loggedInProvider.id}_profilePicture`;
+    const signatureData = generateUploadSignature('profile-pictures', publicId);
+
+    res.status(200).json(
+      new ApiResponse(200, 'Upload signature generated successfully', {
+        ...signatureData,
+        uploadUrl: `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`,
+      })
+    );
+  }
+);
+
+const updateProfilePicture = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+    const { profilePictureUrl } = req.body as { profilePictureUrl: string };
+
+    if (!loggedInProvider?.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!profilePictureUrl || typeof profilePictureUrl !== 'string') {
+      throw new ApiError(400, 'Profile picture URL is required');
+    }
+
+    if (!profilePictureUrl.includes('cloudinary.com')) {
+      throw new ApiError(400, 'Invalid profile picture URL');
+    }
+
+    const existingProvider = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.id, loggedInProvider.id),
+      columns: {
+        id: true,
+        profilePicture: true,
+      },
+    });
+
+    if (!existingProvider) {
+      throw new ApiError(404, 'Service provider not found');
+    }
+
+    // Delete old profile picture from Cloudinary if it exists.
+    if (existingProvider.profilePicture) {
+      const oldPublicId = extractPublicIdFromUrl(
+        existingProvider.profilePicture
+      );
+      if (oldPublicId) {
+        await deleteImage(oldPublicId);
+      }
+    }
+
+    const [updatedProvider] = await db
+      .update(serviceProvider)
+      .set({ profilePicture: profilePictureUrl })
+      .where(eq(serviceProvider.id, loggedInProvider.id))
+      .returning({
+        id: serviceProvider.id,
+        name: serviceProvider.name,
+        email: serviceProvider.email,
+        phoneNumber: serviceProvider.phoneNumber,
+        profilePicture: serviceProvider.profilePicture,
+      });
+
+    if (!updatedProvider) {
+      throw new ApiError(500, 'Failed to update profile picture');
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, 'Profile picture updated successfully', {
+        serviceProvider: updatedProvider,
+      })
+    );
+  }
+);
+
+const deleteProfilePicture = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInProvider = req.user;
+
+    if (!loggedInProvider?.id) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    const existingProvider = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.id, loggedInProvider.id),
+      columns: {
+        id: true,
+        profilePicture: true,
+      },
+    });
+
+    if (!existingProvider) {
+      throw new ApiError(404, 'Service provider not found');
+    }
+
+    if (!existingProvider.profilePicture) {
+      throw new ApiError(400, 'No profile picture to delete');
+    }
+
+    const publicId = extractPublicIdFromUrl(existingProvider.profilePicture);
+    if (publicId) {
+      await deleteImage(publicId);
+    }
+
+    const [updatedProvider] = await db
+      .update(serviceProvider)
+      .set({ profilePicture: null })
+      .where(eq(serviceProvider.id, loggedInProvider.id))
+      .returning({
+        id: serviceProvider.id,
+        name: serviceProvider.name,
+        email: serviceProvider.email,
+        phoneNumber: serviceProvider.phoneNumber,
+        profilePicture: serviceProvider.profilePicture,
+      });
+
+    if (!updatedProvider) {
+      throw new ApiError(500, 'Failed to delete profile picture');
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, 'Profile picture deleted successfully', {
+        serviceProvider: updatedProvider,
+      })
+    );
+  }
+);
 
 const getPendingVerifications = asyncHandler(
   async (req: Request, res: Response) => {
@@ -992,13 +1426,16 @@ const getPendingVerifications = asyncHandler(
 const getProviderDocuments = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { providerId } = req.params;
+    const rawProviderId = (req.params as any)?.providerId as unknown;
+    const providerId = Array.isArray(rawProviderId)
+      ? rawProviderId[0]
+      : rawProviderId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!providerId) {
+    if (!providerId || typeof providerId !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -1041,13 +1478,16 @@ const getProviderDocuments = asyncHandler(
 const verifyProviderDocuments = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { providerId } = req.params;
+    const rawProviderId = (req.params as any)?.providerId as unknown;
+    const providerId = Array.isArray(rawProviderId)
+      ? rawProviderId[0]
+      : rawProviderId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!providerId) {
+    if (!providerId || typeof providerId !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -1120,11 +1560,12 @@ const verifyProviderDocuments = asyncHandler(
   }
 );
 
-export {
+const serviceProviderController = {
   registerServiceProvider,
   loginServiceProvider,
   logoutServiceProvider,
   verifyServiceProvider,
+  resendServiceProviderVerificationOTP,
   updateServiceProvider,
   deleteServiceProvider,
   resetServiceProviderPassword,
@@ -1136,8 +1577,42 @@ export {
   getNearbyProviders,
   updateServiceProviderLocation,
   uploadVerificationDocuments,
+  getDocumentUploadSignatures,
   getDocumentStatus,
   getPendingVerifications,
   getProviderDocuments,
   verifyProviderDocuments,
+  getProfilePictureUploadSignature,
+  updateProfilePicture,
+  deleteProfilePicture,
+} as const;
+
+export default serviceProviderController;
+
+// Keep named exports for tests and legacy imports.
+export {
+  registerServiceProvider,
+  loginServiceProvider,
+  logoutServiceProvider,
+  verifyServiceProvider,
+  resendServiceProviderVerificationOTP,
+  updateServiceProvider,
+  deleteServiceProvider,
+  resetServiceProviderPassword,
+  forgotServiceProviderPassword,
+  getServiceProviderProfile,
+  getServiceProvider,
+  updateServiceProviderStatus,
+  changeProviderPassword,
+  getNearbyProviders,
+  updateServiceProviderLocation,
+  uploadVerificationDocuments,
+  getDocumentUploadSignatures,
+  getDocumentStatus,
+  getPendingVerifications,
+  getProviderDocuments,
+  verifyProviderDocuments,
+  getProfilePictureUploadSignature,
+  updateProfilePicture,
+  deleteProfilePicture,
 };

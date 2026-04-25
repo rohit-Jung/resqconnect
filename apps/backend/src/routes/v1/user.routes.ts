@@ -1,102 +1,117 @@
-import express from 'express';
-
-import { UserRoles } from '@/constants';
-import {
-  authLimiter,
-  otpLimiter,
-  passwordResetLimiter,
-} from '@/config';
-import {
-  changePassword,
-  forgotPassword,
-  getEmergencySettings,
-  getProfile,
-  getUser,
-  loginUser,
-  logoutUser,
-  registerUser,
-  resetPassword,
-  updateEmergencySettings,
-  updatePushToken,
-  updateUser,
-  verifyUser,
-} from '@/controllers/user.controller';
-import {
-  validateRequestBody,
-  validateRoleAuth,
-} from '@/middlewares/auth.middleware';
-import { loginUserSchema, newUserSchema } from '@/models';
+import { loginUserSchema, newUserSchema } from '@repo/db/schemas';
 import {
   changePasswordSchema,
   forgotPasswordSchema,
+  resendUserVerificationOTPSchema,
   resetPasswordSchema,
   updateEmergencySettingsSchema,
   updatePushTokenSchema,
   verifyUserSchema,
-} from '@/validations/user.validations';
+} from '@repo/types/validations';
+
+import express from 'express';
+
+import { authLimiter, otpLimiter, passwordResetLimiter } from '@/config';
+import { UserRoles } from '@/constants';
+import userController from '@/controllers/user.controller';
+import {
+  validateRequestBody,
+  validateRoleAuth,
+} from '@/middlewares/auth.middleware';
 
 const userRouter = express.Router();
 const validateUser = validateRoleAuth([UserRoles.USER]);
 
 userRouter
   .route('/register')
-  .post(authLimiter, validateRequestBody(newUserSchema), registerUser);
+  .post(
+    authLimiter,
+    validateRequestBody(newUserSchema),
+    userController.registerUser
+  );
 userRouter
   .route('/login')
-  .post(authLimiter, validateRequestBody(loginUserSchema), loginUser);
+  .post(
+    authLimiter,
+    validateRequestBody(loginUserSchema),
+    userController.loginUser
+  );
 userRouter
   .route('/logout')
-  .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), logoutUser);
+  .get(
+    validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
+    userController.logoutUser
+  );
 
 userRouter
   .route('/update')
-  .put(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), updateUser);
+  .put(
+    validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
+    userController.updateUser
+  );
 
 userRouter
   .route('/verify')
-  .post(otpLimiter, validateRequestBody(verifyUserSchema), verifyUser);
+  .post(
+    otpLimiter,
+    validateRequestBody(verifyUserSchema),
+    userController.verifyUser
+  );
+
+userRouter
+  .route('/resend-otp')
+  .post(
+    otpLimiter,
+    validateRequestBody(resendUserVerificationOTPSchema),
+    userController.resendUserVerificationOTP
+  );
 
 userRouter
   .route('/forgot-password')
   .post(
     passwordResetLimiter,
     validateRequestBody(forgotPasswordSchema),
-    forgotPassword
+    userController.forgotPassword
   );
 userRouter
   .route('/reset-password')
   .post(
     passwordResetLimiter,
     validateRequestBody(resetPasswordSchema),
-    resetPassword
+    userController.resetPassword
   );
 userRouter
   .route('/change-password')
   .post(
     validateUser,
     validateRequestBody(changePasswordSchema),
-    changePassword
+    userController.changePassword
   );
 
 userRouter
   .route('/profile')
-  .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), getProfile);
-userRouter.route('/:userId').get(validateRoleAuth([UserRoles.ADMIN]), getUser);
+  .get(
+    validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
+    userController.getProfile
+  );
+userRouter
+  .route('/:userId')
+  .get(validateRoleAuth([UserRoles.ADMIN]), userController.getUser);
 
 userRouter.post(
   '/update-push-token',
   validateUser,
   validateRequestBody(updatePushTokenSchema),
-  updatePushToken
+  userController.updatePushToken
 );
 
 userRouter
   .route('/settings/emergency')
-  .get(validateUser, getEmergencySettings)
+  .get(validateUser, userController.getEmergencySettings)
   .put(
     validateUser,
     validateRequestBody(updateEmergencySettingsSchema),
-    updateEmergencySettings
+    userController.updateEmergencySettings
   );
 
 export default userRouter;

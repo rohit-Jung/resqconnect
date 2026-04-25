@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import { UserRoles } from '@/constants';
-import { getAutoComplete, getRoute } from '@/controllers/maps.controller';
+import mapsController from '@/controllers/maps.controller';
 import {
   validateRoleAuth,
   validateUserOrProvider,
@@ -11,8 +11,13 @@ const mapsRouter = Router();
 
 mapsRouter
   .route('/autocomplete')
-  .get(validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]), getAutoComplete);
+  .get(
+    validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
+    mapsController.getAutoComplete
+  );
 
-mapsRouter.route('/optimal-route').post(validateUserOrProvider, getRoute);
+mapsRouter
+  .route('/optimal-route')
+  .post(validateUserOrProvider, mapsController.getRoute);
 
 export default mapsRouter;

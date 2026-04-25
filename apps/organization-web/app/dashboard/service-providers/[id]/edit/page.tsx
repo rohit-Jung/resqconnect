@@ -1,6 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import { ArrowLeft, Car, Loader2, MapPin, User } from 'lucide-react';
 import Link from 'next/link';
@@ -8,24 +11,14 @@ import { useRouter } from 'next/navigation';
 import { use, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   useOrgServiceProvider,
   useOrgUpdateProvider,
 } from '@/services/service-provider/auth.api';
-import { ServiceStatus } from '@/types/auth.types';
 import {
   type TServiceProviderUpdate,
   serviceProviderUpdateSchema,
 } from '@/validations/service-provider.schema';
-
-const STATUS_OPTIONS: { value: ServiceStatus; label: string }[] = [
-  { value: 'available', label: 'Available' },
-  { value: 'assigned', label: 'On Assignment' },
-  { value: 'off_duty', label: 'Off Duty' },
-];
 
 export default function EditServiceProviderPage({
   params,
@@ -38,7 +31,7 @@ export default function EditServiceProviderPage({
   const { data: providerData, isLoading } = useOrgServiceProvider(id);
   const updateMutation = useOrgUpdateProvider();
 
-  const provider = providerData?.data?.data;
+  const responder = providerData?.data?.data;
 
   const {
     register,
@@ -50,23 +43,23 @@ export default function EditServiceProviderPage({
   });
 
   useEffect(() => {
-    if (provider) {
+    if (responder) {
       reset({
-        name: provider.name,
-        age: provider.age,
-        primaryAddress: provider.primaryAddress,
-        serviceArea: provider.serviceArea || undefined,
-        vehicleInformation: provider.vehicleInformation || undefined,
+        name: responder.name,
+        age: responder.age,
+        primaryAddress: responder.primaryAddress,
+        serviceArea: responder.serviceArea || undefined,
+        vehicleInformation: responder.vehicleInformation || undefined,
       });
     }
-  }, [provider, reset]);
+  }, [responder, reset]);
 
   const onSubmit = async (data: TServiceProviderUpdate) => {
     try {
       await updateMutation.mutateAsync({ id, data });
       router.push(`/dashboard/service-providers/${id}`);
     } catch (error) {
-      console.error('Error updating service provider:', error);
+      console.error('Error updating responder:', error);
     }
   };
 
@@ -78,18 +71,18 @@ export default function EditServiceProviderPage({
     );
   }
 
-  if (!provider) {
+  if (!responder) {
     return (
       <div className="min-h-screen bg-background px-6 py-12">
         <h2 className="mb-2 text-xl font-semibold text-foreground">
-          Provider not found
+          Responder not found
         </h2>
         <p className="text-muted-foreground mb-4">
-          The service provider you&apos;re looking for doesn&apos;t exist.
+          The responder you&apos;re looking for doesn&apos;t exist.
         </p>
         <Link href="/dashboard/service-providers">
           <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none">
-            Back to Providers
+            Back to Responders
           </Button>
         </Link>
       </div>
@@ -120,10 +113,10 @@ export default function EditServiceProviderPage({
         <div className="mt-3 h-[2px] w-full bg-primary" />
         <div className="mt-4">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Edit Provider
+            Edit Responder
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Update {provider.name}&apos;s information
+            Update {responder.name}&apos;s information
           </p>
         </div>
       </div>
@@ -281,18 +274,18 @@ export default function EditServiceProviderPage({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-muted-foreground text-sm">Email</p>
-                <p className="font-medium text-foreground">{provider.email}</p>
+                <p className="font-medium text-foreground">{responder.email}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-sm">Phone Number</p>
                 <p className="font-medium text-foreground">
-                  {provider.phoneNumber}
+                  {responder.phoneNumber}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground text-sm">Service Type</p>
                 <p className="font-medium text-foreground capitalize">
-                  {provider.serviceType.replace('_', ' ')}
+                  {responder.serviceType.replace('_', ' ')}
                 </p>
               </div>
               <div>
@@ -300,7 +293,7 @@ export default function EditServiceProviderPage({
                   Verification Status
                 </p>
                 <p className="font-medium text-foreground">
-                  {provider.isVerified ? 'Verified' : 'Not Verified'}
+                  {responder.isVerified ? 'Verified' : 'Not Verified'}
                 </p>
               </div>
             </div>

@@ -1,3 +1,6 @@
+import { serviceProvider } from '@repo/db/schemas';
+import type { Coordinates } from '@repo/types/validations';
+
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 
@@ -5,9 +8,7 @@ import { envConfig, logger } from '@/config';
 import { AVERAGE_SPEED_KM_PER_MIN, type ServiceTypeEnum } from '@/constants';
 import { RoutingProfiles } from '@/constants/mapbox.constants';
 import db from '@/db';
-import { serviceProvider } from '@/models';
 import { constructMatrixUrl } from '@/utils/maps/mapbox';
-import type { Coordinates } from '@/validations/maps.validations';
 
 interface IProviderInfo {
   id: string;

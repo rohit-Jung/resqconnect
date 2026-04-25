@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+
 import {
   Building2,
   ChevronLeft,
@@ -13,7 +15,6 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/providers/sidebar-provider';
 
@@ -22,7 +23,7 @@ const navigation = [
   { name: 'Organizations', href: '/dashboard/organizations', icon: Building2 },
   { name: 'Users', href: '/dashboard/users', icon: Users },
   {
-    name: 'Service Providers',
+    name: 'Responders',
     href: '/dashboard/service-providers',
     icon: Smartphone,
   },

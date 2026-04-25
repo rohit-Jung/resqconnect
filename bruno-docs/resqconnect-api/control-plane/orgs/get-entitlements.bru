@@ -1,0 +1,10 @@
+meta {
+  name: get-entitlements
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{controlPlaneServer}}/orgs/:id/entitlements
+  auth: none
+}

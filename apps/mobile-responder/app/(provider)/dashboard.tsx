@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Vibration } from 'react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -131,6 +132,9 @@ export default function ProviderDashboardScreen() {
     const handleNewEmergency = (data: any) => {
       const parsedData = newEmergencyEventPayloadSchema.safeParse(data);
       if (!parsedData.success) return;
+
+      // Vibrate on incoming request
+      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
 
       const requestData = {
         ...parsedData.data,

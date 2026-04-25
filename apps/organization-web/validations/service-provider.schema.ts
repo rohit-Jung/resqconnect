@@ -12,7 +12,7 @@ export const serviceStatusEnum = z.enum(['available', 'assigned', 'off_duty']);
 export type ServiceType = z.infer<typeof serviceTypeEnum>;
 export type ServiceStatus = z.infer<typeof serviceStatusEnum>;
 
-// Registration Schema (used by organization to register providers)
+// Registration Schema (used by organization to register responders)
 export const serviceProviderRegisterSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   age: z
@@ -39,7 +39,7 @@ export const serviceProviderRegisterFormSchema = z
   .object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
     age: z.string().min(1, 'Age is required'),
-    email: z.string().email('Please enter a valid email'),
+    email: z.email('Please enter a valid email'),
     phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits'),
     primaryAddress: z.string().min(5, 'Address must be at least 5 characters'),
     password: z
@@ -50,8 +50,8 @@ export const serviceProviderRegisterFormSchema = z
       .regex(/[0-9]/, 'Password must contain at least one number'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     serviceType: serviceTypeEnum,
-    panCardUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
-    citizenshipUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+    panCardUrl: z.url('Invalid URL').optional().or(z.literal('')),
+    citizenshipUrl: z.url('Invalid URL').optional().or(z.literal('')),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

@@ -1,14 +1,15 @@
-import { and, eq } from 'drizzle-orm';
-import type { Request, Response } from 'express';
-
-import { logger } from '@/config/logger/winston.config';
-import db from '@/db';
 import {
   emergencyRequest,
   emergencyResponse,
   requestStatusEnum,
   serviceProvider,
-} from '@/models';
+} from '@repo/db/schemas';
+
+import { and, eq } from 'drizzle-orm';
+import type { Request, Response } from 'express';
+
+import { logger } from '@/config/logger/winston.config';
+import db from '@/db';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -410,6 +411,17 @@ const getProviderResponses = asyncHandler(
       );
   }
 );
+
+const emergencyResponseController = {
+  createEmergencyResponse,
+  getEmergencyResponse,
+  updateEmergencyResponse,
+  deleteEmergencyResponse,
+  getProviderResponses,
+} as const;
+
+export default emergencyResponseController;
+
 export {
   createEmergencyResponse,
   getEmergencyResponse,

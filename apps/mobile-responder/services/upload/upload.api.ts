@@ -1,5 +1,5 @@
 import api from '../axiosInstance';
-import { uploadEndpoints } from '../endPoints';
+import { providerUploadEndpoints } from '../endPoints';
 
 export interface CloudinarySignature {
   signature: string;
@@ -24,12 +24,13 @@ export interface UpdateProfilePictureResponse {
   name: string;
   email: string;
   phoneNumber: number;
-  profilePicture: string;
+  profilePicture: string | null;
 }
 
 export const uploadApi = {
   getUploadSignature: async (): Promise<CloudinarySignature> => {
-    const response = await api.get(uploadEndpoints.getSignature);
+    // Responder app uses service_provider auth; backend user upload endpoints reject that role.
+    const response = await api.get(providerUploadEndpoints.getSignature);
     return response.data.data;
   },
 
@@ -41,7 +42,8 @@ export const uploadApi = {
 
     // Get the file extension from URI
     const uriParts = imageUri.split('.');
-    const fileType = uriParts[uriParts.length - 1];
+    const ext = (uriParts[uriParts.length - 1] || '').toLowerCase();
+    const fileType = ext === 'jpg' ? 'jpeg' : ext;
 
     // Create file object for upload
     const file = {
@@ -76,15 +78,20 @@ export const uploadApi = {
   updateProfilePicture: async (
     profilePictureUrl: string
   ): Promise<UpdateProfilePictureResponse> => {
-    const response = await api.put(uploadEndpoints.updateProfilePicture, {
-      profilePictureUrl,
-    });
-    return response.data.data.user;
+    const response = await api.put(
+      providerUploadEndpoints.updateProfilePicture,
+      {
+        profilePictureUrl,
+      }
+    );
+    return response.data.data.serviceProvider;
   },
 
   deleteProfilePicture: async (): Promise<UpdateProfilePictureResponse> => {
-    const response = await api.delete(uploadEndpoints.deleteProfilePicture);
-    return response.data.data.user;
+    const response = await api.delete(
+      providerUploadEndpoints.deleteProfilePicture
+    );
+    return response.data.data.serviceProvider;
   },
 
   /**

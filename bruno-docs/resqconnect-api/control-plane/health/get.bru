@@ -1,0 +1,14 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{controlPlaneServer}}/health
+  auth: none
+}
+
+docs {
+  # Control Plane Health
+}

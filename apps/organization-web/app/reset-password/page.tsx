@@ -1,6 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import {
   ArrowLeft,
@@ -13,13 +16,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useResetPassword } from '@/services/user/auth.api';
 import {
   TResetPasswordForm,
@@ -45,17 +45,12 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem('resetPasswordUserId');
+  });
   const router = useRouter();
   const resetPasswordMutation = useResetPassword();
-
-  useEffect(() => {
-    // Get userId from sessionStorage
-    const storedUserId = sessionStorage.getItem('resetPasswordUserId');
-    if (storedUserId) {
-      setUserId(storedUserId);
-    }
-  }, []);
 
   const {
     register,

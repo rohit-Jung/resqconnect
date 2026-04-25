@@ -21,6 +21,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import OfflineFallbackModal from '@/components/OfflineFallbackModal';
 import OfflineIndicator from '@/components/OfflineIndicator';
+import { useEmergencyRoom } from '@/hooks/useEmergencyRoom';
 import { useEmergencyNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useCreateEmergencyRequest } from '@/services/emergency/emergency.api';
 import { SyncSummary } from '@/services/syncService';
@@ -52,6 +53,9 @@ const EMERGENCY_TYPES: {
 export default function EmergencyRequestScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
+
+  // Initialize emergency room socket listeners (user role)
+  useEmergencyRoom('user');
 
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [offlineModalLocation, setOfflineModalLocation] =

@@ -69,49 +69,49 @@ function statusLabel(status: string) {
 
 function MapUpdater({
   selectedProviderId,
-  providers,
+  responders,
 }: {
   selectedProviderId: string | null;
-  providers: IServiceProvider[];
+  responders: IServiceProvider[];
 }) {
   const map = useMap();
 
   useEffect(() => {
     if (selectedProviderId) {
-      const provider = providers.find(p => p.id === selectedProviderId);
+      const responder = responders.find(p => p.id === selectedProviderId);
       if (
-        provider?.currentLocation?.latitude &&
-        provider?.currentLocation?.longitude
+        responder?.currentLocation?.latitude &&
+        responder?.currentLocation?.longitude
       ) {
         map.flyTo(
           [
-            parseFloat(provider.currentLocation.latitude),
-            parseFloat(provider.currentLocation.longitude),
+            parseFloat(responder.currentLocation.latitude),
+            parseFloat(responder.currentLocation.longitude),
           ],
           15,
           { duration: 0.5 }
         );
       }
     }
-  }, [selectedProviderId, providers, map]);
+  }, [selectedProviderId, responders, map]);
 
   return null;
 }
 
 interface ProviderMapProps {
-  providers: IServiceProvider[];
+  responders: IServiceProvider[];
   selectedProviderId: string | null;
   onSelectProvider: (id: string | null) => void;
 }
 
 export default function ProviderMap({
-  providers,
+  responders,
   selectedProviderId,
   onSelectProvider,
 }: ProviderMapProps) {
   const mapRef = useRef<L.Map>(null);
 
-  const providersWithLocation = providers.filter(
+  const providersWithLocation = responders.filter(
     p => p.currentLocation?.latitude && p.currentLocation?.longitude
   );
 
@@ -138,44 +138,44 @@ export default function ProviderMap({
         />
         <MapUpdater
           selectedProviderId={selectedProviderId}
-          providers={providers}
+          responders={responders}
         />
-        {providersWithLocation.map(provider => {
-          const lat = parseFloat(provider.currentLocation!.latitude);
-          const lng = parseFloat(provider.currentLocation!.longitude);
-          const isSelected = selectedProviderId === provider.id;
+        {providersWithLocation.map(responder => {
+          const lat = parseFloat(responder.currentLocation!.latitude);
+          const lng = parseFloat(responder.currentLocation!.longitude);
+          const isSelected = selectedProviderId === responder.id;
 
           return (
             <Marker
-              key={provider.id}
+              key={responder.id}
               position={[lat, lng]}
-              icon={createProviderIcon(provider.serviceType, isSelected)}
+              icon={createProviderIcon(responder.serviceType, isSelected)}
               eventHandlers={{
-                click: () => onSelectProvider(provider.id),
+                click: () => onSelectProvider(responder.id),
               }}
             >
               <Popup>
                 <div className="min-w-[180px]">
-                  <p className="font-semibold">{provider.name}</p>
+                  <p className="font-semibold">{responder.name}</p>
                   <p className="text-sm text-gray-500">
-                    {serviceTypeLabels[provider.serviceType]}
+                    {serviceTypeLabels[responder.serviceType]}
                   </p>
                   <p className="mt-1 text-xs">
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 font-medium ${
-                        provider.serviceStatus === 'available'
+                        responder.serviceStatus === 'available'
                           ? 'bg-green-100 text-green-700'
-                          : provider.serviceStatus === 'assigned'
+                          : responder.serviceStatus === 'assigned'
                             ? 'bg-orange-100 text-orange-700'
                             : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {statusLabel(provider.serviceStatus)}
+                      {statusLabel(responder.serviceStatus)}
                     </span>
                   </p>
-                  {provider.serviceArea && (
+                  {responder.serviceArea && (
                     <p className="mt-1 text-xs text-gray-500">
-                      {provider.serviceArea}
+                      {responder.serviceArea}
                     </p>
                   )}
                 </div>
@@ -188,7 +188,7 @@ export default function ProviderMap({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="rounded-lg bg-white/90 px-4 py-2 text-center shadow">
             <p className="text-sm text-muted-foreground">
-              No providers with location data yet
+              No responders with location data yet
             </p>
           </div>
         </div>
