@@ -16,6 +16,7 @@ import {
 import Header from '@/components/Header';
 import { TOKEN_KEY } from '@/constants';
 import { useGetDocumentStatus } from '@/services/document/document.api';
+import { serviceProviderApi } from '@/services/provider/provider.api';
 import { useProviderStore } from '@/store/providerStore';
 
 const SIGNAL_RED = '#C44536';
@@ -40,9 +41,24 @@ const VerificationPendingScreen: React.FC = () => {
   const documentStatus = data?.data?.data;
 
   useEffect(() => {
-    if (documentStatus?.documentStatus === 'approved') {
-      router.replace('/(auth)/sign-in');
-    }
+    if (documentStatus?.documentStatus !== 'approved') return;
+
+    // If approved, fetch the full profile and route into provider tabs.
+    // This avoids the UX of "getting logged out" when approval happens.
+    Promise.all([
+      serviceProviderApi.getProfile(),
+      SecureStore.getItemAsync(TOKEN_KEY),
+    ])
+      .then(([profile, token]) => {
+        // Preserve existing token; it should still be valid.
+        useProviderStore.getState().setProvider(profile as any);
+        if (token) useProviderStore.getState().setToken(token);
+        router.replace('/(provider)/dashboard');
+      })
+      .catch(() => {
+        // Fallback: go to sign-in if profile fetch fails.
+        router.replace('/(auth)/sign-in');
+      });
   }, [documentStatus, router]);
 
   useEffect(() => {

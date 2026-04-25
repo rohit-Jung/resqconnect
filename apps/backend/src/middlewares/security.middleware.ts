@@ -1,13 +1,9 @@
 import compression from 'compression';
-import { Express } from 'express';
-import helmet from 'helmet';
+import type { Express, Request, Response } from 'express';
 import mongoSanitize from 'express-mongo-sanitize';
+import helmet from 'helmet';
 import hpp from 'hpp';
 
-/**
- * Configure and apply comprehensive security middlewares to the Express app
- * Includes: Helmet, compression, NoSQL injection prevention, parameter pollution prevention
- */
 export const configureSecurityMiddlewares = (app: Express): void => {
   // Helmet middleware - sets various HTTP headers to secure the app
   // Includes protections against XSS, Clickjacking, MIME type sniffing, etc.
@@ -44,32 +40,36 @@ export const configureSecurityMiddlewares = (app: Express): void => {
   );
 
   // Compression middleware - compresses response bodies for faster transmission
-  // Reduces bandwidth usage especially for large JSON responses
+  // reduces bandwidth usage especially for large JSON responses
   app.use(
     compression({
-      level: 6, // Compression level (0-9, 6 is a good balance)
-      threshold: 1024, // Only compress responses larger than 1KB
-      filter: (req, res) => {
-        // Don't compress if request has 'no-transform' header
+      level: 6, // compression level (0-9)
+      threshold: 1024, // only compress responses larger than 1KB
+      filter: (req: Request, res: Response) => {
+        // don't compress if request has 'no-transform' header
         if (req.headers['x-no-compression']) {
           return false;
         }
-        // Use compression filter from the compression library
+        // use compression filter from the compression library
         return compression.filter(req, res);
       },
     })
   );
 
-  // Data sanitization against NoSQL injection attacks
-  // Removes $ and . from user inputs to prevent MongoDB query injection
-  app.use(
-    mongoSanitize({
-      replaceWith: '_',
-      onSanitize: ({ req, key }) => {
-        console.warn(`Potential NoSQL injection attempt in ${key}:`, req.body?.[key]);
-      },
-    })
-  );
+  // Input sanitization (Mongo-style operator injection hardening).
+  // This backend uses Postgres/Drizzle, so this is defense-in-depth against
+  // malicious payload keys (e.g. "$gt", dotted paths) rather than SQL injection.
+  // app.use(
+  //   mongoSanitize({
+  //     replaceWith: '_',
+  //     onSanitize: ({ req, key }) => {
+  //       console.warn(
+  //         `Potential NoSQL injection attempt in ${key}:`,
+  //         req.body?.[key]
+  //       );
+  //     },
+  //   })
+  // );
 
   // HTTP Parameter Pollution (HPP) prevention
   // Prevents attacks where multiple parameters with same name are sent
@@ -87,34 +87,40 @@ export const configureSecurityMiddlewares = (app: Express): void => {
     })
   );
 
-  // Security headers middleware - additional security headers
-  app.use((req, res, next) => {
-    // Prevent MIME type sniffing
+  // security headers middleware - additional security headers
+  app.use((_, res, next) => {
+    // prevent mime type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
-    // Enable XSS protection in older browsers
+    // enable xss protection in older browsers
     res.setHeader('X-XSS-Protection', '1; mode=block');
 
-    // Clickjacking protection
+    // clickjacking protection
     res.setHeader('X-Frame-Options', 'DENY');
 
-    // Referrer policy for privacy
+    // referrer policy for privacy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-    // Feature policy / Permissions policy
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    // feature policy / permissions policy
+    res.setHeader(
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=()'
+    );
 
-    // Remove powered by header to not reveal tech stack
+    // remove powered by header to not reveal tech stack
     res.removeHeader('X-Powered-By');
 
     next();
   });
 
-  // Additional security headers for API responses
+  // additional security headers for API responses
   app.use((req, res, next) => {
-    // Cache control for sensitive endpoints
+    // cache control for sensitive endpoints
     if (req.path.includes('auth') || req.path.includes('password')) {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader(
+        'Cache-Control',
+        'no-store, no-cache, must-revalidate, proxy-revalidate'
+      );
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
     }

@@ -1,3 +1,6 @@
+import { organization, serviceProvider, user } from '@repo/db/schemas';
+import type { TOrganization, TServiceProvider, TUser } from '@repo/db/schemas';
+
 import { eq, sql } from 'drizzle-orm';
 import jwt, {
   JsonWebTokenError,
@@ -5,11 +8,9 @@ import jwt, {
   TokenExpiredError,
 } from 'jsonwebtoken';
 
-import { envConfig } from '@/config/env.config';
+import { envConfig } from '@/config';
 import { OtherRoles, UserRoles } from '@/constants';
 import db from '@/db';
-import { organization, serviceProvider, user } from '@/models';
-import type { TOrganization, TServiceProvider, TUser } from '@/models';
 
 import ApiError from '../api/ApiError';
 
@@ -19,6 +20,9 @@ export interface IJWTToken extends JwtPayload {
   name: string;
   email: string;
   role: TEntityRole;
+  restricted?: boolean;
+  // Only used for organization tokens.
+  orgStatus?: string;
   iat?: number;
   exp?: number;
 }
@@ -27,6 +31,11 @@ type Entity =
   | Partial<TUser & { kind: 'user' }>
   | Partial<TServiceProvider & { kind: 'service_provider' }>
   | Partial<TOrganization & { kind: 'organization' }>;
+
+type JWTOptions = {
+  restricted?: boolean;
+  orgStatus?: string;
+};
 
 const getRole = (e: Entity): TEntityRole => {
   switch (e.kind) {
@@ -41,10 +50,14 @@ const getRole = (e: Entity): TEntityRole => {
   }
 };
 
-const generateJWT = (user: Entity) => {
+const generateJWT = (user: Entity, options: JWTOptions = {}) => {
   if (!envConfig.jwt_secret) {
     throw new Error('JWT secret not found in environment variables');
   }
+
+  const expiresIn = options.restricted
+    ? envConfig.jwt_restricted_expiry
+    : envConfig.jwt_expiry;
 
   const token = jwt.sign(
     {
@@ -52,10 +65,12 @@ const generateJWT = (user: Entity) => {
       name: user.name,
       email: user.email,
       role: getRole(user),
+      ...(options.restricted ? { restricted: true } : null),
+      ...(options.orgStatus ? { orgStatus: options.orgStatus } : null),
     },
     envConfig.jwt_secret!,
     {
-      expiresIn: envConfig.jwt_expiry,
+      expiresIn,
     }
   );
 
@@ -137,7 +152,17 @@ const verifyAndDecodeToken = async (
     )
     .limit(1);
 
-  return row || null;
+  if (!row) return null;
+
+  // Merge DB-validated identity with JWT claims.
+  // Keep compliance-related claims from the JWT.
+  return {
+    ...row,
+    restricted: decoded.restricted,
+    orgStatus: decoded.orgStatus,
+    iat: decoded.iat,
+    exp: decoded.exp,
+  } as IJWTToken;
 };
 
 export { generateJWT, verifyJWT, verifyAndDecodeToken };

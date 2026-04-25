@@ -1,3 +1,10 @@
+import {
+  emergencyRequest,
+  outbox,
+  requestEvents,
+  serviceProvider,
+} from '@repo/db/schemas';
+
 import { and, asc, eq, isNull, lt, sql } from 'drizzle-orm';
 import { gridDisk, latLngToCell } from 'h3-js';
 
@@ -12,37 +19,17 @@ import {
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyRequest,
-  outbox,
-  requestEvents,
-  serviceProvider,
-} from '@/models';
 import { safeSend } from '@/services/kafka/kafka.service';
-import {
-  cacheEmergencyProviders,
-  getEmergencyProviders,
-} from '@/services/redis.service';
+import { getEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
 
-// Get Kafka topic for outbox event type
-function getTopicForEventType(eventType: string): string {
-  const topicMap: Record<string, string> = {
-    created: KAFKA_TOPICS.EMERGENCY_CREATED,
-    accepted: KAFKA_TOPICS.EMERGENCY_ACCEPTED,
-    cancelled: KAFKA_TOPICS.EMERGENCY_CANCELLED,
-    completed: KAFKA_TOPICS.EMERGENCY_COMPLETED,
-  };
-  return topicMap[eventType] || KAFKA_TOPICS.EMERGENCY_CREATED;
-}
-
-// Runs every 1 second to process pending outbox events
+// runs every 1 second to process pending outbox events
 export function startOutboxPublisher(): NodeJS.Timeout {
   logger.debug('Starting Outbox Publisher Worker...');
 
   return setInterval(async () => {
     try {
-      // Query pending outbox events
+      // query pending outbox events
       const pendingEvents = await db
         .select()
         .from(outbox)
@@ -68,7 +55,7 @@ export function startOutboxPublisher(): NodeJS.Timeout {
             ],
           });
 
-          // Mark as published
+          // mark as published
           await db
             .update(outbox)
             .set({
@@ -102,18 +89,15 @@ export function startOutboxPublisher(): NodeJS.Timeout {
   }, OUTBOX_POLL_INTERVAL);
 }
 
-/**
- * Request Timeout Handler Worker
- * Runs every 10 seconds to handle timed-out pending requests
- */
+// runs every 10 seconds to handle timed-out pending requests
 export function startTimeoutHandler(): NodeJS.Timeout {
-  logger.debug('⏰ Starting Timeout Handler Worker...');
+  logger.debug('[WORKER] Starting Timeout Handler Worker...');
 
   return setInterval(async () => {
     try {
       const now = new Date();
 
-      // Query timed-out pending requests
+      // query timed-out pending requests
       const timedOutRequests = await db
         .select()
         .from(emergencyRequest)
@@ -126,14 +110,16 @@ export function startTimeoutHandler(): NodeJS.Timeout {
 
       if (timedOutRequests.length === 0) return;
 
-      logger.debug(`⏰ Found ${timedOutRequests.length} timed-out requests`);
+      logger.debug(
+        `[WORKER] Found ${timedOutRequests.length} timed-out requests`
+      );
 
       const io = getIo();
 
       for (const req of timedOutRequests) {
         const currentRadius = req.searchRadius || 1;
 
-        // If max radius exceeded, mark as failed
+        // if max radius exceeded, mark as failed
         if (currentRadius > MAX_SEARCH_RADIUS) {
           logger.debug(
             `[ERROR] Request ${req.id} failed after ${currentRadius} escalations`
@@ -144,14 +130,14 @@ export function startTimeoutHandler(): NodeJS.Timeout {
             .set({ requestStatus: 'no_providers_available' })
             .where(eq(emergencyRequest.id, req.id));
 
-          // Log event
+          // log event
           await db.insert(requestEvents).values({
             requestId: req.id,
             eventType: 'failed-no-providers',
             metadata: { searchRadius: currentRadius },
           });
 
-          // Notify user
+          // notify user
           if (io) {
             io.to(`user:${req.userId}`).emit(SocketEvents.EMERGENCY_FAILED, {
               requestId: req.id,
@@ -163,11 +149,11 @@ export function startTimeoutHandler(): NodeJS.Timeout {
           continue;
         }
 
-        // Expand search radius
+        // expand search radius
         const newRadius = currentRadius + 1;
         logger.debug(`🔄 Escalating request ${req.id} to radius ${newRadius}`);
 
-        // Get H3 cell and expand search
+        // get h3 cell and expand search
         const location = req.location as {
           latitude: number;
           longitude: number;
@@ -175,7 +161,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
         const userH3 = latLngToCell(location.latitude, location.longitude, 8);
         const expandedCells = gridDisk(userH3, newRadius);
 
-        // Find new providers in expanded area
+        // find new providers in expanded area
         const newProviders = await db
           .select({
             id: serviceProvider.id,
@@ -190,7 +176,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
             )
           );
 
-        // Update request with new radius and expiry
+        // update request with new radius and expiry
         const newExpiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
         await db
           .update(emergencyRequest)
@@ -200,14 +186,14 @@ export function startTimeoutHandler(): NodeJS.Timeout {
           })
           .where(eq(emergencyRequest.id, req.id));
 
-        // Log escalation event
+        // log escalation event
         await db.insert(requestEvents).values({
           requestId: req.id,
           eventType: 'search-escalated',
           metadata: { newRadius, providersFound: newProviders.length },
         });
 
-        // Broadcast to newly found providers
+        // broadcast to newly found providers
         if (io && newProviders.length > 0) {
           for (const provider of newProviders) {
             io.to(provider.id).emit(SocketEvents.NEW_EMERGENCY, {
@@ -222,7 +208,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
           }
         }
 
-        // Notify user about expansion
+        // notify user about expansion
         if (io) {
           io.to(`user:${req.userId}`).emit(SocketEvents.SEARCH_EXPANDED, {
             requestId: req.id,
@@ -237,10 +223,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
   }, TIMEOUT_CHECK_INTERVAL);
 }
 
-/**
- * Disconnected Provider Handler Worker
- * Runs every 5 seconds to detect providers who accepted but never connected
- */
+// runs every 5 seconds to detect providers who accepted but never connected
 export function startDisconnectionHandler(): NodeJS.Timeout {
   logger.debug('[CONNECTED] Starting Disconnection Handler Worker...');
 
@@ -248,7 +231,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
     try {
       const now = new Date();
 
-      // Query stale accepted requests (accepted but never connected)
+      // query stale accepted requests (accepted but never connected)
       const staleRequests = await db
         .select()
         .from(emergencyRequest)
@@ -273,7 +256,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           `[CONNECTED] Provider accepted request ${req.id} but never connected`
         );
 
-        // Reset request to pending
+        // reset request to pending
         const newExpiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
         await db
           .update(emergencyRequest)
@@ -285,7 +268,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           })
           .where(eq(emergencyRequest.id, req.id));
 
-        // Log event
+        // log event
         await db.insert(requestEvents).values({
           requestId: req.id,
           eventType: 'provider-disconnected',
@@ -293,11 +276,11 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           metadata: { reason: 'never-connected-after-accept' },
         });
 
-        // Get provider list from Redis and re-broadcast
+        // get provider list from redis and re-broadcast
         const providerIds = await getEmergencyProviders(req.id);
 
         if (io && providerIds.length > 0) {
-          // Re-broadcast to original providers
+          // re-broadcast to original providers
           for (const pId of providerIds) {
             io.to(pId).emit(SocketEvents.NEW_EMERGENCY, {
               requestId: req.id,
@@ -311,7 +294,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           }
         }
 
-        // Notify user
+        // notify user
         if (io) {
           io.to(`user:${req.userId}`).emit(SocketEvents.PROVIDER_DISCONNECTED, {
             requestId: req.id,

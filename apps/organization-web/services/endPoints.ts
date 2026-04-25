@@ -11,6 +11,7 @@ export const orgEndpoints = {
   login: `/organization/login`,
   register: `/organization/register`,
   verify: `/organization/verify`,
+  resendOtp: `/organization/resend-otp`,
   profile: `/organization/profile`,
   updateProfile: `/organization/profile`,
   list: `/organization/list`,
@@ -32,11 +33,14 @@ export const orgEndpoints = {
 };
 
 export const paymentEndpoints = {
-  plans: `/payments/plans`,
-  subscribe: `/payments/subscribe`,
-  status: (paymentId: string) => `/payments/status/${paymentId}`,
-  history: `/payments/history`,
-  subscription: `/payments/subscription`,
+  // Control-plane billing endpoints
+  plans: `/plans`,
+  subscribe: `/billing/my/checkout`,
+  status: (paymentId: string) => `/billing/my/payments/${paymentId}`,
+  byPidx: (pidx: string) => `/billing/my/payments/by-pidx/${pidx}`,
+  verify: `/billing/my/payments/verify`,
+  history: `/billing/my/payments`,
+  subscription: `/billing/my/subscription`,
 };
 
 export const superAdminEndpoints = {

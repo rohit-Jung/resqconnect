@@ -1,3 +1,9 @@
+import {
+  Events,
+  EventsEnum,
+  type SmsGatewayInterface,
+} from '@repo/types/validations';
+
 import axios, { HttpStatusCode } from 'axios';
 import type { Request, Response } from 'express';
 
@@ -5,12 +11,6 @@ import { envConfig, logger } from '@/config';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { SMS_TEMPLATES, parseSMSMessage } from '@/utils/sms/sms.parser';
-import {
-  Events,
-  EventsEnum,
-  type SmsGatewayInterface,
-} from '@/validations/messages.validations';
-import { createEmergencyRequest } from '@/workers/messaging.worker';
 
 import { SmsRoutes, postSMS, sendLocalSMS } from './local-sms.service';
 import { markMessageProcessed } from './redis.service';
@@ -75,6 +75,9 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const parsedData = parseResult.data;
+
+  // Lazy import to avoid worker init during tests/import.
+  const { createEmergencyRequest } = await import('@/workers/messaging.worker');
 
   let userId: string;
   const userPhone: string = payload.sender;

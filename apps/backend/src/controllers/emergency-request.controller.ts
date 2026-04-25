@@ -1,8 +1,18 @@
+import {
+  emergencyRequest,
+  emergencyResponse,
+  outbox,
+  requestEvents,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
+
 import { HttpStatusCode } from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { latLngToCell } from 'h3-js';
 
+import { envConfig } from '@/config';
 import {
   H3_RESOLUTION,
   INITIAL_SEARCH_RADIUS,
@@ -15,14 +25,7 @@ import {
 } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyRequest,
-  emergencyResponse,
-  outbox,
-  requestEvents,
-  serviceProvider,
-  user,
-} from '@/models';
+import { postJsonWithRetry } from '@/services/internal-http.service';
 import { publishWithRetry } from '@/services/kafka/kafka.utils';
 import {
   acquireLock,
@@ -547,6 +550,58 @@ const acceptEmergencyRequest = asyncHandler(
         io.in(SocketRoom.USER(existingRequest.userId)).socketsJoin(
           SocketRoom.EMERGENCY(requestId)
         );
+
+        // Fetch provider details once for both local and platform emit
+        const providerData = await db.query.serviceProvider.findFirst({
+          where: eq(serviceProvider.id, providerId),
+        });
+
+        // Also emit locally for dev mode (when no separate platform)
+        io.to(SocketRoom.USER(existingRequest.userId)).emit(
+          SocketEvents.REQUEST_ACCEPTED,
+          {
+            requestId,
+            provider: {
+              id: providerId,
+              name: providerData?.name,
+              phone: providerData?.phoneNumber?.toString(),
+              serviceType: providerData?.serviceType,
+              vehicleNumber: providerData?.vehicleInformation?.number,
+              location: providerData?.currentLocation,
+            },
+          }
+        );
+
+        // Notify platform (silently, don't fail the request)
+        const platformUrl = envConfig.platform_base_url;
+        if (platformUrl && existingRequest.userId) {
+          // Fire async - don't await
+          postJsonWithRetry<{ ok: true }>(
+            `${platformUrl}/api/v1/internal/incidents/${requestId}/update`,
+            {
+              headers: {
+                'x-internal-api-key': envConfig.internal_api_key as string,
+              },
+              body: {
+                userId: existingRequest.userId,
+                eventType: SocketEvents.REQUEST_ACCEPTED,
+                requestStatus: 'assigned',
+                provider: {
+                  id: providerId,
+                  name: providerData?.name,
+                  phone: providerData?.phoneNumber?.toString(),
+                  serviceType: providerData?.serviceType,
+                  vehicleNumber: providerData?.vehicleInformation?.number,
+                  location: providerData?.currentLocation,
+                },
+                message: 'Provider accepted your request',
+              },
+              timeoutMs: 2000,
+              retries: 1,
+              backoffMs: 500,
+            }
+          ).catch(e => console.log('[ACCEPT] Platform notify failed:', e));
+        }
       }
 
       await clearEmergencyProviders(requestId);
@@ -1068,7 +1123,7 @@ const getProviderEmergencyHistory = asyncHandler(
   }
 );
 
-export {
+const controllers = {
   acceptEmergencyRequest,
   cancelEmergencyRequest,
   completeEmergencyRequest,
@@ -1084,3 +1139,5 @@ export {
   rejectEmergencyRequest,
   updateEmergencyRequest,
 };
+
+export default controllers;

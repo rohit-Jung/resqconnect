@@ -1,5 +1,8 @@
 'use client';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import { Skeleton } from '@repo/ui/skeleton';
+
 import {
   Area,
   AreaChart,
@@ -12,9 +15,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface MonthlyTrendItem {
   month: string;

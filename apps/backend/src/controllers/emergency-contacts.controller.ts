@@ -1,15 +1,16 @@
+import { emergencyContact, newEmergencyContactSchema } from '@repo/db/schemas';
+
 import { desc, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import db from '@/db';
-import { emergencyContact, newEmergencyContactSchema } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
 const createEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: userId } = req.user;
+    const userId = req.user?.id;
 
     if (!userId) throw new ApiError(401, 'Unauthorized to perform this action');
 
@@ -54,7 +55,7 @@ const createEmergencyContact = asyncHandler(
 const updateEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
-    const { id: userId } = req.user;
+    const userId = req.user?.id;
     const updateData = req.body;
 
     if (!userId) throw new ApiError(401, 'Unauthorized');
@@ -111,7 +112,8 @@ const updateEmergencyContact = asyncHandler(
 const deleteEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
-    const { id: userId, role } = req.user;
+    const userId = req.user?.id;
+    const role = req.user?.role;
 
     if (!id) throw new ApiError(400, 'Contact ID is required');
 
@@ -155,7 +157,7 @@ const getEmergencyContact = asyncHandler(
 
 const getUserEmergencyContacts = asyncHandler(
   async (req: Request, res: Response) => {
-    const { id: userId } = req.user;
+    const userId = req.user?.id;
 
     if (!userId) throw new ApiError(401, 'Unauthorized');
 
@@ -189,7 +191,7 @@ const getCommonEmergencyContacts = asyncHandler(
 const toggleContactNotification = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
-    const { id: userId } = req.user;
+    const userId = req.user?.id;
 
     if (!userId) throw new ApiError(401, 'Unauthorized');
     if (!id) throw new ApiError(400, 'Contact ID is required');
@@ -223,7 +225,7 @@ const updateContactPushToken = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
     const { pushToken } = req.body;
-    const { id: userId } = req.user;
+    const userId = req.user?.id;
 
     if (!userId) throw new ApiError(401, 'Unauthorized');
     if (!id) throw new ApiError(400, 'Contact ID is required');
@@ -250,6 +252,19 @@ const updateContactPushToken = asyncHandler(
       .json(new ApiResponse(200, 'Contact push token updated', updated[0]));
   }
 );
+
+const emergencyContactsController = {
+  createEmergencyContact,
+  updateEmergencyContact,
+  deleteEmergencyContact,
+  getEmergencyContact,
+  getUserEmergencyContacts,
+  getCommonEmergencyContacts,
+  toggleContactNotification,
+  updateContactPushToken,
+} as const;
+
+export default emergencyContactsController;
 
 export {
   createEmergencyContact,

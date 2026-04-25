@@ -11,7 +11,22 @@ get {
 }
 
 auth:bearer {
-  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImEwODg2YzJlLWRjYWYtNGZiNy04ZTg1LWQzNDA3N2RlYWNiZCIsIm5hbWUiOiJBbWJ1bGFuY2UiLCJlbWFpbCI6ImFtYkByZXNxY29ubmVjdC5jb20iLCJyb2xlIjoic2VydmljZV9wcm92aWRlciIsImlhdCI6MTc2NjkwNTk3MCwiZXhwIjoxNzY2OTA5NTcwfQ.JTD_xQmOUhuV5QGQIuKAR8MAun6xkG9nbxh0FB5CjOI
+  token: {{orgToken}}
+}
+
+docs {
+  # Get Organization Profile
+  
+  Returns the profile of the currently logged-in organization.
+  
+  ## Response
+  - id: Organization UUID
+  - name: Organization name
+  - email: Organization email
+  - serviceCategory: ambulance | police | fire_truck | rescue_team
+  - generalNumber: Contact number
+  - isVerified: Verification status
+  - status: not_active | active | not_verified
 }
 
 settings {

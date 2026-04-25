@@ -1,5 +1,16 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@repo/ui/card';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
+
 import {
   AlertTriangle,
   Check,
@@ -12,16 +23,6 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   ISubscriptionPlan,
   useCreateSubscriptionPlan,
@@ -35,6 +36,12 @@ interface PlanFormData {
   price: string;
   durationMonths: string;
   features: string[];
+  entitlements: {
+    provider_count_limit: string;
+    api_rate_limit_tier: string;
+    notification_fallback_quota: string;
+    analytics_enabled: boolean;
+  };
 }
 
 const emptyFormData: PlanFormData = {
@@ -42,7 +49,81 @@ const emptyFormData: PlanFormData = {
   price: '',
   durationMonths: '',
   features: [''],
+  entitlements: {
+    provider_count_limit: '0',
+    api_rate_limit_tier: '0',
+    notification_fallback_quota: '0',
+    analytics_enabled: false,
+  },
 };
+
+const ENTITLEMENT_KEYS = new Set([
+  'provider_count_limit',
+  'api_rate_limit_tier',
+  'notification_fallback_quota',
+  'analytics_enabled',
+]);
+
+function splitPlanFeatures(features: string[] | undefined) {
+  const entitlements = {
+    provider_count_limit: '0',
+    api_rate_limit_tier: '0',
+    notification_fallback_quota: '0',
+    analytics_enabled: false,
+  };
+
+  const other: string[] = [];
+  for (const raw of features ?? []) {
+    if (typeof raw !== 'string') continue;
+    const idx = raw.indexOf('=');
+    if (idx <= 0) {
+      other.push(raw);
+      continue;
+    }
+    const key = raw.slice(0, idx).trim();
+    const value = raw.slice(idx + 1).trim();
+    if (!ENTITLEMENT_KEYS.has(key)) {
+      other.push(raw);
+      continue;
+    }
+
+    switch (key) {
+      case 'provider_count_limit':
+      case 'api_rate_limit_tier':
+      case 'notification_fallback_quota':
+        entitlements[key] = value;
+        break;
+      case 'analytics_enabled':
+        entitlements.analytics_enabled =
+          value.toLowerCase() === 'true' ||
+          value === '1' ||
+          value.toLowerCase() === 'yes' ||
+          value.toLowerCase() === 'on';
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    entitlements,
+    features: other.length > 0 ? other : [''],
+  };
+}
+
+function buildPlanFeatures(
+  otherFeatures: string[],
+  entitlements: PlanFormData['entitlements']
+) {
+  const cleaned = (otherFeatures ?? []).filter(f => f.trim().length > 0);
+  return [
+    ...cleaned,
+    `provider_count_limit=${entitlements.provider_count_limit}`,
+    `api_rate_limit_tier=${entitlements.api_rate_limit_tier}`,
+    `notification_fallback_quota=${entitlements.notification_fallback_quota}`,
+    `analytics_enabled=${entitlements.analytics_enabled ? 'true' : 'false'}`,
+  ];
+}
 
 export default function PlansManagementPage() {
   const [showForm, setShowForm] = useState(false);
@@ -57,7 +138,7 @@ export default function PlansManagementPage() {
   const updatePlan = useUpdateSubscriptionPlan();
   const deletePlan = useDeleteSubscriptionPlan();
 
-  const plans = plansData?.data?.data ?? [];
+  const plans = plansData?.data?.plans ?? [];
 
   const formatAmount = (paisa: number) => {
     return `NPR ${(paisa / 100).toFixed(2)}`;
@@ -70,12 +151,14 @@ export default function PlansManagementPage() {
   };
 
   const handleOpenEdit = (plan: ISubscriptionPlan) => {
+    const parsed = splitPlanFeatures(plan.features);
     setEditingPlan(plan);
     setFormData({
       name: plan.name,
       price: (plan.price / 100).toString(),
       durationMonths: plan.durationMonths.toString(),
-      features: plan.features.length > 0 ? [...plan.features] : [''],
+      features: parsed.features,
+      entitlements: parsed.entitlements,
     });
     setShowForm(true);
   };
@@ -102,11 +185,40 @@ export default function PlansManagementPage() {
   };
 
   const handleSubmit = async () => {
+    const provider_count_limit = Number.parseInt(
+      formData.entitlements.provider_count_limit,
+      10
+    );
+    const api_rate_limit_tier = Number.parseInt(
+      formData.entitlements.api_rate_limit_tier,
+      10
+    );
+    const notification_fallback_quota = Number.parseInt(
+      formData.entitlements.notification_fallback_quota,
+      10
+    );
+
+    if (
+      !Number.isFinite(provider_count_limit) ||
+      !Number.isFinite(api_rate_limit_tier) ||
+      !Number.isFinite(notification_fallback_quota)
+    ) {
+      // Avoid sending malformed plan entitlements.
+      return;
+    }
+
     const payload = {
       name: formData.name,
       price: Math.round(parseFloat(formData.price) * 100),
       durationMonths: parseInt(formData.durationMonths),
-      features: formData.features.filter(f => f.trim() !== ''),
+      features: buildPlanFeatures(formData.features, {
+        provider_count_limit: String(Math.max(0, provider_count_limit)),
+        api_rate_limit_tier: String(Math.max(0, api_rate_limit_tier)),
+        notification_fallback_quota: String(
+          Math.max(0, notification_fallback_quota)
+        ),
+        analytics_enabled: formData.entitlements.analytics_enabled,
+      }),
     };
 
     try {
@@ -269,6 +381,10 @@ export default function PlansManagementPage() {
 
               <div className="space-y-2">
                 <Label>Features</Label>
+                <p className="text-muted-foreground text-xs">
+                  These are additional plan features (free-form). Entitlements
+                  are managed below and automatically stored on the plan.
+                </p>
                 {formData.features.map((feature, index) => (
                   <div key={index} className="flex gap-2">
                     <Input
@@ -291,6 +407,105 @@ export default function PlansManagementPage() {
                   <Plus className="mr-2 h-3 w-3" />
                   Add Feature
                 </Button>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border p-4">
+                <div>
+                  <Label>Entitlements</Label>
+                  <p className="text-muted-foreground text-xs">
+                    These entitlements are applied automatically when an
+                    organization purchases this plan. They can still be
+                    overridden manually from the organization view.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="entProviderCountLimit">
+                      Provider count limit
+                    </Label>
+                    <Input
+                      id="entProviderCountLimit"
+                      type="number"
+                      inputMode="numeric"
+                      value={formData.entitlements.provider_count_limit}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          entitlements: {
+                            ...prev.entitlements,
+                            provider_count_limit: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="entApiRateLimitTier">
+                      API rate limit tier (per 15m)
+                    </Label>
+                    <Input
+                      id="entApiRateLimitTier"
+                      type="number"
+                      inputMode="numeric"
+                      value={formData.entitlements.api_rate_limit_tier}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          entitlements: {
+                            ...prev.entitlements,
+                            api_rate_limit_tier: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="entNotificationFallbackQuota">
+                      Notification fallback quota
+                    </Label>
+                    <Input
+                      id="entNotificationFallbackQuota"
+                      type="number"
+                      inputMode="numeric"
+                      value={formData.entitlements.notification_fallback_quota}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          entitlements: {
+                            ...prev.entitlements,
+                            notification_fallback_quota: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="pt-7 flex items-center gap-2">
+                      <input
+                        id="entAnalyticsEnabled"
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={formData.entitlements.analytics_enabled}
+                        onChange={e =>
+                          setFormData(prev => ({
+                            ...prev,
+                            entitlements: {
+                              ...prev.entitlements,
+                              analytics_enabled: e.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      <Label htmlFor="entAnalyticsEnabled">
+                        Analytics enabled
+                      </Label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {(createPlan.isError ||

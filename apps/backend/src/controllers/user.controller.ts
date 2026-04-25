@@ -1,3 +1,5 @@
+import { type TUser, user } from '@repo/db/schemas';
+
 import { HttpStatusCode } from 'axios';
 import bcrypt from 'bcryptjs';
 import { eq, or, sql } from 'drizzle-orm';
@@ -13,7 +15,11 @@ import {
   phoneRegex,
 } from '@/constants';
 import db from '@/db';
-import { type TUser, user } from '@/models';
+import {
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from '@/services/failed-login-lockout.service';
 import { capitalizeFirstLetter } from '@/utils';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
@@ -23,6 +29,15 @@ import { generateJWT } from '@/utils/tokens/jwtTokens';
 
 const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const { phoneNumber, email, password, role, latitude, longitude } = req.body;
+
+  // Validate required fields first so tests (and mocks) don't hit bcrypt/db.
+  if (!req.body?.name || !email || !password || !phoneNumber) {
+    throw new ApiError(HttpStatusCode.BadRequest, 'Missing required fields');
+  }
+
+  if (typeof email !== 'string' || !email.includes('@')) {
+    throw new ApiError(HttpStatusCode.BadRequest, 'Invalid email format');
+  }
 
   if (role && role == UserRoles.ADMIN && !adminEmails.includes(email)) {
     throw new ApiError(
@@ -99,6 +114,21 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    throw new ApiError(
+      HttpStatusCode.BadRequest,
+      'Email and password are required'
+    );
+  }
+
+  if (typeof email !== 'string' || !email.includes('@')) {
+    throw new ApiError(HttpStatusCode.BadRequest, 'Invalid email format');
+  }
+
+  if (await isLoginLocked(email)) {
+    throw new ApiError(429, 'Too many failed login attempts. Try again later.');
+  }
+
   const existingUser = await db.query.user.findFirst({
     where: eq(user.email, email),
     columns: {
@@ -115,6 +145,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
+    await recordLoginFailure(email);
     throw new ApiError(400, 'User not found');
   }
 
@@ -122,8 +153,11 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!isPasswordValid) {
     console.log('Invalid credentials');
+    await recordLoginFailure(email);
     throw new ApiError(400, 'Invalid credentials');
   }
+
+  await clearLoginFailures(email);
 
   if (!existingUser.isVerified) {
     const otpToken = await sendOTP(existingUser.email);
@@ -185,6 +219,54 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     );
 });
 
+const resendUserVerificationOTP = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body as { email: string };
+
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.email, email),
+      columns: {
+        id: true,
+        email: true,
+        isVerified: true,
+      },
+    });
+
+    // Avoid leaking whether an email exists.
+    if (!existingUser) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'OTP sent if account exists', {}));
+    }
+
+    if (existingUser.isVerified) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'Account already verified', {}));
+    }
+
+    const otpToken = await sendOTP(existingUser.email);
+    if (!otpToken) {
+      throw new ApiError(500, 'Error sending OTP token. Please try again');
+    }
+
+    const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await db
+      .update(user)
+      .set({
+        verificationToken: otpToken,
+        tokenExpiry: tokenExpiry.toISOString(),
+      })
+      .where(eq(user.id, existingUser.id));
+
+    return res.status(200).json(
+      new ApiResponse(200, 'OTP sent to user for verification', {
+        userId: existingUser.id,
+      })
+    );
+  }
+);
+
 const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
@@ -211,6 +293,12 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
+  const updateData = req.body;
+  if (!updateData || Object.keys(updateData).length === 0) {
+    console.log('No data to update');
+    throw new ApiError(400, 'No data to update');
+  }
+
   const existingUser = await db.query.user.findFirst({
     where: eq(user.id, loggedInUser.id),
   });
@@ -219,13 +307,6 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
     console.log('Unauthorized');
     throw new ApiError(401, 'Unauthorized');
   }
-  const updateData = req.body;
-
-  if (Object.keys(updateData).length === 0) {
-    console.log('No data to update');
-    throw new ApiError(400, 'No data to update');
-  }
-
   const invalidKeys = Object.keys(updateData).filter(
     key => !Object.keys(user).includes(key)
   );
@@ -358,15 +439,6 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
   const tokenExpiry = new Date(tokenExpiryStr + 'Z');
   const currentTime = new Date();
 
-  console.log('Token expiry check:', {
-    storedValue: tokenExpiryStr,
-    tokenExpiry: tokenExpiry.toISOString(),
-    tokenExpiryTime: tokenExpiry.getTime(),
-    currentTime: currentTime.toISOString(),
-    currentTimeMs: currentTime.getTime(),
-    isExpired: currentTime.getTime() > tokenExpiry.getTime(),
-  });
-
   if (currentTime.getTime() > tokenExpiry.getTime()) {
     console.log('Verification token expired');
     throw new ApiError(400, 'Verification token expired');
@@ -418,6 +490,10 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
 
 const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   const { email, phoneNumber } = req.body;
+
+  if (!email && !phoneNumber) {
+    throw new ApiError(400, 'Please provide email or phone number');
+  }
 
   const existingUser = await db.query.user.findFirst({
     where: or(eq(user.email, email), eq(user.phoneNumber, phoneNumber)),
@@ -539,6 +615,14 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
 
   const { oldPassword, newPassword } = req.body;
 
+  if (!oldPassword) {
+    throw new ApiError(400, 'Old password is required');
+  }
+
+  if (!newPassword) {
+    throw new ApiError(400, 'New password is required');
+  }
+
   const existingUser = await db.query.user.findFirst({
     where: eq(user.id, loggedInUser.id),
     columns: {
@@ -638,7 +722,15 @@ export const updateEmergencySettings = asyncHandler(
       updateData.notifyEmergencyContacts = notifyEmergencyContacts;
     }
     if (emergencyNotificationMethod) {
+      const valid = ['sms', 'push', 'both'];
+      if (!valid.includes(emergencyNotificationMethod)) {
+        throw new ApiError(400, 'Invalid notification method');
+      }
       updateData.emergencyNotificationMethod = emergencyNotificationMethod;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new ApiError(400, 'No valid settings to update');
     }
 
     const updatedUser = await db
@@ -702,9 +794,29 @@ export const getEmergencySettings = asyncHandler(
   }
 );
 
+const userController = {
+  registerUser,
+  loginUser,
+  resendUserVerificationOTP,
+  logoutUser,
+  updateUser,
+  getUser,
+  verifyUser,
+  getProfile,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  updatePushToken,
+  updateEmergencySettings,
+  getEmergencySettings,
+} as const;
+
+export default userController;
+
 export {
   registerUser,
   loginUser,
+  resendUserVerificationOTP,
   logoutUser,
   updateUser,
   getUser,

@@ -48,7 +48,7 @@ export const orgRegisterFormSchema = z
   });
 
 export const orgVerifySchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
+  organizationId: z.string().min(1, 'Organization ID is required'),
   otpToken: z.string().length(6, 'OTP must be 6 digits'),
 });
 

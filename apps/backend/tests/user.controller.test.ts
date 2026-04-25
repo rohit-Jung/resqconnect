@@ -15,8 +15,7 @@ import {
   updatePushToken,
   updateUser,
   verifyUser,
-} from '@/controllers/auth.controller';
-
+} from '../src/controllers/user.controller.ts';
 import {
   createMockNext,
   createMockRequest,

@@ -1,18 +1,19 @@
 'use client';
 
-import { Loader2, Lock, Save } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
-import { Button } from '@/components/ui/button';
+import { Button } from '@repo/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@repo/ui/card';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
+
+import { Loader2, Lock, Save } from 'lucide-react';
+import { useState } from 'react';
+
 import {
   useAdminProfile,
   useAdminUpdateProfile,
@@ -22,24 +23,16 @@ export default function SettingsPage() {
   const { data: profileData, isLoading } = useAdminProfile();
   const updateProfileMutation = useAdminUpdateProfile();
 
-  const profile = profileData?.data?.data?.user;
+  const profile = profileData?.data?.admin;
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(profile?.email ?? '');
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  useEffect(() => {
-    if (profile) {
-      setName(profile.name || '');
-      setEmail(profile.email || '');
-    }
-  }, [profile]);
 
   const handleSave = async () => {
     setSaveSuccess(false);
     try {
       await updateProfileMutation.mutateAsync({
-        name: name !== profile?.name ? name : undefined,
+        name: undefined,
         email: email !== profile?.email ? email : undefined,
       });
       setSaveSuccess(true);
@@ -49,8 +42,7 @@ export default function SettingsPage() {
     }
   };
 
-  const hasChanges =
-    name !== (profile?.name || '') || email !== (profile?.email || '');
+  const hasChanges = email !== (profile?.email || '');
 
   if (isLoading) {
     return (
@@ -101,9 +93,15 @@ export default function SettingsPage() {
                 <Input
                   id="adminName"
                   placeholder="Enter your name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  value=""
+                  onChange={() => {
+                    // disabled
+                  }}
+                  disabled
                 />
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Name editing is not implemented in the control plane yet.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adminEmail">Email</Label>
@@ -180,12 +178,10 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                asChild
+                disabled
               >
-                <a href="/change-password">
-                  <Lock className="mr-2 h-4 w-4" />
-                  Change Password
-                </a>
+                <Lock className="mr-2 h-4 w-4" />
+                Change Password (not implemented)
               </Button>
             </CardContent>
           </Card>

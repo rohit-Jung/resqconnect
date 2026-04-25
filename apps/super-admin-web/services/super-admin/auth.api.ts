@@ -4,16 +4,10 @@ import { AxiosError, AxiosResponse } from 'axios';
 
 import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
 import type {
-  ApiResponse,
-  IAdminLoginResponse,
-  IAdminProfileResponse,
-  IAdminVerifyResponse,
-  IOtpResponse,
-} from '@/types/auth.types';
-import {
-  TSuperAdminLogin,
-  TSuperAdminVerify,
-} from '@/validations/super-admin.schema';
+  CpLoginResponse,
+  CpMeResponse,
+} from '@/types/control-plane.types';
+import type { TSuperAdminLogin } from '@/validations/super-admin.schema';
 
 import api from '../axiosInstance';
 import { authEndpoints } from '../endPoints';
@@ -23,37 +17,24 @@ import { authEndpoints } from '../endPoints';
 // Returns either IAdminLoginResponse (if verified) or IOtpResponse (if needs verification)
 export const useSuperAdminLogin = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<IAdminLoginResponse | IOtpResponse>>,
+    AxiosResponse<CpLoginResponse>,
     AxiosError,
     TSuperAdminLogin
   >({
     mutationFn: loginData => {
-      return api.post(authEndpoints.login, loginData);
+      return api.post(authEndpoints.login, {
+        email: loginData.email,
+        password: loginData.password,
+      });
     },
   });
 };
 
-// Verify mutation - uses /user/verify endpoint
-export const useSuperAdminVerify = () => {
-  return useMutation<
-    AxiosResponse<ApiResponse<IAdminVerifyResponse>>,
-    AxiosError,
-    TSuperAdminVerify
-  >({
-    mutationFn: verifyData => {
-      return api.post(authEndpoints.verify, verifyData);
-    },
-  });
-};
-
-// Profile query - uses /user/profile endpoint
+// Me query - uses /auth/me endpoint
 export const useSuperAdminProfile = (enabled: boolean = true) => {
-  return useQuery<
-    AxiosResponse<ApiResponse<IAdminProfileResponse>>,
-    AxiosError
-  >({
+  return useQuery<AxiosResponse<CpMeResponse>, AxiosError>({
     queryKey: ['adminProfile'],
-    queryFn: () => api.get(authEndpoints.profile),
+    queryFn: () => api.get(authEndpoints.me),
     enabled,
     retry: false,
   });
@@ -68,8 +49,9 @@ export const useAdminProfile = (options: { enabled?: boolean } = {}) => {
 export const useAdminLogout = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<AxiosResponse, AxiosError>({
-    mutationFn: () => api.get(authEndpoints.logout),
+  return useMutation<AxiosResponse<{ ok: true }>, AxiosError>({
+    mutationFn: async () =>
+      ({ data: { ok: true } }) as AxiosResponse<{ ok: true }>,
     onSuccess: () => {
       removeTokenFromStorage('adminToken');
       queryClient.clear();
@@ -82,12 +64,12 @@ export const useAdminUpdateProfile = () => {
   const queryClient = useQueryClient();
 
   return useMutation<
-    AxiosResponse<ApiResponse<{ user: IAdminProfileResponse }>>,
+    AxiosResponse,
     AxiosError,
     { name?: string; email?: string }
   >({
-    mutationFn: data => {
-      return api.put('/user/update', data);
+    mutationFn: async () => {
+      throw new Error('Not implemented');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });

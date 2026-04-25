@@ -1,17 +1,18 @@
+import { feedback } from '@repo/db/schemas';
+
 import { eq } from 'drizzle-orm';
 import type { NextFunction, Request, Response } from 'express';
 
 import db from '@/db';
-import { feedback } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
 const createFeedback = asyncHandler(async (req: Request, res: Response) => {
   const { serviceProviderId, message, serviceRatings } = req.body;
-  const { id } = req.user;
+  const userId = req.user?.id;
 
-  if (!id) {
+  if (!userId) {
     throw new ApiError(401, 'Unauthorized to perform this action');
   }
 
@@ -22,7 +23,7 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
   const createdFeedback = await db
     .insert(feedback)
     .values({
-      userId: id,
+      userId,
       serviceProviderId,
       message,
       serviceRatings,
@@ -51,7 +52,7 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
 const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const { id: userId } = req.user;
+  const userId = req.user?.id;
 
   if (!userId) {
     throw new ApiError(401, 'Unauthorized to perform this action');
@@ -105,7 +106,8 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
 
 const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { id: userId, role } = req.user;
+  const userId = req.user?.id;
+  const role = req.user?.role;
 
   if (!userId) {
     throw new ApiError(401, 'Unauthorized to perform this action');
@@ -168,6 +170,16 @@ const getUsersFeedback = asyncHandler(async (req: Request, res: Response) => {
 
   res.status(200).json(new ApiResponse(200, 'Feedbacks found', feedbacks));
 });
+
+const feedbackController = {
+  createFeedback,
+  updateFeedback,
+  deleteFeedback,
+  getFeedback,
+  getUsersFeedback,
+} as const;
+
+export default feedbackController;
 
 export {
   createFeedback,

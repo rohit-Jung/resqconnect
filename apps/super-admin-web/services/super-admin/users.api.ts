@@ -5,7 +5,6 @@ import { AxiosError, AxiosResponse } from 'axios';
 import type { ApiResponse, IUser } from '@/types/auth.types';
 
 import api from '../axiosInstance';
-import { userEndpoints } from '../endPoints';
 
 // Query keys for cache management
 export const userKeys = {
@@ -17,10 +16,15 @@ export const userKeys = {
 
 // Get user by ID
 export const useGetUserById = (id: string, enabled: boolean = true) => {
+  void api;
+  void enabled;
   return useQuery<AxiosResponse<ApiResponse<IUser>>, AxiosError>({
     queryKey: userKeys.detail(id),
-    queryFn: () => api.get(userEndpoints.getById(id)),
-    enabled: enabled && !!id,
+    queryFn: async () => {
+      // Control plane does not replicate per-user details yet.
+      throw new Error('Not implemented');
+    },
+    enabled: false,
   });
 };
 

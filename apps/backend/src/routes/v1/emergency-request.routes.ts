@@ -1,23 +1,11 @@
+import { emergencyRequestValidations } from '@repo/types/validations';
+import { routeParamsValidations } from '@repo/types/validations';
+
 import { Router } from 'express';
 
-import { UserRoles } from '@/constants/enums.constants';
 import { emergencyLimiter } from '@/config/rate-limit.config';
-import {
-  acceptEmergencyRequest,
-  cancelEmergencyRequest,
-  completeEmergencyRequest,
-  confirmProviderArrival,
-  createEmergencyRequest,
-  deleteEmergencyRequest,
-  getEmergencyRequest,
-  getProviderEmergencyHistory,
-  getRecentEmergencyRequests,
-  getUserEmergencyHistory,
-  getUsersEmergencyRequests,
-  providerConfirmedArrival,
-  rejectEmergencyRequest,
-  updateEmergencyRequest,
-} from '@/controllers/emergency-request.controller';
+import { UserRoles } from '@/constants/enums.constants';
+import emergencyRequestController from '@/controllers/emergency-request.controller';
 import {
   requireAuthenticatedUser,
   validateQueryParams,
@@ -25,8 +13,6 @@ import {
   validateRoleAuth,
   validateServiceProvider,
 } from '@/middlewares/auth.middleware';
-import { CreateNewRequestSchema } from '@/validations/emergency-request';
-import { getHistoryQuerySchema } from '@/validations/route-params.validations';
 
 const emergencyRequestRouter = Router();
 
@@ -35,77 +21,80 @@ emergencyRequestRouter
   .get(
     validateRoleAuth([UserRoles.USER]),
     requireAuthenticatedUser,
-    getUsersEmergencyRequests
+    emergencyRequestController.getUsersEmergencyRequests
   )
   .post(
     emergencyLimiter,
     validateRoleAuth([UserRoles.USER]),
-    validateRequestBody(CreateNewRequestSchema),
+    validateRequestBody(emergencyRequestValidations.CreateNewRequestSchema),
     requireAuthenticatedUser,
-    createEmergencyRequest
+    emergencyRequestController.createEmergencyRequest
   );
 
 emergencyRequestRouter.get(
   '/recent',
   validateRoleAuth([UserRoles.USER]),
-  getRecentEmergencyRequests
+  emergencyRequestController.getRecentEmergencyRequests
 );
 
 emergencyRequestRouter.patch(
   '/:id/cancel',
   validateRoleAuth([UserRoles.USER]),
-  cancelEmergencyRequest
+  emergencyRequestController.cancelEmergencyRequest
 );
 
 emergencyRequestRouter.patch(
   '/:id/confirm-arrival',
   validateRoleAuth([UserRoles.USER]),
-  confirmProviderArrival
+  emergencyRequestController.confirmProviderArrival
 );
 
 emergencyRequestRouter.patch(
   '/:id/confirm-arrived',
   validateServiceProvider,
-  providerConfirmedArrival
+  emergencyRequestController.providerConfirmedArrival
 );
 
 emergencyRequestRouter.patch(
   '/:id/accept',
   validateServiceProvider,
-  acceptEmergencyRequest
+  emergencyRequestController.acceptEmergencyRequest
 );
 
 emergencyRequestRouter.patch(
   '/:id/reject',
   validateServiceProvider,
-  rejectEmergencyRequest
+  emergencyRequestController.rejectEmergencyRequest
 );
 
 emergencyRequestRouter.patch(
   '/:id/complete',
   validateServiceProvider,
-  completeEmergencyRequest
+  emergencyRequestController.completeEmergencyRequest
 );
 
 emergencyRequestRouter.get(
   '/user/history',
   validateRoleAuth([UserRoles.USER]),
-  validateQueryParams(getHistoryQuerySchema),
+  validateQueryParams(routeParamsValidations.getHistoryQuerySchema),
   requireAuthenticatedUser,
-  getUserEmergencyHistory
+  emergencyRequestController.getUserEmergencyHistory
 );
 
 emergencyRequestRouter.get(
   '/provider/history',
   validateServiceProvider,
-  validateQueryParams(getHistoryQuerySchema),
-  getProviderEmergencyHistory
+  validateQueryParams(routeParamsValidations.getHistoryQuerySchema),
+  emergencyRequestController.getProviderEmergencyHistory
 );
 
 emergencyRequestRouter
   .route('/:id')
-  .get(getEmergencyRequest)
-  .put(updateEmergencyRequest)
-  .delete(validateRoleAuth([UserRoles.ADMIN]), deleteEmergencyRequest);
+  .get(emergencyRequestController.getEmergencyRequest)
+  .put(emergencyRequestController.updateEmergencyRequest)
+  .delete(
+    validateRoleAuth([UserRoles.ADMIN]),
+    emergencyRequestController.deleteEmergencyRequest
+  );
 
 export default emergencyRequestRouter;

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-import { envConfig } from '@/config/env.config';
+import { envConfig } from '@/config';
 
-const MAPS_ACCESS_TOKEN = envConfig.galli_maps_token;
+const MAPS_ACCESS_TOKEN = envConfig.mapbox_access_token;
 const BASE_API = `https://route-init.gallimap.com/api/v1`;
 
 interface IAutoCompleteProps {

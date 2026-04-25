@@ -1,9 +1,10 @@
+import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/avatar';
+import { Button } from '@repo/ui/button';
+
 import { Play, Star } from 'lucide-react';
 import Image from 'next/image';
 
 import DeviceMockup from '@/assets/images/mobile-cta.png';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 
 export function Hero() {
   return (

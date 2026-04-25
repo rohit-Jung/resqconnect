@@ -1,6 +1,16 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@repo/ui/select';
 
 import {
   Ambulance,
@@ -18,11 +28,9 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
+import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   type ICreateOrganizationPayload,
   useCreateOrganization,
@@ -46,8 +54,8 @@ const SERVICE_CATEGORIES: {
     description: 'Emergency medical transport services',
   },
   {
-    value: 'fire_brigade',
-    label: 'Fire Brigade',
+    value: 'fire_truck',
+    label: 'Fire Truck',
     icon: <Flame className="h-6 w-6" />,
     description: 'Fire fighting and rescue services',
   },
@@ -57,7 +65,22 @@ const SERVICE_CATEGORIES: {
     icon: <Shield className="h-6 w-6" />,
     description: 'Law enforcement and security',
   },
+  {
+    value: 'rescue_team',
+    label: 'Rescue Team',
+    icon: <Shield className="h-6 w-6" />,
+    description: 'Search and rescue operations',
+  },
 ];
+
+const SECTOR_OPTIONS = [
+  { value: 'hospital', label: 'Hospital' },
+  { value: 'police', label: 'Police' },
+  { value: 'fire', label: 'Fire' },
+] as const satisfies ReadonlyArray<{
+  value: TCreateOrganization['sector'];
+  label: string;
+}>;
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -72,25 +95,30 @@ export default function NewOrganizationPage() {
     handleSubmit,
     formState: { errors },
     setValue,
+    control,
   } = useForm<TCreateOrganization>({
     resolver: zodResolver(createOrganizationSchema),
     mode: 'onBlur',
   });
 
+  const selectedSector = useWatch({ control, name: 'sector' });
+
   const onSubmit = async (data: TCreateOrganization) => {
     try {
       // Convert form data to API format, excluding confirmPassword
       const { confirmPassword, ...formData } = data;
+      void confirmPassword;
       const apiData = {
         ...formData,
         generalNumber: parseInt(data.generalNumber, 10),
       } as ICreateOrganizationPayload;
       createMutation.mutate(apiData, {
         onSuccess: () => {
+          toast.success('Organization created');
           router.push('/dashboard/organizations');
         },
         onError(error) {
-          alert('Failed to create organization');
+          toast.error('Failed to create organization');
           console.error('Error: ', error);
         },
       });
@@ -191,6 +219,77 @@ export default function NewOrganizationPage() {
               Organization Information
             </h2>
             <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sector" className="text-foreground">
+                    Sector
+                  </Label>
+                  <Select
+                    value={selectedSector}
+                    onValueChange={value =>
+                      setValue(
+                        'sector',
+                        value as TCreateOrganization['sector'],
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="sector"
+                      className={`w-full border-border focus-visible:border-primary ${
+                        errors.sector
+                          ? 'border-primary ring-1 ring-primary'
+                          : ''
+                      }`}
+                      aria-invalid={!!errors.sector}
+                    >
+                      <SelectValue placeholder="Select sector" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SECTOR_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <input type="hidden" {...register('sector')} />
+                  {errors.sector && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.sector.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="siloBaseUrl" className="text-foreground">
+                    Silo Backend Base URL
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Base URL of the silo backend (not the frontend). Example:
+                    https://silo.example.com
+                  </p>
+                  <Input
+                    id="siloBaseUrl"
+                    placeholder="http://localhost:4000"
+                    className={`border-border focus:border-primary ${
+                      errors.siloBaseUrl
+                        ? 'border-primary ring-1 ring-primary'
+                        : ''
+                    }`}
+                    aria-invalid={!!errors.siloBaseUrl}
+                    {...register('siloBaseUrl')}
+                  />
+                  {errors.siloBaseUrl && (
+                    <p className="text-primary text-sm font-medium">
+                      {errors.siloBaseUrl.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-foreground">

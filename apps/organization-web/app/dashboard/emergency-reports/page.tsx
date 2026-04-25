@@ -1,5 +1,7 @@
 'use client';
 
+import { Skeleton } from '@repo/ui/skeleton';
+
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertTriangle,
@@ -14,8 +16,6 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import {
   IRecentEmergencyRequest,
@@ -67,7 +67,10 @@ export default function EmergencyReportsPage() {
     { label: 'PENDING', value: analytics?.emergencyRequests.pending ?? 0 },
   ];
 
-  const allReports = analytics?.emergencyRequests.recent ?? [];
+  const allReports = useMemo(
+    () => analytics?.emergencyRequests.recent ?? [],
+    [analytics?.emergencyRequests.recent]
+  );
 
   // Filter reports based on selected status
   const reports = useMemo(() => {
@@ -110,7 +113,7 @@ export default function EmergencyReportsPage() {
     },
     {
       value: 'no_providers_available',
-      label: 'No Providers',
+      label: 'No Responders',
       color: 'bg-orange-100 dark:bg-orange-950',
     },
   ];
@@ -156,7 +159,7 @@ export default function EmergencyReportsPage() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-4">
-            {stats.map((stat, idx) => (
+            {stats.map(stat => (
               <div
                 key={stat.label}
                 className="border-l-2 border-foreground dark:border-foreground pl-4"
@@ -283,7 +286,7 @@ export default function EmergencyReportsPage() {
                     </div>
                   )}
 
-                  {/* Requester and Provider Info */}
+                  {/* Requester and Responder Info */}
                   <div className="grid grid-cols-2 gap-3 mb-4 pb-4 border-b border-foreground dark:border-foreground border-opacity-10 dark:border-opacity-10">
                     {/* Requester */}
                     {report.requester && (
@@ -304,12 +307,12 @@ export default function EmergencyReportsPage() {
                       </div>
                     )}
 
-                    {/* Provider */}
+                    {/* Responder */}
                     {report.provider && (
                       <div>
                         <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground dark:text-muted-foreground mb-1 flex items-center gap-1">
                           <CheckCircle className="h-3 w-3" />
-                          Provider
+                          Responder
                         </div>
                         <div className="text-xs font-medium text-foreground dark:text-foreground mb-1">
                           {report.provider.name}

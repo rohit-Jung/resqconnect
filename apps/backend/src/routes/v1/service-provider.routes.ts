@@ -1,108 +1,147 @@
-import { Router } from 'express';
+import {
+  loginServiceProviderSchema,
+  uploadDocumentsSchema,
+} from '@repo/db/schemas';
+import { serviceProviderValidations } from '@repo/types/validations';
 
-import { uploadDocuments } from '@/config/cloudinary.config';
+import { Router } from 'express';
+import { z } from 'zod';
+
 import {
   authLimiter,
   otpLimiter,
   passwordResetLimiter,
 } from '@/config/rate-limit.config';
-import {
-  changeProviderPassword,
-  deleteServiceProvider,
-  forgotServiceProviderPassword,
-  getDocumentStatus,
-  getNearbyProviders,
-  getServiceProvider,
-  getServiceProviderProfile,
-  loginServiceProvider,
-  logoutServiceProvider,
-  registerServiceProvider,
-  resetServiceProviderPassword,
-  updateServiceProvider,
-  updateServiceProviderLocation,
-  updateServiceProviderStatus,
-  uploadVerificationDocuments,
-  verifyServiceProvider,
-} from '@/controllers/service-provider.controller';
+import serviceProviderController from '@/controllers/service-provider.controller';
 import {
   validateRequestBody,
   validateServiceProvider,
 } from '@/middlewares/auth.middleware';
-import { loginServiceProviderSchema } from '@/models';
-import {
-  updateServiceProviderSchema,
-  updateServiceProviderLocationSchema,
-  updateServiceProviderStatusSchema,
-  forgotServiceProviderPasswordSchema,
-  resetServiceProviderPasswordSchema,
-  changeProviderPasswordSchema,
-  verifyServiceProviderSchema,
-} from '@/validations/service-provider.validations';
+import { requireActiveProviderOrganization } from '@/middlewares/org-status.guard';
 
 const serviceProviderRouter = Router();
 
-// Public routes
-serviceProviderRouter.post('/register', authLimiter, registerServiceProvider);
+serviceProviderRouter.post(
+  '/register',
+  authLimiter,
+  serviceProviderController.registerServiceProvider
+);
 serviceProviderRouter.post(
   '/login',
   authLimiter,
   validateRequestBody(loginServiceProviderSchema),
-  loginServiceProvider
+  serviceProviderController.loginServiceProvider
 );
 serviceProviderRouter.post(
   '/verify',
   otpLimiter,
-  validateRequestBody(verifyServiceProviderSchema),
-  verifyServiceProvider
+  validateRequestBody(serviceProviderValidations.verifyServiceProviderSchema),
+  serviceProviderController.verifyServiceProvider
+);
+
+serviceProviderRouter.post(
+  '/resend-otp',
+  otpLimiter,
+  validateRequestBody(
+    serviceProviderValidations.resendServiceProviderVerificationOTPSchema
+  ),
+  serviceProviderController.resendServiceProviderVerificationOTP
 );
 serviceProviderRouter.post(
   '/forgot-password',
   passwordResetLimiter,
-  validateRequestBody(forgotServiceProviderPasswordSchema),
-  forgotServiceProviderPassword
+  validateRequestBody(
+    serviceProviderValidations.forgotServiceProviderPasswordSchema
+  ),
+  serviceProviderController.forgotServiceProviderPassword
 );
 serviceProviderRouter.post(
   '/reset-password',
   passwordResetLimiter,
-  validateRequestBody(resetServiceProviderPasswordSchema),
-  resetServiceProviderPassword
+  validateRequestBody(
+    serviceProviderValidations.resetServiceProviderPasswordSchema
+  ),
+  serviceProviderController.resetServiceProviderPassword
 );
-serviceProviderRouter.get('/nearby', getNearbyProviders);
+serviceProviderRouter.get(
+  '/nearby',
+  serviceProviderController.getNearbyProviders
+);
 
-// Protected routes
+// protected routes
 serviceProviderRouter.use(validateServiceProvider);
-serviceProviderRouter.post('/logout', logoutServiceProvider);
-serviceProviderRouter.get('/profile', getServiceProviderProfile);
+serviceProviderRouter.use(requireActiveProviderOrganization);
+serviceProviderRouter.post(
+  '/logout',
+  serviceProviderController.logoutServiceProvider
+);
+serviceProviderRouter.get(
+  '/profile',
+  serviceProviderController.getServiceProviderProfile
+);
+
+// profile picture (direct-to-Cloudinary signed upload)
+serviceProviderRouter.get(
+  '/profile-picture/signature',
+  serviceProviderController.getProfilePictureUploadSignature
+);
+serviceProviderRouter.put(
+  '/profile-picture',
+  validateRequestBody(
+    z.object({
+      profilePictureUrl: z.string().url('Must be url'),
+    })
+  ),
+  serviceProviderController.updateProfilePicture
+);
+serviceProviderRouter.delete(
+  '/profile-picture',
+  serviceProviderController.deleteProfilePicture
+);
 serviceProviderRouter.patch(
   '/update',
-  validateRequestBody(updateServiceProviderSchema),
-  updateServiceProvider
+  validateRequestBody(serviceProviderValidations.updateServiceProviderSchema),
+  serviceProviderController.updateServiceProvider
 );
 serviceProviderRouter.patch(
   '/update-location',
-  validateRequestBody(updateServiceProviderLocationSchema),
-  updateServiceProviderLocation
+  validateRequestBody(
+    serviceProviderValidations.updateServiceProviderLocationSchema
+  ),
+  serviceProviderController.updateServiceProviderLocation
 );
-serviceProviderRouter.delete('/delete', deleteServiceProvider);
+serviceProviderRouter.delete(
+  '/delete',
+  serviceProviderController.deleteServiceProvider
+);
 serviceProviderRouter.post(
   '/change-password',
-  validateRequestBody(changeProviderPasswordSchema),
-  changeProviderPassword
+  validateRequestBody(serviceProviderValidations.changeProviderPasswordSchema),
+  serviceProviderController.changeProviderPassword
 );
 
-// Document verification routes (provider uploads documents)
+// document verification routes (provider uploads documents)
 serviceProviderRouter.post(
   '/documents',
-  uploadDocuments,
-  uploadVerificationDocuments
+  validateRequestBody(uploadDocumentsSchema),
+  serviceProviderController.uploadVerificationDocuments
 );
-serviceProviderRouter.get('/documents/status', getDocumentStatus);
+serviceProviderRouter.get(
+  '/documents/signatures',
+  serviceProviderController.getDocumentUploadSignatures
+);
+serviceProviderRouter.get(
+  '/documents/status',
+  serviceProviderController.getDocumentStatus
+);
 
-serviceProviderRouter.get('/:id', getServiceProvider);
+serviceProviderRouter.get('/:id', serviceProviderController.getServiceProvider);
 serviceProviderRouter.patch(
   '/status',
-  validateRequestBody(updateServiceProviderStatusSchema),
-  updateServiceProviderStatus
+  validateRequestBody(
+    serviceProviderValidations.updateServiceProviderStatusSchema
+  ),
+  serviceProviderController.updateServiceProviderStatus
 );
 
 export default serviceProviderRouter;

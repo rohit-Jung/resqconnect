@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import z from 'zod';
 
 import { logger } from '@/config';
 import { ServiceTypeEnum } from '@/constants';
@@ -34,12 +34,12 @@ const EMERGENCY_TYPE_MAP: Record<string, ServiceTypeEnum> = {
 };
 
 const parsedSMSSchema = z.object({
-  emergencyType: z.nativeEnum(ServiceTypeEnum),
+  emergencyType: z.enum(ServiceTypeEnum),
   location: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
-  userId: z.string().uuid().optional(),
+  userId: z.uuidv4().optional(),
   userName: z.string().optional(),
   userPhone: z.string().optional(),
   description: z.string().optional(),

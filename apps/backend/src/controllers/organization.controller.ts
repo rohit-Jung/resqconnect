@@ -1,3 +1,13 @@
+import {
+  type TOrganization,
+  emergencyRequest,
+  emergencyResponse,
+  organization,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
+import { registerOrganizationSchema } from '@repo/types/validations';
+
 import bcrypt from 'bcryptjs';
 import { and, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -6,13 +16,10 @@ import { latLngToCell } from 'h3-js';
 import { H3_RESOLUTION } from '@/constants';
 import db from '@/db';
 import {
-  type TOrganization,
-  emergencyRequest,
-  emergencyResponse,
-  organization,
-  serviceProvider,
-  user,
-} from '@/models';
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from '@/services/failed-login-lockout.service';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -21,7 +28,27 @@ import { generateJWT } from '@/utils/tokens/jwtTokens';
 
 const registerOrganization = asyncHandler(
   async (req: Request, res: Response) => {
-    const { name, email, serviceCategory, generalNumber, password } = req.body;
+    const parsed = registerOrganizationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new ApiError(
+        400,
+        'Validation error',
+        parsed.error.issues.map(i => i.message)
+      );
+    }
+
+    // Check if the user is a super admin
+    const loggedInUser = req.user;
+
+    if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
+      throw new ApiError(
+        401,
+        'Unauthorized: Only super admins can register organizations'
+      );
+    }
+
+    const { name, email, serviceCategory, generalNumber, password } =
+      parsed.data;
 
     const existingOrganization = await db.query.organization.findFirst({
       where: and(
@@ -43,6 +70,7 @@ const registerOrganization = asyncHandler(
         serviceCategory,
         generalNumber,
         password: hashedPassword,
+        lifecycleStatus: 'pending_approval',
       })
       .returning({
         id: organization.id,
@@ -87,9 +115,12 @@ const getOrganizationById = asyncHandler(
       throw new ApiError(401, 'Unauthorized to perform this action');
     }
 
-    const organizationId = req.params.id;
+    const rawOrganizationId = (req.params as any)?.id as unknown;
+    const organizationId = Array.isArray(rawOrganizationId)
+      ? rawOrganizationId[0]
+      : rawOrganizationId;
 
-    if (!organizationId) {
+    if (!organizationId || typeof organizationId !== 'string') {
       throw new ApiError(401, 'Organiztion Id required in params');
     }
 
@@ -120,9 +151,12 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized to perform this action');
   }
 
-  const organizationId = req.params.id;
+  const rawOrganizationId = (req.params as any)?.id as unknown;
+  const organizationId = Array.isArray(rawOrganizationId)
+    ? rawOrganizationId[0]
+    : rawOrganizationId;
 
-  if (!organizationId) {
+  if (!organizationId || typeof organizationId !== 'string') {
     throw new ApiError(401, 'Organiztion Id required in params');
   }
 
@@ -162,9 +196,12 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized to perform this action');
   }
 
-  const organizationId = req.params.id;
+  const rawOrganizationId = (req.params as any)?.id as unknown;
+  const organizationId = Array.isArray(rawOrganizationId)
+    ? rawOrganizationId[0]
+    : rawOrganizationId;
 
-  if (!organizationId) {
+  if (!organizationId || typeof organizationId !== 'string') {
     throw new ApiError(401, 'Organiztion Id required in params');
   }
 
@@ -217,7 +254,16 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
 
 const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  
+
+  if (typeof email === 'string' && email.includes('@')) {
+    if (await isLoginLocked(email)) {
+      throw new ApiError(
+        429,
+        'Too many failed login attempts. Try again later.'
+      );
+    }
+  }
+
   const existingOrg = await db.query.organization.findFirst({
     where: eq(organization.email, email),
     columns: {
@@ -226,11 +272,13 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
       email: true,
       password: true,
       isVerified: true,
+      lifecycleStatus: true,
     },
   });
 
   if (!existingOrg) {
     console.log('User not found');
+    if (typeof email === 'string') await recordLoginFailure(email);
     throw new ApiError(400, 'User not found');
   }
 
@@ -238,8 +286,11 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
 
   if (!isPasswordValid) {
     console.log('Invalid credentials');
+    if (typeof email === 'string') await recordLoginFailure(email);
     throw new ApiError(400, 'Invalid credentials');
   }
+
+  if (typeof email === 'string') await clearLoginFailures(email);
 
   if (!existingOrg.isVerified) {
     const otpToken = await sendOTP(existingOrg.email);
@@ -277,11 +328,48 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const token = generateJWT(existingOrg);
+  const isRestricted = existingOrg.lifecycleStatus !== 'active';
+  // Ensure JWT role is set to 'organization' (generateJWT relies on `kind`).
+  const token = generateJWT(
+    { ...existingOrg, kind: 'organization' },
+    {
+      restricted: isRestricted,
+      orgStatus: existingOrg.lifecycleStatus,
+    }
+  );
+
+  let warnings: string[] = [];
+  if (isRestricted) {
+    // Friendly, status-specific message for the frontend.
+    switch (existingOrg.lifecycleStatus) {
+      case 'pending_approval':
+        warnings = [
+          'Your organization is pending approval. Access is restricted until approval is granted.',
+        ];
+        break;
+      case 'suspended':
+        warnings = [
+          'Your organization is suspended. Please contact support or check billing to restore access.',
+        ];
+        break;
+      case 'trial_expired':
+        warnings = [
+          'Your trial has expired. Please subscribe to restore full access.',
+        ];
+        break;
+      default:
+        warnings = [
+          `Organization status is '${existingOrg.lifecycleStatus}'. Access is restricted until status becomes 'active'.`,
+        ];
+    }
+  }
   const loggedInOrg: Partial<TOrganization> = JSON.parse(
     JSON.stringify(existingOrg)
   );
   delete loggedInOrg.password;
+
+  // Avoid leaking internal lifecycle status under the legacy `user` object.
+  delete (loggedInOrg as any).lifecycleStatus;
 
   res
     .status(200)
@@ -290,6 +378,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
       new ApiResponse(200, `Organization logged in successfully.`, {
         user: loggedInOrg,
         token,
+        warnings,
       })
     );
 });
@@ -319,10 +408,11 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const tokenExpiry = new Date(existingUser.tokenExpiry);
-  const currentTime = new Date(Date.now()).toISOString();
+  const tokenExpiryStr = existingUser.tokenExpiry;
+  const tokenExpiry = new Date(tokenExpiryStr + 'Z');
+  const currentTime = new Date();
 
-  if (new Date(currentTime) > tokenExpiry) {
+  if (currentTime.getTime() > tokenExpiry.getTime()) {
     console.log('Verification token expired');
     throw new ApiError(400, 'Verification token expired');
   }
@@ -360,6 +450,54 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
     })
   );
 });
+
+const resendOrganizationVerificationOTP = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body as { email: string };
+
+    const existingOrg = await db.query.organization.findFirst({
+      where: eq(organization.email, email),
+      columns: {
+        id: true,
+        email: true,
+        isVerified: true,
+      },
+    });
+
+    // Avoid leaking whether an email exists.
+    if (!existingOrg) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'OTP sent if account exists', {}));
+    }
+
+    if (existingOrg.isVerified) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, 'Account already verified', {}));
+    }
+
+    const otpToken = await sendOTP(existingOrg.email);
+    if (!otpToken) {
+      throw new ApiError(500, 'Error sending OTP token. Please try again');
+    }
+
+    const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await db
+      .update(organization)
+      .set({
+        verificationToken: otpToken,
+        tokenExpiry: tokenExpiry.toISOString(),
+      })
+      .where(eq(organization.id, existingOrg.id));
+
+    return res.status(200).json(
+      new ApiResponse(200, 'OTP sent to organization for verification', {
+        organizationId: existingOrg.id,
+      })
+    );
+  }
+);
 
 const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
   const loggedInOrg = req.user;
@@ -476,13 +614,14 @@ const getOrgServiceProviders = asyncHandler(
 const getOrgServiceProviderById = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { id } = req.params;
+    const rawId = (req.params as any)?.id as unknown;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -527,6 +666,8 @@ const registerOrgServiceProvider = asyncHandler(
       serviceType,
       currentLocation,
       vehicleInformation,
+      panCardUrl,
+      citizenshipUrl,
     } = req.body;
 
     // Validate service type matches organization category
@@ -561,7 +702,11 @@ const registerOrgServiceProvider = asyncHandler(
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const { latitude, longitude } = currentLocation;
+
+    // Org portal doesn't capture GPS at registration time.
+    // Default to Kathmandu so the record is valid; provider app will update location later.
+    const latitude = Number(currentLocation?.latitude ?? 27.7172);
+    const longitude = Number(currentLocation?.longitude ?? 85.324);
     const h3Index = latLngToCell(latitude, longitude, H3_RESOLUTION);
     const h3IndexBigInt = BigInt(`0x${h3Index}`);
     const locationPoint = `POINT(${longitude} ${latitude})`;
@@ -589,6 +734,10 @@ const registerOrgServiceProvider = asyncHandler(
           model: 'Not filled',
           color: 'Not filled',
         },
+        documentStatus:
+          panCardUrl || citizenshipUrl ? 'pending' : 'not_submitted',
+        ...(panCardUrl ? { panCardUrl } : {}),
+        ...(citizenshipUrl ? { citizenshipUrl } : {}),
       })
       .returning({
         id: serviceProvider.id,
@@ -610,13 +759,14 @@ const registerOrgServiceProvider = asyncHandler(
 const updateOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { id } = req.params;
+    const rawId = (req.params as any)?.id as unknown;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -665,13 +815,14 @@ const updateOrgServiceProvider = asyncHandler(
 const deleteOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { id } = req.params;
+    const rawId = (req.params as any)?.id as unknown;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -698,13 +849,14 @@ const deleteOrgServiceProvider = asyncHandler(
 const verifyOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const { id } = req.params;
+    const rawId = (req.params as any)?.id as unknown;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       throw new ApiError(400, 'Provider ID is required');
     }
 
@@ -960,7 +1112,11 @@ const getOrgDashboardAnalytics = asyncHandler(
         });
 
         // Get provider info if request is assigned/completed
-        let providerData = null;
+        let providerData: {
+          id: string;
+          name: string;
+          phoneNumber: number;
+        } | null = null;
         if (
           request.requestStatus === 'assigned' ||
           request.requestStatus === 'completed' ||
@@ -970,7 +1126,7 @@ const getOrgDashboardAnalytics = asyncHandler(
             where: eq(emergencyResponse.emergencyRequestId, request.id),
           });
 
-          if (emergencyResp) {
+          if (emergencyResp?.serviceProviderId) {
             const provider = await db.query.serviceProvider.findFirst({
               where: eq(serviceProvider.id, emergencyResp.serviceProviderId),
               columns: {
@@ -979,7 +1135,7 @@ const getOrgDashboardAnalytics = asyncHandler(
                 phoneNumber: true,
               },
             });
-            providerData = provider;
+            providerData = provider ?? null;
           }
         }
 
@@ -1069,9 +1225,33 @@ const getOrgDashboardAnalytics = asyncHandler(
   }
 );
 
+const organizationController = {
+  registerOrganization,
+  verifyOrgOTP,
+  resendOrganizationVerificationOTP,
+  getOrgProfile,
+  getAllOrganizations,
+  getOrganizationById,
+  deleteOrganization,
+  updateOrganization,
+  updateOrgProfile,
+  loginOrganization,
+  listOrganizationsPublic,
+  getOrgServiceProviders,
+  getOrgServiceProviderById,
+  registerOrgServiceProvider,
+  updateOrgServiceProvider,
+  deleteOrgServiceProvider,
+  verifyOrgServiceProvider,
+  getOrgDashboardAnalytics,
+} as const;
+
+export default organizationController;
+
 export {
   registerOrganization,
   verifyOrgOTP,
+  resendOrganizationVerificationOTP,
   getOrgProfile,
   getAllOrganizations,
   getOrganizationById,

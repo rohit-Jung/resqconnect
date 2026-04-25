@@ -1,3 +1,5 @@
+import { user } from '@repo/db/schemas';
+
 import { HttpStatusCode } from 'axios';
 import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -9,7 +11,6 @@ import {
   isCloudinaryConfigured,
 } from '@/config/cloudinary.config';
 import db from '@/db';
-import { user } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -175,3 +176,11 @@ export const deleteProfilePicture = asyncHandler(
     );
   }
 );
+
+const uploadController = {
+  getUploadSignature,
+  updateProfilePicture,
+  deleteProfilePicture,
+} as const;
+
+export default uploadController;

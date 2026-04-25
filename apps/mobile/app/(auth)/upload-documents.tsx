@@ -21,6 +21,7 @@ import {
 import Header from '@/components/Header';
 import { TOKEN_KEY } from '@/constants';
 import {
+  documentUploadApi,
   useGetDocumentStatus,
   useUploadDocuments,
 } from '@/services/document/document.api';
@@ -45,7 +46,7 @@ const UploadDocumentsScreen: React.FC = () => {
   const [panCard, setPanCard] = useState<DocumentImage | null>(null);
   const [citizenship, setCitizenship] = useState<DocumentImage | null>(null);
 
-  const { mutate: uploadDocuments, isPending } = useUploadDocuments();
+  const { mutateAsync: uploadDocuments, isPending } = useUploadDocuments();
   const { logout } = useProviderStore();
   const { data: statusData } = useGetDocumentStatus(true);
 
@@ -95,7 +96,13 @@ const UploadDocumentsScreen: React.FC = () => {
       const asset = result.assets[0];
       const filename = asset.uri.split('/').pop() || `${type}.jpg`;
       const match = /\.(\w+)$/.exec(filename);
-      const fileType = match ? `image/${match[1]}` : 'image/jpeg';
+      const ext = (match?.[1] || '').toLowerCase();
+      const fileType =
+        ext === 'jpg' || ext === 'jpeg'
+          ? 'image/jpeg'
+          : ext === 'png'
+            ? 'image/png'
+            : 'image/jpeg';
 
       setImage({
         uri: asset.uri,
@@ -114,30 +121,46 @@ const UploadDocumentsScreen: React.FC = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('panCard', {
-      uri: panCard.uri,
-      name: panCard.name,
-      type: panCard.type,
-    } as any);
-    formData.append('citizenship', {
-      uri: citizenship.uri,
-      name: citizenship.name,
-      type: citizenship.type,
-    } as any);
+    try {
+      // Step 1: Get signatures for both documents
+      const signatures = await documentUploadApi.getDocumentUploadSignatures();
 
-    uploadDocuments(formData, {
-      onSuccess: () => {
-        router.replace('/(auth)/verification-pending');
-      },
-      onError: error => {
-        console.error('Upload error:', error);
-        Alert.alert(
-          'Upload Failed',
-          'Failed to upload documents. Please try again.'
-        );
-      },
-    });
+      // Step 2: Upload files directly to Cloudinary
+      const [panCardUpload, citizenshipUpload] = await Promise.all([
+        documentUploadApi.uploadToCloudinary(
+          panCard.uri,
+          panCard.name,
+          panCard.type,
+          signatures.panCard
+        ),
+        documentUploadApi.uploadToCloudinary(
+          citizenship.uri,
+          citizenship.name,
+          citizenship.type,
+          signatures.citizenship
+        ),
+      ]);
+
+      // Step 3: Confirm URLs with backend
+      await uploadDocuments({
+        panCardUrl: panCardUpload.secure_url,
+        citizenshipUrl: citizenshipUpload.secure_url,
+      });
+
+      router.replace('/(auth)/verification-pending');
+    } catch (e: any) {
+      const message =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        'Failed to upload documents. Please try again.';
+      console.log('[UploadDocuments] upload failed:', {
+        message,
+        status: e?.response?.status,
+        data: e?.response?.data,
+      });
+      Alert.alert('Upload Failed', message);
+    }
   };
 
   const DocumentCard = ({

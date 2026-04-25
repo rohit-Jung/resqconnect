@@ -1,5 +1,7 @@
+import { envConfig } from '@/config';
+
 export const getOtpMessage = (otpCode: string) => {
-  return `Welcome to firstResQ. Your Login OTP Code is ${otpCode}`;
+  return `Welcome to Resqconnect. Your Login OTP Code is ${otpCode}`;
 };
 
 export const phoneRegex = /^[0-9]{10}$/;
@@ -23,5 +25,8 @@ export const OUTBOX_POLL_INTERVAL = 1000; // 1 second
 export const TIMEOUT_CHECK_INTERVAL = 10000; // 10 seconds
 export const DISCONNECT_CHECK_INTERVAL = 5000; // 5 seconds
 export const MAX_SEARCH_RADIUS = 5;
+
+export const FETCH_INTERVAL = 3000; // polling interval in milliseconds
+export const EMERGENCY_PHONE_NUMBER = envConfig.emergency_phone_number || '112'; // emergency phone number for fallback
 
 export * from './enums.constants';

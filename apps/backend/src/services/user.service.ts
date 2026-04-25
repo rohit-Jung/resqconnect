@@ -1,8 +1,9 @@
+import { user } from '@repo/db/schemas';
+
 import { eq } from 'drizzle-orm';
 
 import { logger } from '@/config';
 import db from '@/db';
-import { user } from '@/models';
 
 export interface UserLookupResult {
   found: boolean;

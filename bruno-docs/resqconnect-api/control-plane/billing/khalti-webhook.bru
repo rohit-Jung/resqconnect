@@ -1,0 +1,15 @@
+meta {
+  name: khalti-webhook
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{controlPlaneServer}}/billing/webhooks/khalti
+  body: json
+  auth: none
+}
+
+body:json {
+  {}
+}

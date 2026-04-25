@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import api from '../axiosInstance';
+import controlPlaneApi from '../controlPlaneAxiosInstance';
 import { paymentEndpoints } from '../endPoints';
 
 // Types
@@ -20,7 +20,6 @@ export interface ISubscriptionPlan {
 export interface IPayment {
   id: string;
   organizationId: string;
-  subscriptionId?: string;
   amount: number;
   khaltiPidx?: string;
   khaltiTransactionId?: string;
@@ -47,6 +46,43 @@ export interface IActiveSubscription {
   updatedAt: string;
 }
 
+type CpPlansResponse = {
+  ok: boolean;
+  plans: ISubscriptionPlan[];
+};
+
+type CpMyPaymentsResponse = {
+  ok: boolean;
+  payments: IPayment[];
+  pagination: IPaymentHistoryResponse['pagination'];
+};
+
+type CpMyPaymentResponse = {
+  ok: boolean;
+  payment: IPayment;
+};
+
+type CpMySubscriptionResponse = {
+  ok: boolean;
+  subscription: IActiveSubscription | null;
+};
+
+type CpCheckoutResponse = {
+  ok: boolean;
+  data: {
+    pidx: string;
+    payment_url: string;
+    expires_at?: string;
+    expires_in?: number;
+  };
+};
+
+type CpVerifyResponse = {
+  ok: boolean;
+  activated?: boolean;
+  lookup?: unknown;
+};
+
 export interface IPaymentHistoryResponse {
   payments: IPayment[];
   pagination: {
@@ -69,11 +105,6 @@ export interface IPaymentQueryParams {
   status?: string;
 }
 
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-}
-
 // Query keys
 export const paymentKeys = {
   all: ['payments'] as const,
@@ -88,21 +119,18 @@ export const paymentKeys = {
 
 // Get subscription plans (public)
 export const useGetSubscriptionPlans = (enabled: boolean = true) => {
-  return useQuery<AxiosResponse<ApiResponse<ISubscriptionPlan[]>>, AxiosError>({
+  return useQuery<AxiosResponse<CpPlansResponse>, AxiosError>({
     queryKey: paymentKeys.plans(),
-    queryFn: () => api.get(paymentEndpoints.plans),
+    queryFn: () => controlPlaneApi.get(paymentEndpoints.plans),
     enabled,
   });
 };
 
 // Get active subscription (org auth required)
 export const useGetActiveSubscription = (enabled: boolean = true) => {
-  return useQuery<
-    AxiosResponse<ApiResponse<IActiveSubscription | null>>,
-    AxiosError
-  >({
+  return useQuery<AxiosResponse<CpMySubscriptionResponse>, AxiosError>({
     queryKey: paymentKeys.subscription(),
-    queryFn: () => api.get(paymentEndpoints.subscription),
+    queryFn: () => controlPlaneApi.get(paymentEndpoints.subscription),
     enabled,
     refetchInterval: 60000,
   });
@@ -123,22 +151,46 @@ export const useGetPaymentHistory = (
     ? `${paymentEndpoints.history}?${queryString}`
     : paymentEndpoints.history;
 
-  return useQuery<
-    AxiosResponse<ApiResponse<IPaymentHistoryResponse>>,
-    AxiosError
-  >({
+  return useQuery<AxiosResponse<CpMyPaymentsResponse>, AxiosError>({
     queryKey: paymentKeys.list(params),
-    queryFn: () => api.get(url),
+    queryFn: () => controlPlaneApi.get(url),
     enabled,
   });
 };
 
 // Get payment by ID (org auth required)
 export const useGetPaymentById = (id: string, enabled: boolean = true) => {
-  return useQuery<AxiosResponse<ApiResponse<IPayment>>, AxiosError>({
+  return useQuery<AxiosResponse<CpMyPaymentResponse>, AxiosError>({
     queryKey: paymentKeys.detail(id),
-    queryFn: () => api.get(paymentEndpoints.status(id)),
+    queryFn: () => controlPlaneApi.get(paymentEndpoints.status(id)),
     enabled: enabled && !!id,
+  });
+};
+
+export const useGetPaymentByPidx = (pidx: string, enabled: boolean = true) => {
+  return useQuery<AxiosResponse<CpMyPaymentResponse>, AxiosError>({
+    queryKey: paymentKeys.detail(`pidx:${pidx}`),
+    queryFn: () => controlPlaneApi.get(paymentEndpoints.byPidx(pidx)),
+    enabled: enabled && !!pidx,
+  });
+};
+
+export const useVerifyPaymentByPidx = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    AxiosResponse<CpVerifyResponse>,
+    AxiosError,
+    { pidx: string }
+  >({
+    mutationFn: data => controlPlaneApi.post(paymentEndpoints.verify, data),
+    onSuccess: (_res, variables) => {
+      queryClient.invalidateQueries({ queryKey: paymentKeys.subscription() });
+      queryClient.invalidateQueries({ queryKey: paymentKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: paymentKeys.detail(`pidx:${variables.pidx}`),
+      });
+    },
   });
 };
 
@@ -147,11 +199,16 @@ export const useSubscribeToPlan = () => {
   const queryClient = useQueryClient();
 
   return useMutation<
-    AxiosResponse<ApiResponse<ISubscribeResponse>>,
+    AxiosResponse<CpCheckoutResponse>,
     AxiosError,
     { planId: string; returnUrl?: string }
   >({
-    mutationFn: data => api.post(paymentEndpoints.subscribe, data),
+    // Control-plane checkout is admin/org aware; for org portal we pass planId and returnUrl.
+    mutationFn: data =>
+      controlPlaneApi.post(paymentEndpoints.subscribe, {
+        planId: data.planId,
+        returnUrl: data.returnUrl,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: paymentKeys.subscription() });
       queryClient.invalidateQueries({ queryKey: paymentKeys.lists() });

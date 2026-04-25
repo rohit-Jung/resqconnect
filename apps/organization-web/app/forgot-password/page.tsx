@@ -1,6 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import { ArrowLeft, CheckCircle, Loader2, Mail } from 'lucide-react';
 import Link from 'next/link';
@@ -9,9 +12,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useForgotPassword } from '@/services/user/auth.api';
 import {
   TForgotPassword,

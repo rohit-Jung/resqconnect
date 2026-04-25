@@ -1,31 +1,64 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express from 'express';
+import express, { type NextFunction, type Request } from 'express';
 
-import { corsOptions, globalLimiter, configureSecurityMiddlewares } from '@/config';
+import {
+  configureSecurityMiddlewares,
+  corsOptions,
+  globalLimiter,
+} from '@/config';
+import { auditLogMiddleware } from '@/middlewares/audit-log.middleware';
+import { orgTierApiLimiter } from '@/middlewares/entitlements-rate-limit.middleware';
+import { requireMfa } from '@/middlewares/mfa.middleware';
 import { notFoundMiddleware } from '@/middlewares/not-found.middleware';
+import { phiMaskMiddleware } from '@/middlewares/phi-mask.middleware';
+import { populateUserFromToken } from '@/middlewares/populate-user.middleware';
+import { enforceRbac } from '@/middlewares/rbac.middleware';
+import { enforceSessionTimeout } from '@/middlewares/session-timeout.middleware';
 import { v1Router } from '@/routes';
 
 const app = express();
 
-// Configure security middlewares (Helmet, compression, sanitization, etc.)
+// security middlewares
 configureSecurityMiddlewares(app);
 
 // CORS middleware - must be after security middlewares
 app.use(cors(corsOptions));
 
-// Body parsing middleware
+// body parsing middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Apply global rate limiting to all routes (baseline DDoS protection)
-app.use(globalLimiter);
+// populate req.user when a token is present.
+app.use(populateUserFromToken);
 
-// API routes
+// compliance middlewares (sector-config driven)
+app.use(auditLogMiddleware);
+app.use(phiMaskMiddleware);
+
+// global rate limiting to all routes (baseline DDoS protection)
+// app.use(globalLimiter);
+
+// enforce org-tiered api limits (15m window).
+// uses redis so  works across instances.
+// app.use(orgTierApiLimiter);
+
+// enforce compliance constraints after auth middleware populates req.user.
+// these middlewares are safe no-ops for unauthenticated requests.
+app.use(enforceSessionTimeout);
+app.use(requireMfa);
+app.use(enforceRbac);
+
+app.use(function (req: Request, _, next: NextFunction) {
+  console.log('[Received] at ', req.method, req.url);
+  next();
+});
+
+// api routes
 app.use('/api/v1', v1Router);
 
-// Not found middleware (must be last)
+// not found middleware (must be last)
 app.use(notFoundMiddleware);
 
 export { app };

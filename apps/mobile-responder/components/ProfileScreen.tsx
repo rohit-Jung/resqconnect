@@ -124,7 +124,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 uploadApi
                   .deleteProfilePicture()
                   .then(() => onProfilePictureChange?.(null))
-                  .catch(() => {})
+                  .catch((e: any) => {
+                    const message =
+                      e?.response?.data?.message ||
+                      e?.response?.data?.error ||
+                      e?.message ||
+                      'Failed to remove profile picture';
+                    Alert.alert('Error', message);
+                  })
                   .finally(() => setIsUploading(false));
               },
             },
@@ -175,11 +182,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           );
           onProfilePictureChange?.(newUrl);
           Alert.alert('Success', 'Profile picture updated successfully!');
-        } catch {
-          Alert.alert(
-            'Upload Failed',
-            'Failed to upload profile picture. Please try again.'
-          );
+        } catch (e: any) {
+          const message =
+            e?.response?.data?.message ||
+            e?.response?.data?.error ||
+            e?.message ||
+            'Failed to upload profile picture. Please try again.';
+          Alert.alert('Upload Failed', message);
         } finally {
           setIsUploading(false);
         }

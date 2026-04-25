@@ -9,7 +9,7 @@ import { TOKEN_KEY } from '@/constants';
 import api, { apiWithoutAuthLogout } from '../axiosInstance';
 import { serviceProviderEndpoints } from '../endPoints';
 
-// Types
+// types
 export interface IDocumentStatus {
   documentStatus: 'not_submitted' | 'pending' | 'approved' | 'rejected';
   rejectionReason: string | null;
@@ -34,7 +34,26 @@ export interface IUploadDocumentsResponse {
   };
 }
 
-// Get document verification status - uses apiWithoutAuthLogout to prevent auto-logout
+export interface CloudinarySignature {
+  signature: string;
+  timestamp: number;
+  cloudName: string;
+  apiKey: string;
+  folder: string;
+  publicId?: string;
+  uploadUrl: string;
+}
+
+export interface IDocumentSignaturesResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    panCard: CloudinarySignature;
+    citizenship: CloudinarySignature;
+  };
+}
+
+// get document verification status - uses apiwithoutauthlogout to prevent auto-logout
 export const useGetDocumentStatus = (enabled: boolean = true) => {
   const [shouldPoll, setShouldPoll] = useState(false);
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -68,18 +87,59 @@ export const useGetDocumentStatus = (enabled: boolean = true) => {
   return query;
 };
 
-// Upload documents (PAN card + Citizenship) - uses main api with logout capability
+// upload documents (pan card + citizenship) - uses main api with logout capability
 export const useUploadDocuments = () => {
   return useMutation<
     AxiosResponse<IUploadDocumentsResponse>,
     AxiosError,
-    FormData
+    { panCardUrl: string; citizenshipUrl: string }
   >({
-    mutationFn: (formData: FormData) =>
-      api.post(serviceProviderEndpoints.uploadDocuments, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }),
+    mutationFn: body =>
+      api.post(serviceProviderEndpoints.uploadDocuments, body),
   });
+};
+
+export const documentUploadApi = {
+  getDocumentUploadSignatures: async (): Promise<{
+    panCard: CloudinarySignature;
+    citizenship: CloudinarySignature;
+  }> => {
+    const response = await api.get(serviceProviderEndpoints.documentSignatures);
+    return response.data.data;
+  },
+
+  uploadToCloudinary: async (
+    fileUri: string,
+    fileName: string,
+    mimeType: string,
+    signature: CloudinarySignature
+  ): Promise<{ secure_url: string }> => {
+    const formData = new FormData();
+    const file = {
+      uri: fileUri,
+      type: mimeType,
+      name: fileName,
+    } as unknown as Blob;
+
+    formData.append('file', file);
+    formData.append('api_key', signature.apiKey);
+    formData.append('timestamp', signature.timestamp.toString());
+    formData.append('signature', signature.signature);
+    formData.append('folder', signature.folder);
+    if (signature.publicId) {
+      formData.append('public_id', signature.publicId);
+    }
+
+    const response = await fetch(signature.uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Failed to upload document');
+    }
+
+    return response.json();
+  },
 };

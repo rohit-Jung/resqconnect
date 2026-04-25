@@ -1,0 +1,17 @@
+meta {
+  name: update-status
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{controlPlaneServer}}/orgs/ab5363e7-5583-4a2e-b689-91d3d27d5167/status
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "status": "active"
+  }
+}

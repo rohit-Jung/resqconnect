@@ -1,9 +1,9 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+
 import { Play } from 'lucide-react';
 import Link from 'next/link';
-
-import { Button } from '@/components/ui/button';
 
 export function CTA() {
   return (

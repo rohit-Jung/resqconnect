@@ -1,14 +1,15 @@
 'use client';
 
+import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import { Skeleton } from '@repo/ui/skeleton';
+
 import { Users } from 'lucide-react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { IRecentProvider, ServiceStatus } from '@/types/auth.types';
 
 interface DashboardTeamsProps {
-  providers?: IRecentProvider[];
+  responders?: IRecentProvider[];
   isLoading?: boolean;
 }
 
@@ -34,7 +35,7 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function DashboardTeams({ providers, isLoading }: DashboardTeamsProps) {
+export function DashboardTeams({ responders, isLoading }: DashboardTeamsProps) {
   if (isLoading) {
     return (
       <Card>
@@ -59,7 +60,7 @@ export function DashboardTeams({ providers, isLoading }: DashboardTeamsProps) {
     );
   }
 
-  const teams = providers ?? [];
+  const teams = responders ?? [];
 
   if (teams.length === 0) {
     return (
@@ -70,9 +71,7 @@ export function DashboardTeams({ providers, isLoading }: DashboardTeamsProps) {
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Users className="text-muted-foreground mb-2 h-8 w-8" />
-            <p className="text-muted-foreground text-sm">
-              No service providers yet
-            </p>
+            <p className="text-muted-foreground text-sm">No responders yet</p>
           </div>
         </CardContent>
       </Card>

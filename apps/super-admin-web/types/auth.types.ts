@@ -77,8 +77,8 @@ export interface IDashboardAnalytics {
 }
 
 // Legacy exports for backward compatibility
-export interface ISuperAdminLoginResponse extends IAdminLoginResponse {}
-export interface ISuperAdminProfileResponse extends IAdminProfileResponse {}
+export type ISuperAdminLoginResponse = IAdminLoginResponse;
+export type ISuperAdminProfileResponse = IAdminProfileResponse;
 
 // Verify response
 export interface IAdminVerifyResponse {

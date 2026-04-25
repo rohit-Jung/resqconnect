@@ -1,18 +1,19 @@
+import { serviceTypeEnum } from '@repo/db/schemas';
+import { serviceProvider } from '@repo/db/schemas';
+
 import { and, eq } from 'drizzle-orm';
 
 import db from '@/db';
-import { serviceTypeEnum } from '@/models';
-import { serviceProvider } from '@/models';
 
 interface LatLng {
   latitude: number;
   longitude: number;
 }
 
-// Simple distance calculation using lat/long differences
-// Returns distance in meters
+// simple distance calculation using lat/long differences
+// returns distance in meters
 function calculateDistance(coord1: LatLng, coord2: LatLng): number {
-  // Convert lat/long differences to meters
+  // convert lat/long differences to meters
   // 1 degree of latitude ≈ 111,111 meters
   // 1 degree of longitude ≈ 111,111 * cos(latitude) meters
   const latDiff = Math.abs(coord1.latitude - coord2.latitude) * 111111;
@@ -21,7 +22,7 @@ function calculateDistance(coord1: LatLng, coord2: LatLng): number {
     111111 *
     Math.cos((coord1.latitude * Math.PI) / 180);
 
-  // Use Pythagorean theorem to get straight-line distance
+  // use pythagorean theorem to get straight-line distance
   return Math.sqrt(latDiff * latDiff + longDiff * longDiff);
 }
 
@@ -141,7 +142,7 @@ async function getBestServiceProvider(
     }
   }
 
-  // Optional fallback
+  // optional fallback
   if (process.env.NODE_ENV === 'development') {
     const fallbackProvider = await db.query.serviceProvider.findFirst({
       where: and(

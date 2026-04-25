@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   type CallbackParams,

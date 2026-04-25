@@ -1,9 +1,9 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+
 import {
   AlertTriangle,
-  BarChart3,
-  Building2,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -17,14 +17,13 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/providers/sidebar-provider';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   {
-    name: 'Service Providers',
+    name: 'Responders',
     href: '/dashboard/service-providers',
     icon: Users,
   },

@@ -1,8 +1,18 @@
+// TODO: Clean this cause we have a webhook setup now
+import {
+  emergencyRequest,
+  outbox,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
+
 import { eq, sql } from 'drizzle-orm';
 import { latLngToCell } from 'h3-js';
 
 import { envConfig, logger } from '@/config';
 import {
+  EMERGENCY_PHONE_NUMBER,
+  FETCH_INTERVAL,
   H3_RESOLUTION,
   INITIAL_SEARCH_RADIUS,
   REQUEST_TIMEOUT_MS,
@@ -13,7 +23,6 @@ import {
   OUTBOX_EVENT_TYPES,
 } from '@/constants/kafka.constants';
 import db from '@/db';
-import { emergencyRequest, outbox, user } from '@/models';
 import { publishWithRetry } from '@/services/kafka/kafka.utils';
 import {
   batchCheckMessagesProcessed,
@@ -36,12 +45,6 @@ import {
   SMS_TEMPLATES,
   parseSMSMessage,
 } from '@/utils/sms/sms.parser';
-
-// Polling interval in milliseconds
-const FETCH_INTERVAL = 3000;
-
-// Emergency phone number for fallback
-const EMERGENCY_PHONE_NUMBER = envConfig.emergency_phone_number || '112';
 
 // Health check state
 let lastPollTime: Date | null = null;
@@ -83,7 +86,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
 
   const parsedData = parseResult.data;
   let userId: string;
-  const userPhone: string = from;
 
   // Try to identify the user
   if (parsedData.userId) {
@@ -302,7 +304,7 @@ async function createEmergencyRequest(
         status: 'pending',
       });
 
-      // Update user's current location
+      // update user's current location
       await tx
         .update(user)
         .set({
@@ -316,7 +318,7 @@ async function createEmergencyRequest(
       return newRequest;
     });
 
-    // Try to publish to Kafka immediately
+    // try to publish to kafka immediately
     const kafkaTopic = getKafkaTopic(emergencyType);
     logger.info(
       `[WORKER] Attempting to publish request ${result.id} to Kafka topic ${kafkaTopic}`
@@ -343,7 +345,7 @@ async function createEmergencyRequest(
       logger.info(
         `[WORKER] Successfully published request ${result.id} to Kafka`
       );
-      // Mark outbox event as published
+      // mark outbox event as published
       await db
         .update(outbox)
         .set({ status: 'published', publishedAt: new Date().toISOString() })
@@ -384,13 +386,13 @@ function formatEmergencyType(type: string): string {
 
 async function handleIncomingMessages(toNumber: string): Promise<void> {
   try {
-    // Get last poll timestamp for incremental fetching
+    // get last poll timestamp for incremental fetching
     const lastPollTimeFromRedis = await getLastSMSPollTimestamp();
     logger.info(
       `[WORKER] Polling for SMS messages. Last poll: ${lastPollTimeFromRedis || 'never'}`
     );
 
-    // Fetch messages from Twilio with error handling
+    // fetch messages from twilio with error handling
     let messages: TwilioMessage[] = [];
     try {
       messages = await getMessages(
@@ -413,12 +415,12 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
 
     logger.info(`[WORKER] Fetched ${messages.length} SMS messages from Twilio`);
 
-    // Filter to only incoming messages (direction: 'inbound')
+    // filter to only incoming messages (direction: 'inbound')
     const inboundMessages = messages.filter(msg => msg.direction === 'inbound');
 
     if (inboundMessages.length === 0) {
       logger.info(`[WORKER] No inbound messages in this batch`);
-      // Update poll timestamp even if no inbound messages
+      // update poll timestamp even if no inbound messages
       await setLastSMSPollTimestamp(new Date());
       return;
     }
@@ -427,7 +429,7 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
       `[WORKER] Processing ${inboundMessages.length} inbound messages`
     );
 
-    // Batch check which messages have already been processed
+    // batch check which messages have already been processed
     const messageSids = inboundMessages.map(m => m.sid);
     let processedMap: Map<string, boolean>;
     try {
@@ -440,11 +442,11 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
       errorCount++;
       lastError =
         redisError instanceof Error ? redisError.message : 'Redis error';
-      // Continue anyway - we might process duplicates but safety is preserved
+      // continue anyway - we might process duplicates but safety is preserved
       processedMap = new Map();
     }
 
-    // Filter out already processed messages
+    // filter out already processed messages
     const newMessages = inboundMessages.filter(
       msg => !processedMap.get(msg.sid)
     );
@@ -466,7 +468,7 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
 
     logger.info(`[WORKER] Found ${newMessages.length} new messages to process`);
 
-    // Process messages sequentially to avoid race conditions and DB conflicts
+    // process messages sequentially to avoid race conditions and db conflicts
     for (const message of newMessages) {
       try {
         await processSingleMessage(message);
@@ -483,7 +485,7 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
       }
     }
 
-    // Update last poll timestamp
+    // update last poll timestamp
     try {
       await setLastSMSPollTimestamp(new Date());
       lastPollTime = new Date();
@@ -528,7 +530,7 @@ async function startSMSPollingWorker(): Promise<void> {
   errorCount = 0;
   messagesProcessed = 0;
 
-  // Initial fetch to verify Twilio connection
+  // initial fetch to verify twilio connection
   logger.info(`[WORKER] Running initial SMS poll to verify connectivity...`);
   try {
     await handleIncomingMessages(toNumber);
@@ -542,10 +544,10 @@ async function startSMSPollingWorker(): Promise<void> {
       initialError instanceof Error
         ? initialError.message
         : 'Initial poll failed';
-    // Continue anyway - worker will retry
+    // continue anyway - worker will retry
   }
 
-  // Poll at interval with error recovery
+  // poll at interval with error recovery
   const pollIntervalId = setInterval(async () => {
     try {
       await handleIncomingMessages(toNumber);
@@ -554,11 +556,11 @@ async function startSMSPollingWorker(): Promise<void> {
       errorCount++;
       lastError =
         error instanceof Error ? error.message : 'Polling interval error';
-      // Continue running - don't break the interval
+      // continue running - don't break the interval
     }
   }, FETCH_INTERVAL);
 
-  // Graceful shutdown handler
+  // graceful shutdown handler
   process.on('SIGTERM', () => {
     logger.info(`[WORKER] Received SIGTERM - Stopping SMS Polling Worker`);
     clearInterval(pollIntervalId);
@@ -587,13 +589,25 @@ export async function sendProviderAssignedSMS(
     formatEmergencyType(emergencyType),
     providerName
   );
-  const result = await sendSMS(userPhone, message);
+
+  // attribute to an org when possible so entitlements can enforce sms quota.
+  // caller may not have org context; best-effort lookup by provider name.
+  let organizationId: string | undefined;
+  try {
+    const provider = await db.query.serviceProvider.findFirst({
+      where: eq(serviceProvider.name, providerName),
+      columns: { organizationId: true },
+    });
+    organizationId = provider?.organizationId;
+  } catch {
+    // ignore; fall back to unmetered send
+  }
+
+  const result = await sendSMS(userPhone, message, { organizationId });
   return result.success;
 }
 
-/**
- * Get health status of the SMS Polling Worker
- */
+// get health status of the sms polling worker
 export function getSMSWorkerHealth() {
   const uptime = workerStartTime
     ? Date.now() - workerStartTime.getTime()

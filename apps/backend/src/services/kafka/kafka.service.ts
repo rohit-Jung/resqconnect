@@ -1,19 +1,25 @@
 import Redis from 'ioredis';
 import { type Consumer, Kafka, type Producer, logLevel } from 'kafkajs';
 
+import { envConfig } from '@/config';
 import { KAFKA_CONSUMER_ID, KAFKA_TOPICS } from '@/constants/kafka.constants';
 
 export const redis = new Redis({
-  host: 'localhost',
-  port: 6379,
+  host: envConfig.redis_host,
+  port: envConfig.redis_port,
 });
 
 const kafka = new Kafka({
   clientId: 'resqconnect',
-  brokers: ['localhost:9092'],
+  brokers: String(envConfig.kafka_brokers)
+    .split(',')
+    .map(b => b.trim())
+    .filter(Boolean),
   logLevel: logLevel.WARN,
+  requestTimeout: 10000,
+  enforceRequestTimeout: false,
   retry: {
-    initialRetryTime: 300,
+    initialRetryTime: 500,
     retries: 10,
   },
 });

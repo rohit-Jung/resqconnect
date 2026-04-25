@@ -1,12 +1,13 @@
-import { eq } from 'drizzle-orm';
-
-import { envConfig, logger } from '@/config';
-import db from '@/db';
 import {
   organizationSubscriptions,
   payments,
   subscriptionPlans,
-} from '@/models';
+} from '@repo/db/schemas';
+
+import { eq } from 'drizzle-orm';
+
+import { envConfig, logger } from '@/config';
+import db from '@/db';
 
 export interface KhaltiInitiateResponse {
   pidx: string;
@@ -89,11 +90,11 @@ export async function initiatePayment(
       return { success: false, error: 'Failed to create payment record' };
     }
 
-    // Prepare Khalti initiate request
+    // prepare khalti initiate request
     const khaltiPayload = {
       return_url: returnUrl || envConfig.khalti_return_url,
       website_url: envConfig.khalti_website_url,
-      amount: plan.price, // Amount in paisa
+      amount: plan.price, // amount in paisa
       purchase_order_id: newPayment.id,
       purchase_order_name: `${plan.name} Subscription`,
       customer_info: {
@@ -214,7 +215,7 @@ export async function handleCallback(params: CallbackParams): Promise<{
       return { success: false, error: 'Payment not found' };
     }
 
-    // If payment is already completed, return early
+    // if payment is already completed, return early
     if (existingPayment.status === 'completed') {
       logger.info(`Payment ${existingPayment.id} already completed`);
       return { success: true, payment: existingPayment };
@@ -247,10 +248,10 @@ export async function handleCallback(params: CallbackParams): Promise<{
       .where(eq(payments.id, existingPayment.id))
       .returning();
 
-    // If payment completed, create subscription
+    // if payment completed, create subscription
     if (paymentStatus === 'completed') {
-      // Get the plan from purchase_order_name or find it
-      // For now, we'll need to store planId somewhere - let's use a lookup
+      // get the plan from purchase_order_name or find it
+      // for now, we'll need to store planid somewhere - let's use a lookup
       const planId = params.purchase_order_id
         ? await getPlanIdFromPayment(existingPayment.id)
         : null;
@@ -303,8 +304,8 @@ export async function handleCallback(params: CallbackParams): Promise<{
 }
 
 async function getPlanIdFromPayment(paymentId: string): Promise<string | null> {
-  // For now, return the first active plan
-  // In production, store the planId in the payment record or metadata
+  // for now, return the first active plan
+  // in production, store the planid in the payment record or metadata
   const activePlan = await db.query.subscriptionPlans.findFirst({
     where: eq(subscriptionPlans.isActive, true),
   });

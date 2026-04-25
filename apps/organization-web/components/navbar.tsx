@@ -1,9 +1,10 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+
 import Link from 'next/link';
 
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Button } from '@/components/ui/button';
 
 export function Navbar() {
   return (

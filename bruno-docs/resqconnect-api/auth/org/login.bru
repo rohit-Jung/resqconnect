@@ -1,23 +1,37 @@
 meta {
   name: login
   type: http
-  seq: 10
+  seq: 2
 }
 
 post {
   url: {{server}}/organization/login
   body: json
-  auth: inherit
+  auth: none
 }
 
 body:json {
   {
-    "email": "amb@resqconnect.com",
-    "password": "ambulance@123"
+   "email": "ambulance@example.com",
+    "password": "ambulanceTest@123"
   }
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+docs {
+  # Organization Login
+  
+  Authenticate an organization and receive a JWT token.
+  
+  ## Request Body
+  - email: Organization email
+  - password: Organization password
+  
+  ## Response
+  - token: JWT token for authenticated requests
+  - organization: Organization details
 }

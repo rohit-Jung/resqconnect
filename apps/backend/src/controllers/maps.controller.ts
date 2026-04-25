@@ -1,15 +1,16 @@
+import { user } from '@repo/db/schemas';
+import { getRouteDataSchema } from '@repo/types/validations';
+
 import { HttpStatusCode } from 'axios';
 import { eq } from 'drizzle-orm';
 import { type Request, type Response } from 'express';
 
 import db from '@/db';
-import { user } from '@/models';
 import { getRouteFromMapbox } from '@/services/mapbox.service';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { compeletAutoSearch, getOptimalRoute } from '@/utils/maps/galli-maps';
-import { getRouteDataSchema } from '@/validations/maps.validations';
 
 const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
   const { q: searchQuery, lat: currentLat, lg: currentLong } = req.query;
@@ -135,7 +136,6 @@ const getOptimalRouteForUser = asyncHandler(
 );
 
 const getRoute = asyncHandler(async (req: Request, res: Response) => {
-  console.log('HIT', req.body);
   const parsedData = getRouteDataSchema.safeParse(req.body);
   if (!parsedData.success) {
     return res
@@ -143,7 +143,6 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
       .json(ApiError.validationError(parsedData.error));
   }
 
-  console.log('HIT');
   const { origin, dest, profile } = parsedData.data;
   const routeResult = await getRouteFromMapbox(origin, dest, profile);
 
@@ -163,5 +162,13 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
       )
     );
 });
+
+const mapsController = {
+  getAutoComplete,
+  getOptimalRouteForUser,
+  getRoute,
+} as const;
+
+export default mapsController;
 
 export { getAutoComplete, getOptimalRouteForUser, getRoute };

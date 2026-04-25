@@ -58,7 +58,7 @@ export default function DashboardPage() {
             isLoading={isLoading}
           />
           <DashboardTeams
-            providers={analytics?.providers?.recent}
+            responders={analytics?.providers?.recent}
             isLoading={isLoading}
           />
         </div>

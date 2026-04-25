@@ -1,5 +1,8 @@
 'use client';
 
+import { Badge } from '@repo/ui/badge';
+import { Button } from '@repo/ui/button';
+
 import {
   AlertCircle,
   Ambulance,
@@ -25,8 +28,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   useOrgDeleteProvider,
   useOrgServiceProvider,
@@ -97,10 +98,10 @@ export default function ServiceProviderDetailPage({
   const deleteMutation = useOrgDeleteProvider();
   const verifyMutation = useOrgVerifyProvider();
 
-  const provider = providerData?.data?.data;
+  const responder = providerData?.data?.data;
 
   const handleDelete = async () => {
-    if (confirm('Are you sure you want to delete this service provider?')) {
+    if (confirm('Are you sure you want to delete this responder?')) {
       await deleteMutation.mutateAsync(id);
       router.push('/dashboard/service-providers');
     }
@@ -118,26 +119,26 @@ export default function ServiceProviderDetailPage({
     );
   }
 
-  if (!provider) {
+  if (!responder) {
     return (
       <div className="min-h-screen bg-background dark:bg-background px-6 py-12">
         <h2 className="mb-2 text-xl font-semibold text-foreground dark:text-foreground">
-          Provider not found
+          Responder not found
         </h2>
         <p className="text-muted-foreground mb-4 dark:text-muted-foreground">
-          The service provider you&apos;re looking for doesn&apos;t exist.
+          The responder you&apos;re looking for doesn&apos;t exist.
         </p>
         <Link href="/dashboard/service-providers">
           <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none">
-            Back to Providers
+            Back to Responders
           </Button>
         </Link>
       </div>
     );
   }
 
-  const typeConfig = SERVICE_TYPE_CONFIG[provider.serviceType];
-  const statusConfig = STATUS_CONFIG[provider.serviceStatus];
+  const typeConfig = SERVICE_TYPE_CONFIG[responder.serviceType];
+  const statusConfig = STATUS_CONFIG[responder.serviceStatus];
 
   return (
     <div className="min-h-screen bg-background dark:bg-background">
@@ -192,7 +193,7 @@ export default function ServiceProviderDetailPage({
         <div className="mt-4 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
-              {provider.name}
+              {responder.name}
             </h1>
             <div className="mt-2 flex items-center gap-2">
               <Badge
@@ -231,7 +232,7 @@ export default function ServiceProviderDetailPage({
                       Email
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.email}
+                      {responder.email}
                     </p>
                   </div>
                 </div>
@@ -244,7 +245,7 @@ export default function ServiceProviderDetailPage({
                       Phone
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.phoneNumber}
+                      {responder.phoneNumber}
                     </p>
                   </div>
                 </div>
@@ -257,7 +258,7 @@ export default function ServiceProviderDetailPage({
                       Address
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.primaryAddress}
+                      {responder.primaryAddress}
                     </p>
                   </div>
                 </div>
@@ -279,7 +280,7 @@ export default function ServiceProviderDetailPage({
                       Age
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.age || 'Not specified'}
+                      {responder.age || 'Not specified'}
                     </p>
                   </div>
                 </div>
@@ -292,13 +293,13 @@ export default function ServiceProviderDetailPage({
                       Joined
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.createdAt
-                        ? new Date(provider.createdAt).toLocaleDateString()
+                      {responder.createdAt
+                        ? new Date(responder.createdAt).toLocaleDateString()
                         : 'N/A'}
                     </p>
                   </div>
                 </div>
-                {provider.serviceArea && (
+                {responder.serviceArea && (
                   <div className="flex items-center gap-3 sm:col-span-2">
                     <div className="bg-muted rounded-lg p-2">
                       <MapPin className="text-muted-foreground h-5 w-5 dark:text-muted-foreground" />
@@ -308,7 +309,7 @@ export default function ServiceProviderDetailPage({
                         Service Area
                       </p>
                       <p className="font-medium text-foreground dark:text-foreground">
-                        {provider.serviceArea}
+                        {responder.serviceArea}
                       </p>
                     </div>
                   </div>
@@ -317,7 +318,7 @@ export default function ServiceProviderDetailPage({
             </div>
 
             {/* Vehicle Information */}
-            {provider.vehicleInformation && (
+            {responder.vehicleInformation && (
               <div className="bg-card rounded-xl border p-6">
                 <h2 className="mb-4 text-lg font-semibold text-foreground dark:text-foreground">
                   Vehicle Information
@@ -328,7 +329,7 @@ export default function ServiceProviderDetailPage({
                       Type
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.vehicleInformation.type || 'N/A'}
+                      {responder.vehicleInformation.type || 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -336,7 +337,7 @@ export default function ServiceProviderDetailPage({
                       Number
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.vehicleInformation.number || 'N/A'}
+                      {responder.vehicleInformation.number || 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -344,7 +345,7 @@ export default function ServiceProviderDetailPage({
                       Model
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.vehicleInformation.model || 'N/A'}
+                      {responder.vehicleInformation.model || 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -352,7 +353,7 @@ export default function ServiceProviderDetailPage({
                       Color
                     </p>
                     <p className="font-medium text-foreground dark:text-foreground">
-                      {provider.vehicleInformation.color || 'N/A'}
+                      {responder.vehicleInformation.color || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -367,20 +368,20 @@ export default function ServiceProviderDetailPage({
                 </h2>
                 <Badge
                   className={`rounded-none border-0 ${
-                    provider.documentStatus === 'approved'
+                    responder.documentStatus === 'approved'
                       ? 'bg-green-100 text-green-700'
-                      : provider.documentStatus === 'pending'
+                      : responder.documentStatus === 'pending'
                         ? 'bg-yellow-100 text-yellow-700'
-                        : provider.documentStatus === 'rejected'
+                        : responder.documentStatus === 'rejected'
                           ? 'bg-red-100 text-red-700'
                           : 'bg-gray-100 text-gray-700'
                   }`}
                 >
-                  {provider.documentStatus === 'approved'
+                  {responder.documentStatus === 'approved'
                     ? 'Approved'
-                    : provider.documentStatus === 'pending'
+                    : responder.documentStatus === 'pending'
                       ? 'Pending'
-                      : provider.documentStatus === 'rejected'
+                      : responder.documentStatus === 'rejected'
                         ? 'Rejected'
                         : 'Not Submitted'}
                 </Badge>
@@ -393,9 +394,9 @@ export default function ServiceProviderDetailPage({
                     <p className="text-muted-foreground text-sm dark:text-muted-foreground">
                       PAN Card
                     </p>
-                    {provider.panCardUrl && (
+                    {responder.panCardUrl && (
                       <a
-                        href={provider.panCardUrl}
+                        href={responder.panCardUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline flex items-center gap-1 text-sm"
@@ -406,9 +407,9 @@ export default function ServiceProviderDetailPage({
                     )}
                   </div>
                   <p className="font-medium text-foreground dark:text-foreground">
-                    {provider.panCardUrl ? (
+                    {responder.panCardUrl ? (
                       <a
-                        href={provider.panCardUrl}
+                        href={responder.panCardUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline flex items-center gap-2"
@@ -430,9 +431,9 @@ export default function ServiceProviderDetailPage({
                     <p className="text-muted-foreground text-sm dark:text-muted-foreground">
                       Citizenship Document
                     </p>
-                    {provider.citizenshipUrl && (
+                    {responder.citizenshipUrl && (
                       <a
-                        href={provider.citizenshipUrl}
+                        href={responder.citizenshipUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline flex items-center gap-1 text-sm"
@@ -443,9 +444,9 @@ export default function ServiceProviderDetailPage({
                     )}
                   </div>
                   <p className="font-medium text-foreground dark:text-foreground">
-                    {provider.citizenshipUrl ? (
+                    {responder.citizenshipUrl ? (
                       <a
-                        href={provider.citizenshipUrl}
+                        href={responder.citizenshipUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline flex items-center gap-2"
@@ -462,8 +463,8 @@ export default function ServiceProviderDetailPage({
                 </div>
 
                 {/* Rejection Reason */}
-                {provider.documentStatus === 'rejected' &&
-                  provider.rejectionReason && (
+                {responder.documentStatus === 'rejected' &&
+                  responder.rejectionReason && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                       <div className="flex gap-3">
                         <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
@@ -472,7 +473,7 @@ export default function ServiceProviderDetailPage({
                             Rejection Reason
                           </p>
                           <p className="text-sm text-red-700 mt-1">
-                            {provider.rejectionReason}
+                            {responder.rejectionReason}
                           </p>
                         </div>
                       </div>
@@ -480,18 +481,20 @@ export default function ServiceProviderDetailPage({
                   )}
 
                 {/* Verification Info */}
-                {provider.documentStatus === 'approved' &&
-                  provider.verifiedAt && (
+                {responder.documentStatus === 'approved' &&
+                  responder.verifiedAt && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <div className="flex gap-3">
                         <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-green-900">
                             Verified on{' '}
-                            {new Date(provider.verifiedAt).toLocaleDateString()}
+                            {new Date(
+                              responder.verifiedAt
+                            ).toLocaleDateString()}
                           </p>
                           <p className="text-sm text-green-700">
-                            By: {provider.verifiedBy || 'System'}
+                            By: {responder.verifiedBy || 'System'}
                           </p>
                         </div>
                       </div>
@@ -507,11 +510,11 @@ export default function ServiceProviderDetailPage({
             <div className="bg-card rounded-xl border p-6 text-center">
               <div className="bg-primary/10 mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full">
                 <span className="text-primary text-3xl font-bold">
-                  {provider.name.charAt(0).toUpperCase()}
+                  {responder.name.charAt(0).toUpperCase()}
                 </span>
               </div>
               <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-                {provider.name}
+                {responder.name}
               </h3>
               <p className="text-muted-foreground text-sm dark:text-muted-foreground">
                 {typeConfig.label}
@@ -524,7 +527,7 @@ export default function ServiceProviderDetailPage({
                 Verification Status
               </h3>
               <div className="flex items-center gap-3">
-                {provider.isVerified ? (
+                {responder.isVerified ? (
                   <>
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <div>
@@ -550,7 +553,7 @@ export default function ServiceProviderDetailPage({
                   </>
                 )}
               </div>
-              {!provider.isVerified && (
+              {!responder.isVerified && (
                 <Button
                   className="mt-4 w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-none"
                   onClick={handleVerify}
@@ -579,8 +582,8 @@ export default function ServiceProviderDetailPage({
                       Last Updated:
                     </span>{' '}
                     <span className="font-medium text-foreground dark:text-foreground">
-                      {provider.updatedAt
-                        ? new Date(provider.updatedAt).toLocaleDateString()
+                      {responder.updatedAt
+                        ? new Date(responder.updatedAt).toLocaleDateString()
                         : 'N/A'}
                     </span>
                   </div>

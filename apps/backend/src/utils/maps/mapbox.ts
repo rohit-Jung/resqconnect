@@ -1,15 +1,16 @@
 import {
+  type ConstructDirectionUrlProps,
+  type ConstructMatrixUrlProps,
+  constructDirectionUrlPropsSchema,
+} from '@repo/types/validations';
+
+import {
   DIRECTIONS_URL,
   GeometryFormat,
   MATRIX_URL,
   OverviewType,
   VoiceUnit,
 } from '@/constants/mapbox.constants';
-import {
-  type ConstructDirectionUrlProps,
-  type ConstructMatrixUrlProps,
-  constructDirectionUrlPropsSchema,
-} from '@/validations/maps.validations';
 
 // ref: https://docs.mapbox.com/api/navigation/directions
 export function constructDirectionUrl(

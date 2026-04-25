@@ -1,0 +1,45 @@
+meta {
+  name: test
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://192.168.1.70:8080/messages?skipPhoneValidation=true&deviceActiveWithin=12
+  body: json
+  auth: basic
+}
+
+params:query {
+  skipPhoneValidation: true
+  deviceActiveWithin: 12
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:basic {
+  username: resqconnect
+  password: jhsHCTSQ
+}
+
+body:json {
+  {
+    "textMessage": {
+      "text": "Kina send navako k"
+    },
+    "deviceId": "ffffffffd465c42b0000019d63daeacc",
+    "phoneNumbers": [
+      "+9779807333458"
+    ],
+    "simNumber": 1,
+    "ttl": 3600,
+    "priority": 100
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

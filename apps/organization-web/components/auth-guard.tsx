@@ -2,7 +2,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import {
   getTokenFromStorage,
@@ -16,18 +16,13 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [hasToken, setHasToken] = useState(false);
+
+  const token = getTokenFromStorage('token');
+  const hasToken = !!token;
 
   useEffect(() => {
-    const token = getTokenFromStorage('token');
-    if (!token) {
-      router.push('/login');
-    } else {
-      setHasToken(true);
-    }
-    setIsChecking(false);
-  }, [router]);
+    if (!hasToken) router.push('/login');
+  }, [hasToken, router]);
 
   const { isLoading, isError } = useOrgProfile(hasToken);
 
@@ -38,7 +33,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   }, [isError, router]);
 
-  if (isChecking || (hasToken && isLoading)) {
+  if (!hasToken || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -51,7 +46,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!hasToken || isError) {
+  if (isError) {
     return null;
   }
 

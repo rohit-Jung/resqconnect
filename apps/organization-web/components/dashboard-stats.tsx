@@ -1,9 +1,10 @@
 'use client';
 
+import { Card, CardContent } from '@repo/ui/card';
+import { Skeleton } from '@repo/ui/skeleton';
+
 import { AlertTriangle, Clock, TrendingUp, Users } from 'lucide-react';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { IOrgDashboardAnalytics } from '@/types/auth.types';
 
 interface DashboardStatsProps {

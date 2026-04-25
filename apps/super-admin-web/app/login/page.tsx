@@ -1,6 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@repo/ui/button';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -9,12 +12,8 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { GuestGuard } from '@/components/guest-guard';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useSuperAdminLogin } from '@/services/super-admin/auth.api';
-import { IAdminLoginResponse, IOtpResponse } from '@/types/auth.types';
 import {
   TSuperAdminLogin,
   superAdminLoginSchema,
@@ -39,8 +38,8 @@ function parseApiError(err: unknown): string {
 
 export default function SuperAdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const router = useRouter();
   const loginMutation = useSuperAdminLogin();
+  const router = useRouter();
 
   const {
     register,
@@ -51,30 +50,21 @@ export default function SuperAdminLoginPage() {
     defaultValues: {
       email: '',
       password: '',
-      role: 'admin',
     },
   });
 
   const onSubmit = (data: TSuperAdminLogin) => {
     loginMutation.mutate(data, {
       onSuccess: response => {
-        const responseData = response.data.data;
-
-        if ('otpToken' in responseData) {
-          const otpData = responseData as IOtpResponse;
-          toast.success('OTP sent to your email');
-          router.push(`/verify?userId=${otpData.userId}`);
-        } else {
-          const loginData = responseData as IAdminLoginResponse;
-          if (loginData.token) {
-            setTokenToStorage('adminToken', loginData.token);
-          }
-          toast.success('Welcome back');
-          router.push('/dashboard');
+        if (response.data.token) {
+          setTokenToStorage('adminToken', response.data.token);
         }
+        toast.success('Welcome back');
+        router.push('/dashboard');
       },
       onError: error => {
-        toast.error(parseApiError(error));
+        console.log('ERROR', parseApiError(error));
+        // toast.error(parseApiError(error));
       },
     });
   };

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import type { ApiResponse, IDashboardAnalytics } from '@/types/auth.types';
+import type { IDashboardAnalytics } from '@/types/auth.types';
 
 import api from '../axiosInstance';
 import { adminEndpoints } from '../endPoints';
@@ -35,10 +35,12 @@ export const useDashboardAnalytics = (
     sortField: params.sortField || 'createdAt',
   };
 
-  return useQuery<AxiosResponse<ApiResponse<IDashboardAnalytics>>, AxiosError>({
+  return useQuery<
+    AxiosResponse<{ ok: true; data: IDashboardAnalytics }>,
+    AxiosError
+  >({
     queryKey: dashboardKeys.analyticsWithParams(queryParams),
-    queryFn: () =>
-      api.get(adminEndpoints.dashboardAnalytics, { params: queryParams }),
+    queryFn: () => api.get(adminEndpoints.dashboard, { params: queryParams }),
     enabled,
   });
 };

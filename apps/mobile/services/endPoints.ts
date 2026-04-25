@@ -18,6 +18,12 @@ export const uploadEndpoints = {
   deleteProfilePicture: `/upload/profile-picture`,
 };
 
+export const providerUploadEndpoints = {
+  getSignature: `/service-provider/profile-picture/signature`,
+  updateProfilePicture: `/service-provider/profile-picture`,
+  deleteProfilePicture: `/service-provider/profile-picture`,
+};
+
 export const serviceProviderEndpoints = {
   login: `/service-provider/login`,
   verify: `/service-provider/verify`,
@@ -31,6 +37,7 @@ export const serviceProviderEndpoints = {
   nearby: `/service-provider/nearby`,
   // Document verification
   uploadDocuments: `/service-provider/documents`,
+  documentSignatures: `/service-provider/documents/signatures`,
   documentStatus: `/service-provider/documents/status`,
 };
 

@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Tailwind v4: include class usage from workspace packages */
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

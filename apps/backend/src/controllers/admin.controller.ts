@@ -1,13 +1,14 @@
+import { organization, serviceProvider, user } from '@repo/db/schemas';
+import { getRouteParamSchema } from '@repo/types/validations';
+
 import { HttpStatusCode } from 'axios';
 import { asc, count, desc, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import db from '@/db';
-import { organization, serviceProvider, user } from '@/models';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { getRouteParamSchema } from '@/validations/route-params.validations';
 
 function getStatsQuery(
   role: 'serviceProvider' | 'user' | 'organization',
@@ -177,5 +178,9 @@ const getDashboardAnalytics = asyncHandler(
     );
   }
 );
+
+const adminController = { getDashboardAnalytics } as const;
+
+export default adminController;
 
 export { getDashboardAnalytics };

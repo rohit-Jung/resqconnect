@@ -102,8 +102,14 @@ export default function EditProfileScreen() {
                   updateProfilePicture(null);
                   await refetch();
                   Alert.alert('Success', 'Profile picture removed');
-                } catch {
-                  Alert.alert('Error', 'Failed to remove profile picture');
+                } catch (e: any) {
+                  Alert.alert(
+                    'Error',
+                    e?.response?.data?.message ||
+                      e?.response?.data?.error ||
+                      e?.message ||
+                      'Failed to remove profile picture'
+                  );
                 } finally {
                   setIsUploading(false);
                 }
@@ -157,10 +163,13 @@ export default function EditProfileScreen() {
           updateProfilePicture(newUrl);
           await refetch();
           Alert.alert('Success', 'Profile picture updated successfully!');
-        } catch {
+        } catch (e: any) {
           Alert.alert(
             'Upload Failed',
-            'Failed to upload profile picture. Please try again.'
+            e?.response?.data?.message ||
+              e?.response?.data?.error ||
+              e?.message ||
+              'Failed to upload profile picture. Please try again.'
           );
         } finally {
           setIsUploading(false);
