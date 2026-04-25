@@ -38,22 +38,17 @@ app.use(auditLogMiddleware);
 app.use(phiMaskMiddleware);
 
 // global rate limiting to all routes (baseline DDoS protection)
-// app.use(globalLimiter);
+app.use(globalLimiter);
 
 // enforce org-tiered api limits (15m window).
 // uses redis so  works across instances.
-// app.use(orgTierApiLimiter);
+app.use(orgTierApiLimiter);
 
 // enforce compliance constraints after auth middleware populates req.user.
 // these middlewares are safe no-ops for unauthenticated requests.
 app.use(enforceSessionTimeout);
 app.use(requireMfa);
 app.use(enforceRbac);
-
-app.use(function (req: Request, _, next: NextFunction) {
-  console.log('[Received] at ', req.method, req.url);
-  next();
-});
 
 // api routes
 app.use('/api/v1', v1Router);
