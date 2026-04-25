@@ -245,11 +245,14 @@ export default function EmergencyTrackingScreen() {
   // Pulse animation is now handled by usePulseAnimation hook
   // No need for separate useEffect
 
-  // Simulated location movement along route (for testing)
-  // Moves the provider/user location along the calculated route every 1 second
+  // Simulated location movement along route (for testing only)
+  // Enable with EXPO_PUBLIC_TEST_MODE=true in .env
   useEffect(() => {
-    // Only enable for testing when we have a route and emergency is active
+    const isTestMode = process.env.EXPO_PUBLIC_TEST_MODE === 'true';
+
+    // Only enable in test mode when we have a route and emergency is active
     if (
+      !isTestMode ||
       !routeCoordinates.length ||
       currentStatus !== EmergencyStatus.ACCEPTED ||
       !isProvider
