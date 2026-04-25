@@ -1,23 +1,26 @@
+import type { Coordinates } from '@repo/types/validations';
+
 import { envConfig, logger } from '@/config';
 import { RoutingProfiles } from '@/constants/mapbox.constants';
 import { cacheRoute, getCachedRoute } from '@/services/redis.service';
 import type { RouteResponse, RouteResult } from '@/types/maps.types';
 import { constructDirectionUrl } from '@/utils/maps/mapbox';
-import type { Coordinates } from '@/validations/maps.validations';
 
 export async function getRouteFromMapbox(
   origin: Coordinates,
   destination: Coordinates,
-  profile: RoutingProfiles = RoutingProfiles.DrivingTraffic
+  profile: RoutingProfiles = RoutingProfiles.DrivingTraffic,
+  emergencyType?: string
 ): Promise<RouteResult> {
   try {
-    // Check cache first
+    // Check cache first (by emergency type/sector)
     const cachedRoute = await getCachedRoute(
       origin.lat,
       origin.lng,
       destination.lat,
       destination.lng,
-      profile
+      profile,
+      emergencyType
     );
 
     if (cachedRoute) {
@@ -30,7 +33,7 @@ export async function getRouteFromMapbox(
 
     const url = constructDirectionUrl({
       profile,
-      token: envConfig.mapbox_token,
+      token: envConfig.mapbox_access_token as string,
       origin,
       dest: destination,
     });
@@ -73,13 +76,14 @@ export async function getRouteFromMapbox(
       })),
     };
 
-    // Cache the route for future use
+    // Cache the route for future use (by emergency type/sector)
     await cacheRoute(
       origin.lat,
       origin.lng,
       destination.lat,
       destination.lng,
       profile,
+      emergencyType,
       processedRoute
     );
 
