@@ -1,11 +1,12 @@
+import { emergencyRequest, serviceProvider } from '@repo/db/schemas';
+
 import { eq, sql } from 'drizzle-orm';
 import { latLngToCell } from 'h3-js';
 import { Server, Socket } from 'socket.io';
 
-import { logger } from '@/config/logger/winston.config';
+import { envConfig, logger } from '@/config';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
-import { serviceProvider } from '@/models';
 
 const LOCATION_RADIUS_METERS = 50;
 
@@ -71,6 +72,38 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
           timestamp: timestamp || Date.now(),
         }
       );
+
+      // Forward to platform for user tracking
+      if (envConfig.platform_base_url) {
+        const { postJsonWithRetry } =
+          await import('@/services/internal-http.service');
+
+        // Fetch userId from request in DB
+        const request = await db.query.emergencyRequest.findFirst({
+          where: eq(emergencyRequest.id, requestId),
+          columns: { userId: true },
+        });
+
+        postJsonWithRetry(
+          `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
+          {
+            headers: {
+              'x-internal-api-key': envConfig.internal_api_key as string,
+            },
+            body: {
+              userId: request?.userId,
+              eventType: SocketEvents.PROVIDER_LOCATION_UPDATED,
+              payload: {
+                providerId,
+                location: { latitude, longitude },
+                timestamp: timestamp || Date.now(),
+              },
+            },
+            timeoutMs: 1000,
+            retries: 1,
+          }
+        ).catch(e => logger.warn(`[LOCATION] Failed to notify platform: ${e}`));
+      }
     } else if (userId) {
       // User location → broadcast to emergency room
       io.to(SocketRoom.EMERGENCY(requestId)).emit(

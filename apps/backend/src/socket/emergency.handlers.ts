@@ -1,16 +1,19 @@
-import { and, eq } from 'drizzle-orm';
-import type { Server, Socket } from 'socket.io';
-
-import { logger } from '@/config/logger/winston.config';
-import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
-import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
-import db from '@/db';
 import {
   emergencyRequest,
   emergencyResponse,
   requestEvents,
   serviceProvider,
-} from '@/models';
+  user,
+} from '@repo/db/schemas';
+
+import { and, eq } from 'drizzle-orm';
+import type { Server, Socket } from 'socket.io';
+
+import { envConfig } from '@/config';
+import { logger } from '@/config/logger/winston.config';
+import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
+import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
+import db from '@/db';
 import { getRouteFromMapbox } from '@/services/mapbox.service';
 import {
   acquireLock,
@@ -308,6 +311,47 @@ async function handleAcceptRequest(
     setTimeout(async () => {
       await releaseLock(requestId);
     }, 2000);
+
+    // Notify platform asynchronously when provider accepts
+    if (envConfig.platform_base_url && request.userId) {
+      const userId = request.userId;
+      const reqId = requestId;
+      const providerInfo = provider;
+      const routeInfo = routeData;
+      (async () => {
+        try {
+          const { postJsonWithRetry } =
+            await import('@/services/internal-http.service');
+          await postJsonWithRetry(
+            `${envConfig.platform_base_url}/api/v1/internal/incidents/${reqId}/update`,
+            {
+              headers: {
+                'x-internal-api-key': envConfig.internal_api_key as string,
+              },
+              body: {
+                userId,
+                eventType: SocketEvents.REQUEST_ACCEPTED,
+                requestStatus: 'accepted',
+                provider: {
+                  id: providerInfo?.id,
+                  name: providerInfo?.name,
+                  phone: providerInfo?.phoneNumber?.toString(),
+                  serviceType: providerInfo?.serviceType,
+                  vehicleNumber: providerInfo?.vehicleInformation?.number,
+                  location: providerInfo?.currentLocation,
+                },
+                route: routeInfo,
+              },
+              timeoutMs: 2000,
+              retries: 1,
+              backoffMs: 500,
+            }
+          );
+        } catch (e) {
+          logger.warn(`[ACCEPT] Failed to notify platform: ${e}`);
+        }
+      })();
+    }
   } catch (error) {
     logger.error(`Error handling accept from provider ${providerId}:`, error);
 
@@ -765,6 +809,28 @@ async function handleConfirmArrival(
         message: 'Emergency has been marked as complete.',
       }
     );
+
+    // Forward completion to platform
+    if (envConfig.platform_base_url && emergReq.userId) {
+      const { postJsonWithRetry } =
+        await import('@/services/internal-http.service');
+      postJsonWithRetry(
+        `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
+        {
+          headers: {
+            'x-internal-api-key': envConfig.internal_api_key as string,
+          },
+          body: {
+            userId: emergReq.userId,
+            eventType: SocketEvents.REQUEST_COMPLETED,
+            requestStatus: 'completed',
+            payload: { completedBy: role, completedAt },
+          },
+          timeoutMs: 1000,
+          retries: 1,
+        }
+      ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
+    }
 
     // Also emit to user and provider rooms
     if (emergReq.userId) {
