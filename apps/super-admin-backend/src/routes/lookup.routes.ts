@@ -4,11 +4,10 @@ import {
   listOrgsForLookup,
   lookupOrgByName,
 } from '@/controllers/lookup.controller';
+import { asyncHandler } from '@/utils/async-handler';
 
 export const lookupRouter = Router();
 
-// Mobile responder lookup: resolve org name -> sector + silo URL + orgId.
-lookupRouter.get('/org', lookupOrgByName);
+lookupRouter.get('/org', asyncHandler(lookupOrgByName));
 
-// Mobile responder lookup: list orgs for sector picker.
-lookupRouter.get('/orgs', listOrgsForLookup);
+lookupRouter.get('/orgs', asyncHandler(listOrgsForLookup));

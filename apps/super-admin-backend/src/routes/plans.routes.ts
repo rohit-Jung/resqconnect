@@ -7,12 +7,12 @@ import {
   updatePlan,
 } from '@/controllers/plans.controller';
 import { requireAdminAuth } from '@/middlewares/admin-auth.middleware';
+import { asyncHandler } from '@/utils/async-handler';
 
 export const plansRouter = Router();
 
-plansRouter.get('/', listPlans);
+plansRouter.get('/', asyncHandler(listPlans));
 
-// Minimal admin endpoint (no auth yet in this app) to seed plans.
-plansRouter.post('/', requireAdminAuth, createPlan);
-plansRouter.put('/:id', requireAdminAuth, updatePlan);
-plansRouter.delete('/:id', requireAdminAuth, deletePlan);
+plansRouter.post('/', requireAdminAuth, asyncHandler(createPlan));
+plansRouter.put('/:id', requireAdminAuth, asyncHandler(updatePlan));
+plansRouter.delete('/:id', requireAdminAuth, asyncHandler(deletePlan));
