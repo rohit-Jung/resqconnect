@@ -8,6 +8,13 @@
       "when": 1776482719733,
       "tag": "0000_magical_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777097387044,
+      "tag": "0001_even_yellowjacket",
+      "breakpoints": true
     }
   ]
 }

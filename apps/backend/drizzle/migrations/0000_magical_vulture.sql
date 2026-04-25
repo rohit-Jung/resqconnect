@@ -250,7 +250,6 @@ CREATE TABLE "organization_entitlements_snapshot" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "emergency_request" ADD CONSTRAINT "emergency_request_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "emergency_response" ADD CONSTRAINT "emergency_response_emergency_request_id_emergency_request_id_fk" FOREIGN KEY ("emergency_request_id") REFERENCES "public"."emergency_request"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "emergency_response" ADD CONSTRAINT "emergency_response_service_provider_id_service_provider_id_fk" FOREIGN KEY ("service_provider_id") REFERENCES "public"."service_provider"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "feedback" ADD CONSTRAINT "feedback_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
