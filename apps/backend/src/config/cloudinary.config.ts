@@ -1,56 +1,30 @@
 import { v2 as cloudinary } from 'cloudinary';
-import type { Request } from 'express';
-import multer from 'multer';
-import type { FileFilterCallback } from 'multer';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
-import { envConfig } from './env.config';
+import { envConfig } from '@/config';
 
-cloudinary.config({
-  cloud_name: envConfig.cloudinary_cloud_name,
-  api_key: envConfig.cloudinary_api_key,
-  api_secret: envConfig.cloudinary_api_secret,
-});
+const cloudName =
+  typeof envConfig.cloudinary_cloud_name === 'string'
+    ? envConfig.cloudinary_cloud_name
+    : undefined;
+const apiKey =
+  typeof envConfig.cloudinary_api_key === 'string'
+    ? envConfig.cloudinary_api_key
+    : undefined;
+const apiSecret =
+  typeof envConfig.cloudinary_api_secret === 'string'
+    ? envConfig.cloudinary_api_secret
+    : undefined;
 
-const documentStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'document-verification',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-    public_id: (_req: Request, file: Express.Multer.File) => {
-      const timestamp = Date.now();
-      const fieldName = file.fieldname;
-      return `${fieldName}-${timestamp}`;
-    },
-  } as any,
-});
-
-export const uploadDocuments = multer({
-  storage: documentStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (
-    _req: Request,
-    file: Express.Multer.File,
-    cb: FileFilterCallback
-  ) => {
-    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only JPEG, PNG, and PDF files are allowed'));
-    }
-  },
-}).fields([
-  { name: 'panCard', maxCount: 1 },
-  { name: 'citizenship', maxCount: 1 },
-]);
+if (cloudName && apiKey && apiSecret) {
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+}
 
 export function isCloudinaryConfigured(): boolean {
-  return !!(
-    envConfig.cloudinary_cloud_name &&
-    envConfig.cloudinary_api_key &&
-    envConfig.cloudinary_api_secret
-  );
+  return !!(cloudName && apiKey && apiSecret);
 }
 
 export function generateUploadSignature(
@@ -75,16 +49,13 @@ export function generateUploadSignature(
     paramsToSign.public_id = publicId;
   }
 
-  const signature = cloudinary.utils.api_sign_request(
-    paramsToSign,
-    envConfig.cloudinary_api_secret!
-  );
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret!);
 
   return {
     signature,
     timestamp,
-    cloudName: envConfig.cloudinary_cloud_name!,
-    apiKey: envConfig.cloudinary_api_key!,
+    cloudName: cloudName!,
+    apiKey: apiKey!,
     folder,
     publicId,
   };
