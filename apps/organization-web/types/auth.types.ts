@@ -81,6 +81,18 @@ export interface IOrgProfileResponse {
   role: string;
 }
 
+export interface IOrgProfileWithEntitlements {
+  user: IOrgProfileResponse;
+  entitlements: IOrgEntitlements;
+}
+
+export interface IOrgEntitlements {
+  provider_count_limit: number;
+  api_rate_limit_tier: number;
+  notification_fallback_quota: number;
+  analytics_enabled: boolean;
+}
+
 // Service Provider Types
 export interface IServiceProviderLoginResponse {
   token: string;

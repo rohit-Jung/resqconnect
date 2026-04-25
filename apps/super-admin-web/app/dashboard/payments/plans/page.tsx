@@ -64,6 +64,26 @@ const ENTITLEMENT_KEYS = new Set([
   'analytics_enabled',
 ]);
 
+function getHumanReadableFeature(feature: string): string {
+  const idx = feature.indexOf('=');
+  if (idx <= 0) return feature;
+  const key = feature.slice(0, idx).trim();
+  const value = feature.slice(idx + 1).trim();
+
+  switch (key) {
+    case 'provider_count_limit':
+      return `Up to ${value} service providers`;
+    case 'api_rate_limit_tier':
+      return `${value} API requests per 15 min`;
+    case 'notification_fallback_quota':
+      return `${value} SMS fallback quota`;
+    case 'analytics_enabled':
+      return value === 'true' ? 'Analytics enabled' : 'Analytics disabled';
+    default:
+      return feature;
+  }
+}
+
 function splitPlanFeatures(features: string[] | undefined) {
   const entitlements = {
     provider_count_limit: '0',
@@ -639,7 +659,7 @@ export default function PlansManagementPage() {
                       {plan.features.map((feature, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm">
                           <Check className="h-4 w-4 shrink-0 text-green-500" />
-                          {feature}
+                          {getHumanReadableFeature(feature)}
                         </li>
                       ))}
                     </ul>

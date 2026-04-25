@@ -6,11 +6,16 @@ import { DashboardAlerts } from '@/components/dashboard-alerts';
 import { DashboardCharts } from '@/components/dashboard-charts';
 import { DashboardStats } from '@/components/dashboard-stats';
 import { DashboardTeams } from '@/components/dashboard-teams';
+import { useOrgProfile } from '@/services/organization/auth.api';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 
 export default function DashboardPage() {
   const { data: analyticsResponse, isLoading } = useOrgDashboardAnalytics();
+  const { data: profileResponse } = useOrgProfile();
   const analytics = analyticsResponse?.data?.data;
+  const profileData = profileResponse?.data?.data;
+  const entitlements = profileData?.entitlements;
+  const analyticsEnabled = entitlements?.analytics_enabled ?? true;
 
   if (isLoading) {
     return (
@@ -48,10 +53,18 @@ export default function DashboardPage() {
       {/* Content */}
       <div className="px-6 pb-8 space-y-6">
         <DashboardStats data={analytics} isLoading={isLoading} />
-        <DashboardCharts
-          emergencyRequests={analytics?.emergencyRequests}
-          isLoading={isLoading}
-        />
+        <div className={analyticsEnabled ? '' : 'blur-sm select-none'}>
+          <DashboardCharts
+            emergencyRequests={analytics?.emergencyRequests}
+            isLoading={isLoading}
+          />
+        </div>
+        {!analyticsEnabled && (
+          <p className="text-center text-sm text-muted-foreground">
+            Analytics are disabled for your organization. Contact super admin to
+            enable.
+          </p>
+        )}
         <div className="grid gap-6 md:grid-cols-2">
           <DashboardAlerts
             emergencyRequests={analytics?.emergencyRequests?.recent}

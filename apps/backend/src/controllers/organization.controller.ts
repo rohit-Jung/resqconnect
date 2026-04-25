@@ -15,6 +15,7 @@ import { latLngToCell } from 'h3-js';
 
 import { H3_RESOLUTION } from '@/constants';
 import db from '@/db';
+import { getLatestOrgEntitlements } from '@/services/entitlements.service';
 import {
   clearLoginFailures,
   isLoginLocked,
@@ -293,38 +294,9 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   if (typeof email === 'string') await clearLoginFailures(email);
 
   if (!existingOrg.isVerified) {
-    const otpToken = await sendOTP(existingOrg.email);
-
-    if (!otpToken) {
-      console.log('Error Sending OTP token. Please try again');
-      throw new ApiError(300, 'Error Sending OTP token. Please try again');
-    }
-
-    const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
-    const updatedOrg = await db
-      .update(organization)
-      .set({
-        verificationToken: otpToken,
-        tokenExpiry: tokenExpiry.toISOString(),
-      })
-      .where(eq(organization.id, existingOrg.id));
-
-    if (!updatedOrg) {
-      console.log('Error Updating user. Please try again');
-      throw new ApiError(400, 'Error Updating user. Please try again');
-    }
-
-    console.log('OTP sent to user for verification', {
-      userId: existingOrg.id,
-      otpToken,
-    });
-
-    return res.status(200).json(
-      new ApiResponse(200, 'OTP sent to user for verification', {
-        userId: existingOrg.id,
-        // otpToken,
-      })
+    throw new ApiError(
+      403,
+      'Super admin has not verified your organization yet. Please contact support.'
     );
   }
 
@@ -521,9 +493,20 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'User not found');
   }
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, 'User found', { user: existingOrg }));
+  const entitlements = await getLatestOrgEntitlements(loggedInOrg.id);
+  const entitlementsData = entitlements?.entitlements ?? {
+    provider_count_limit: 0,
+    api_rate_limit_tier: 15000,
+    notification_fallback_quota: 0,
+    analytics_enabled: false,
+  };
+
+  res.status(200).json(
+    new ApiResponse(200, 'User found', {
+      user: existingOrg,
+      entitlements: entitlementsData,
+    })
+  );
 });
 
 // Update organization's own profile

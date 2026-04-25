@@ -4,6 +4,7 @@ import { AxiosError, AxiosResponse } from 'axios';
 
 // Import response types
 import {
+  IOrgEntitlements,
   IOrgLoginResponse,
   IOrgProfileResponse,
   IOrgRegisterResponse,
@@ -70,7 +71,12 @@ const useOrgResendVerificationOTP = () => {
 };
 
 const useOrgProfile = (enabled: boolean = true) => {
-  return useQuery<AxiosResponse<ApiResponse<IOrgProfileResponse>>, AxiosError>({
+  return useQuery<
+    AxiosResponse<
+      ApiResponse<{ user: IOrgProfileResponse; entitlements: IOrgEntitlements }>
+    >,
+    AxiosError
+  >({
     queryKey: ['orgProfile'],
     queryFn: () => api.get(orgEndpoints.profile),
     enabled,
