@@ -1,0 +1,284 @@
+services:
+  # Control plane
+  control_plane_db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_control_plane
+    ports:
+      - '127.0.0.1:5550:5432'
+    volumes:
+      - stack_control_plane_postgres_data:/var/lib/postgresql/data
+
+  control_plane_backend:
+    build:
+      context: ..
+      dockerfile: apps/super-admin-backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@control_plane_db:5432/resq_control_plane
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    env_file:
+      - ./control-plane/control-plane.env
+    depends_on:
+      - control_plane_db
+    ports:
+      - '127.0.0.1:7500:4000'
+
+  # Platform backend (user-facing)
+  platform_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_platform
+    ports:
+      - '127.0.0.1:5540:5432'
+    volumes:
+      - stack_platform_postgres_data:/var/lib/postgresql/data
+
+  # Shared Redis for route caching
+  shared_redis:
+    image: valkey/valkey
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6380:6379'
+
+  platform_backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      MODE: platform
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@platform_db:5432/resq_platform
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      PLATFORM_BASE_URL: http://platform_backend:3000
+      SILO_FIRE_BASE_URL: http://fire_backend:3000
+      SILO_HOSPITAL_BASE_URL: http://hospital_backend:3000
+      SILO_POLICE_BASE_URL: http://police_backend:3000
+      REDIS_HOST: shared_redis
+      REDIS_PORT: 6379
+      DISPATCH_TIMEOUT_MS: 2000
+      DISPATCH_RETRIES: 2
+      DISPATCH_BACKOFF_MS: 500
+    env_file:
+      - ./platform/platform.env
+    depends_on:
+      - platform_db
+    ports:
+      - '127.0.0.1:7400:3000'
+
+  # Fire silo
+  fire_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_fire
+    ports:
+      - '127.0.0.1:5541:5432'
+    volumes:
+      - stack_fire_postgres_data:/var/lib/postgresql/data
+
+  fire_redis:
+    image: valkey/valkey
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6381:6379'
+
+  fire_kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:9094:9092'
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@fire_kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9094,PLAINTEXT_INTERNAL://fire_kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - stack_fire_kafka_data:/var/lib/kafka/data
+
+  fire_backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      MODE: silo
+      SECTOR: fire
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@fire_db:5432/resq_fire
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_HOST: shared_redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: fire_kafka:29092
+      PLATFORM_BASE_URL: http://platform_backend:3000
+    env_file:
+      - ./fire/silo.env
+    depends_on:
+      - fire_db
+      - fire_redis
+      - fire_kafka
+    ports:
+      - '127.0.0.1:7401:3000'
+
+  # Hospital silo
+  hospital_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_hospital
+    ports:
+      - '127.0.0.1:5542:5432'
+    volumes:
+      - stack_hospital_postgres_data:/var/lib/postgresql/data
+
+  hospital_redis:
+    image: valkey/valkey
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6382:6379'
+
+  hospital_kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:9095:9092'
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@hospital_kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9095,PLAINTEXT_INTERNAL://hospital_kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - stack_hospital_kafka_data:/var/lib/kafka/data
+
+  hospital_backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      MODE: silo
+      SECTOR: hospital
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@hospital_db:5432/resq_hospital
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_HOST: shared_redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: hospital_kafka:29092
+      PLATFORM_BASE_URL: http://platform_backend:3000
+    env_file:
+      - ./hospital/silo.env
+    depends_on:
+      - hospital_db
+      - hospital_redis
+      - hospital_kafka
+    ports:
+      - '127.0.0.1:7402:3000'
+
+  # Police silo
+  police_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_police
+    ports:
+      - '127.0.0.1:5543:5432'
+    volumes:
+      - stack_police_postgres_data:/var/lib/postgresql/data
+
+  police_redis:
+    image: valkey/valkey
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6383:6379'
+
+  police_kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:9096:9092'
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@police_kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9096,PLAINTEXT_INTERNAL://police_kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - stack_police_kafka_data:/var/lib/kafka/data
+
+  police_backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      MODE: silo
+      SECTOR: police
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@police_db:5432/resq_police
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_HOST: shared_redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: police_kafka:29092
+      PLATFORM_BASE_URL: http://platform_backend:3000
+    env_file:
+      - ./police/silo.env
+    depends_on:
+      - police_db
+      - police_redis
+      - police_kafka
+    ports:
+      - '127.0.0.1:7403:3000'
+
+volumes:
+  stack_control_plane_postgres_data:
+  stack_fire_postgres_data:
+  stack_fire_kafka_data:
+  stack_hospital_postgres_data:
+  stack_hospital_kafka_data:
+  stack_police_postgres_data:
+  stack_police_kafka_data:
