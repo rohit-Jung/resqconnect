@@ -1,3 +1,5 @@
+import { asyncHandler } from '@repo/utils/api';
+
 import { Router } from 'express';
 
 import {
@@ -8,7 +10,6 @@ import {
   updateOrgStatus,
 } from '@/controllers/orgs.controller';
 import { requireAdminAuth } from '@/middlewares/admin-auth.middleware';
-import { asyncHandler } from '@/utils/async-handler';
 
 export const orgsRouter = Router();
 
