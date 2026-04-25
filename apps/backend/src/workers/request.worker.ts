@@ -1,3 +1,11 @@
+import {
+  emergencyRequest,
+  requestEvents,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
+import { EmergencyRequestPayload } from '@repo/types/validations';
+
 import { eq } from 'drizzle-orm';
 import type { Server } from 'socket.io';
 
@@ -10,12 +18,6 @@ import {
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
-import {
-  emergencyRequest,
-  requestEvents,
-  serviceProvider,
-  user,
-} from '@/models';
 import { assignResponderConsumer } from '@/services/kafka/kafka.service';
 import {
   calculateDistancesAndSort,
@@ -23,7 +25,6 @@ import {
 } from '@/services/matching.service';
 import { cacheEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
-import { EmergencyRequestPayload } from '@/validations/emergency-request';
 
 async function startEmergencyRequestService() {
   logger.info('Starting Kafka consumer connection...');
@@ -211,13 +212,26 @@ async function startEmergencyRequestService() {
         io.in(result.providerId).socketsJoin(SocketRoom.EMERGENCY(requestId));
         io.in(userId).socketsJoin(SocketRoom.EMERGENCY(requestId));
 
+        // Get provider info to include in notification
+        const providerData = await db.query.serviceProvider.findFirst({
+          where: eq(serviceProvider.id, result.providerId),
+        });
+
         io.to(SocketRoom.EMERGENCY(requestId)).emit(
-          SocketEvents.JOINED_EMERGENCY_ROOM,
+          SocketEvents.REQUEST_ACCEPTED,
           {
             requestId,
             emergencyLocation,
             emergencyType,
             providerId: result.providerId,
+            provider: {
+              id: providerData?.id,
+              name: providerData?.name,
+              phone: providerData?.phoneNumber?.toString(),
+              serviceType: providerData?.serviceType,
+              vehicleNumber: providerData?.vehicleInformation?.number,
+              location: providerData?.currentLocation,
+            },
           }
         );
 
