@@ -8,21 +8,23 @@ export const EMERGENCY_LOCK_KEY = (requestId: string) =>
 export const PROVIDER_LOCATION_KEY = (providerId: string) =>
   `provider:${providerId}:location`;
 
-// Route cache keys - cache routes between same origin-destination pairs
-// Format: route:{origin_lat}:{origin_lng}:{dest_lat}:{dest_lng}:{profile}
+// Route cache keys - cache routes by sector (emergency type) for same origin-destination pairs
+// Format: route:{emergencyType}:{origin_lat}:{origin_lng}:{dest_lat}:{dest_lng}:{profile}
 export const ROUTE_CACHE_KEY = (
   originLat: number,
   originLng: number,
   destLat: number,
   destLng: number,
-  profile: string
+  profile: string,
+  emergencyType?: string
 ) => {
   // Round to 4 decimal places to handle small location variations (~11 meters)
   const oLat = Math.round(originLat * 10000) / 10000;
   const oLng = Math.round(originLng * 10000) / 10000;
   const dLat = Math.round(destLat * 10000) / 10000;
   const dLng = Math.round(destLng * 10000) / 10000;
-  return `route:${oLat}:${oLng}:${dLat}:${dLng}:${profile}`;
+  const sector = emergencyType || 'default';
+  return `route:${sector}:${oLat}:${oLng}:${dLat}:${dLng}:${profile}`;
 };
 
 // SMS deduplication keys
@@ -304,7 +306,7 @@ export async function batchCheckMessagesProcessed(
 
 /**
  * Cache a computed route to avoid re-computing the same route
- * Caches routes between same origin-destination pairs
+ * Caches routes by emergency type (sector) for same origin-destination pairs
  */
 export async function cacheRoute(
   originLat: number,
@@ -312,24 +314,39 @@ export async function cacheRoute(
   destLat: number,
   destLng: number,
   profile: string,
-  routeData: any
+  emergencyType?: string
 ): Promise<void> {
-  const key = ROUTE_CACHE_KEY(originLat, originLng, destLat, destLng, profile);
+  const key = ROUTE_CACHE_KEY(
+    originLat,
+    originLng,
+    destLat,
+    destLng,
+    profile,
+    emergencyType
+  );
   await redis.set(key, JSON.stringify(routeData), 'EX', CACHE_EXPIRY.ROUTE);
   console.log(`[ROUTE_CACHE] Cached route: ${key}`);
 }
 
 /**
- * Get cached route for origin-destination pair
+ * Get cached route by emergency type (sector) for origin-destination pair
  */
 export async function getCachedRoute(
   originLat: number,
   originLng: number,
   destLat: number,
   destLng: number,
-  profile: string
+  profile: string,
+  emergencyType?: string
 ): Promise<any | null> {
-  const key = ROUTE_CACHE_KEY(originLat, originLng, destLat, destLng, profile);
+  const key = ROUTE_CACHE_KEY(
+    originLat,
+    originLng,
+    destLat,
+    destLng,
+    profile,
+    emergencyType
+  );
   const data = await redis.get(key);
   if (data) {
     console.log(`[ROUTE_CACHE] Cache HIT: ${key}`);
