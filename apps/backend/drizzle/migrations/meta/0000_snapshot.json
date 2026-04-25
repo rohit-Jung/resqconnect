@@ -1,5 +1,5 @@
 {
-  "id": "ba4bec93-8c27-4912-a8cc-3a9749707c81",
+  "id": "281f94c8-b09a-47b6-8b5c-a1f6a8fda63e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -335,21 +335,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "emergency_request_user_id_user_id_fk": {
-          "name": "emergency_request_user_id_user_id_fk",
-          "tableFrom": "emergency_request",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
