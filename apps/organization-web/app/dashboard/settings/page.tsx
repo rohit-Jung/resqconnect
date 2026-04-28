@@ -24,7 +24,8 @@ export default function SettingsPage() {
   const { data: profileData, isLoading } = useOrgProfile();
   const updateProfileMutation = useOrgUpdateProfile();
 
-  const orgData: IOrgProfileResponse | undefined = profileData?.data?.data;
+  const profileResponse = profileData?.data?.data;
+  const orgData: IOrgProfileResponse | undefined = profileResponse?.user;
 
   // Keep local edits, but render server values until user changes.
   const [draftName, setDraftName] = useState<string | null>(null);
