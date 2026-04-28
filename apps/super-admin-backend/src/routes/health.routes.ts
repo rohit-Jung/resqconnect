@@ -1,7 +1,8 @@
+import { asyncHandler } from '@repo/utils/api';
+
 import { Router } from 'express';
 
 import { dbHealthcheck, healthcheck } from '@/controllers/health.controller';
-import { asyncHandler } from '@/utils/async-handler';
 
 export const healthRouter = Router();
 

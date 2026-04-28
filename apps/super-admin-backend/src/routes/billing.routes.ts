@@ -1,3 +1,5 @@
+import { asyncHandler } from '@repo/utils/api';
+
 import { Router } from 'express';
 
 import {
@@ -14,7 +16,6 @@ import {
 } from '@/controllers/billing.controller';
 import { requireAdminAuth } from '@/middlewares/admin-auth.middleware';
 import { requireOrgAuth } from '@/middlewares/org-auth.middleware';
-import { asyncHandler } from '@/utils/async-handler';
 
 export const billingRouter = Router();
 
