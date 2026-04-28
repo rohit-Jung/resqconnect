@@ -40,7 +40,6 @@ organizationRouter
   .get(
     validateOrg,
     requireActiveOrganization,
-    requireAnalyticsEnabled,
     organizationController.getOrgDashboardAnalytics
   );
 

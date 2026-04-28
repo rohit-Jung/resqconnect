@@ -14,7 +14,7 @@ export type OrgEntitlements = {
 
 export const RESTRICTIVE_DEFAULT_ENTITLEMENTS: OrgEntitlements = {
   provider_count_limit: 0,
-  api_rate_limit_tier: 0,
+  api_rate_limit_tier: 15000,
   notification_fallback_quota: 0,
   analytics_enabled: false,
 };
