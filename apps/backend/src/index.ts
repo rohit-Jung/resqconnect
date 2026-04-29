@@ -42,16 +42,16 @@ function startServer() {
 
       // start background workers (outbox publisher, timeout handler, etc.)
       startAllWorkers();
+
+      registerSmsWebhook().catch(err => {
+        // TODO: migrate console logs to logger
+        console.log('[WEBHOOK]: error while registering', err);
+      });
     }
 
     // TODO: this was old polling remove it
     // start sms polling worker for offline emergency requests
     // startSMSPollingWorker().catch(console.log);
-
-    registerSmsWebhook().catch(err => {
-      // TODO: migrate console logs to logger
-      console.log('[WEBHOOK]: error while registering', err);
-    });
   } catch (error) {
     console.log('Error starting server', error);
   }
