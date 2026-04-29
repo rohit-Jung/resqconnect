@@ -212,7 +212,7 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       payload.sender,
       SMS_TEMPLATES.REQUEST_FAILED(
         'An unexpected error occurred',
-        EMERGENCY_PHONE_NUMBER
+        EMERGENCY_PHONE_NUMBER as string
       )
     );
 
@@ -230,6 +230,7 @@ const registerSmsWebhook = async () => {
       url: `${envConfig.backend_base_path}/webhooks/messaging`,
       event: Events.SmsReceived,
     };
+    console.log('URL', envConfig.backend_base_path);
 
     const token = `${envConfig.sms_username}:${envConfig.sms_password}`;
     const auth_token = `Basic ${Buffer.from(token).toString('base64')}`;
