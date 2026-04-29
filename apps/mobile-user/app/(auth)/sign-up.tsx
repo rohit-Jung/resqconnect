@@ -178,7 +178,10 @@ const SignupScreen: React.FC = () => {
               placeholder={placeholder}
               placeholderTextColor={MID_GRAY}
               keyboardType={keyboardType}
-              secureTextEntry={secureTextEntry && !showPasswordToggle}
+              secureTextEntry={
+                secureTextEntry &&
+                !(name === 'password' ? showPassword : showConfirmPassword)
+              }
               autoCapitalize={autoCapitalize}
               maxLength={maxLength}
             />
