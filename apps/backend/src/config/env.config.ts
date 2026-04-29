@@ -45,7 +45,7 @@ const envSchema = z.object({
   SMS_USERNAME: z.string(),
   SMS_PASSWORD: z.string(),
 
-  BACKEND_BASE: z.string(),
+  BACKEND_BASE_PATH: z.string(),
 
   // Platform <-> silo base URLs (internal docker network addresses)
   PLATFORM_BASE_URL: z.string().optional(),
