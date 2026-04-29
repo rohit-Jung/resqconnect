@@ -230,6 +230,7 @@ const registerSmsWebhook = async () => {
       url: `${envConfig.backend_base_path}/webhooks/messaging`,
       event: Events.SmsReceived,
     };
+
     console.log('URL', envConfig.backend_base_path);
 
     const token = `${envConfig.sms_username}:${envConfig.sms_password}`;
@@ -237,7 +238,7 @@ const registerSmsWebhook = async () => {
 
     logger.info('[SMS WEBHOOK] Registering');
     const response = await axios.post(
-      `${envConfig.sms_uri_base}${SmsRoutes.registerWebhook}`,
+      `${envConfig.sms_uri}${SmsRoutes.registerWebhook}`,
       webhookData,
       {
         headers: {
