@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "ResQ",
-    "slug": "resq",
+    "name": "Resqconnect",
+    "slug": "resq-civilian",
     "version": "1.0.0",
-    "scheme": "resq",
+    "scheme": "resq-civilian",
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
@@ -45,7 +45,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f28bc5f5-0ba0-473b-a5bb-f1adedd7394e"
+        "projectId": "d1da640e-4a39-4ac4-9608-d5196cab6166"
       }
     }
   }
