@@ -1,9 +1,9 @@
 import { Router } from 'express';
 
 import { envConfig } from '@/config';
-import webHookRouter from '@/controllers/webhook.controller';
 import healthCheckRouter from '@/routes/healthcheck.routes';
 import userRouter from '@/routes/v1/user.routes';
+import webHookRouter from '@/routes/v1/webhook.routes';
 
 import adminRouter from './admin.routes';
 import emergencyContactsRouter from './emergency-contacts.routes';
@@ -37,7 +37,7 @@ if (envConfig.mode === 'platform') {
   v1Router.use('/upload', uploadRouter);
   v1Router.use('/webhooks', webHookRouter);
 } else {
-  // Silo mode needs emergency-request routes for accept/reject/complete
+  // silo mode needs emergency-request routes for accept/reject/complete
   v1Router.use('/emergency-request', emergencyRequestRouter);
   v1Router.use('/organization', organizationRouter);
   v1Router.use('/service-provider', serviceProviderRouter);
