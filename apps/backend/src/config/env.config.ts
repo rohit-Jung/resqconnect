@@ -1,5 +1,3 @@
-import { env } from 'node:process';
-
 import z from 'zod';
 import { type z as zType } from 'zod';
 
@@ -31,7 +29,7 @@ const envSchema = z.object({
   TO_NUMBER: z.string(),
   EMERGENCY_PHONE_NUMBER: z.string().default('112'),
 
-  // Khalti Payment Configuration
+  // khalti payment configuration
   KHALTI_SECRET_KEY: z.string(),
   KHALTI_BASE_URL: z.string().default('https://dev.khalti.com/api/v2'),
   KHALTI_RETURN_URL: z.string(),
@@ -40,10 +38,11 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
 
-  // LOCAL SMS INFO
+  // local sms info
   SMS_URI: z.string(),
   SMS_USERNAME: z.string(),
   SMS_PASSWORD: z.string(),
+  SMS_DEVICE_ID: z.string(),
 
   BACKEND_BASE_PATH: z.string(),
 
@@ -53,7 +52,7 @@ const envSchema = z.object({
   SILO_HOSPITAL_BASE_URL: z.string().optional(),
   SILO_POLICE_BASE_URL: z.string().optional(),
 
-  // Internal incident bridge routing
+  // internal incident bridge routing
   SILO_BASE_URL: z.string().optional(),
   SILO_NAME: z.enum(['fire', 'hospital', 'police']).optional(),
 
