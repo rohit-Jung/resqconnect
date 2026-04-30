@@ -5,7 +5,11 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 
 import { envConfig, logger } from '@/config';
-import { AVERAGE_SPEED_KM_PER_MIN, type ServiceTypeEnum } from '@/constants';
+import {
+  AVERAGE_SPEED_KM_PER_MIN,
+  type ServiceTypeEnum,
+  type ServiceTypeEnumVal,
+} from '@/constants';
 import { RoutingProfiles } from '@/constants/mapbox.constants';
 import db from '@/db';
 import { constructMatrixUrl } from '@/utils/maps/mapbox';
@@ -58,7 +62,7 @@ export async function findNearbyProviders({
 }: {
   lat: number;
   lng: number;
-  type: ServiceTypeEnum;
+  type: ServiceTypeEnumVal;
   kRingRadius: number;
 }): Promise<Array<IProviderInfo>> {
   // res - how large or small hex cells are

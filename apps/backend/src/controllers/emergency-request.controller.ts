@@ -6,6 +6,7 @@ import {
   serviceProvider,
   user,
 } from '@repo/db/schemas';
+import type { ICreateNewUserRequest } from '@repo/types/validations';
 
 import { HttpStatusCode } from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -38,10 +39,13 @@ import { getKafkaTopic } from '@/utils';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
+import '@/validations/';
 
 const createEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { emergencyType, emergencyDescription, userLocation } = req.body;
+    const { emergencyType, emergencyDescription, userLocation } =
+      req.body as ICreateNewUserRequest;
+
     const loggedInUser = req.user;
 
     const h3Index = latLngToCell(
@@ -60,7 +64,7 @@ const createEmergencyRequest = asyncHandler(
           .insert(emergencyRequest)
           .values({
             userId: loggedInUser!.id,
-            serviceType: String(emergencyType).toLowerCase() as any,
+            serviceType: emergencyType,
             description: emergencyDescription,
             location: {
               latitude: userLocation.latitude,
@@ -205,7 +209,7 @@ const getUsersEmergencyRequests = asyncHandler(
 const updateEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const { status } = req.body;
+    // const { status } = req.body;
 
     if (!id) {
       throw new ApiError(400, 'Emergency request ID is required');
@@ -875,7 +879,7 @@ const providerConfirmedArrival = asyncHandler(
 const getUserEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInUser = req.user;
-    const { page, limit, sortBy, status } = (req as any).validatedQuery as {
+    const { page, limit, sortBy, status } = req.validatedQuery as {
       page: number;
       limit: number;
       sortBy: 'asc' | 'desc';
@@ -892,7 +896,7 @@ const getUserEmergencyHistory = asyncHandler(
 
     const offset = (page - 1) * limit;
 
-    console.log('[RECEIVED]', req.user, (req as any).validatedQuery, status);
+    console.log('[RECEIVED]', req.user, req.validatedQuery, status);
 
     const whereConditions = status
       ? and(
@@ -978,7 +982,7 @@ const getUserEmergencyHistory = asyncHandler(
 const getProviderEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInProvider = req.user;
-    const { page, limit, sortBy, status } = (req as any).validatedQuery as {
+    const { page, limit, sortBy, status } = req.validatedQuery as {
       page: number;
       limit: number;
       sortBy: 'asc' | 'desc';

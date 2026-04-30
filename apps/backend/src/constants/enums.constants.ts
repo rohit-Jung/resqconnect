@@ -14,6 +14,7 @@ export enum ServiceTypeEnum {
   RESCUE_TEAM = 'rescue_team',
   FIRE_TRUCK = 'fire_truck',
 }
+export type ServiceTypeEnumVal = `${ServiceTypeEnum}`;
 
 export enum serviceStatusEnum {
   AVAILABLE = 'available',

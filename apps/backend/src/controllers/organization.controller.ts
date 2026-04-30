@@ -574,6 +574,8 @@ const getOrgServiceProviders = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
 
+    console.log('[DEBUG] getOrgProviders', loggedInOrg);
+
     if (!loggedInOrg || !loggedInOrg.id) {
       throw new ApiError(401, 'Unauthorized');
     }
@@ -586,6 +588,8 @@ const getOrgServiceProviders = asyncHandler(
         tokenExpiry: false,
       },
     });
+
+    console.log('[DEBUG] getOrgProviders', providers);
 
     res
       .status(200)
