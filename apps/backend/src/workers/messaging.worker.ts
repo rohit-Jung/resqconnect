@@ -19,11 +19,9 @@ import {
 } from '@/constants';
 import {
   AGGREGATE_TYPES,
-  EVENT_TYPES,
   OUTBOX_EVENT_TYPES,
 } from '@/constants/kafka.constants';
 import db from '@/db';
-import { publishWithRetry } from '@/services/kafka/kafka.utils';
 import {
   batchCheckMessagesProcessed,
   getLastSMSPollTimestamp,
@@ -317,44 +315,6 @@ async function createEmergencyRequest(
 
       return newRequest;
     });
-
-    // try to publish to kafka immediately
-    const kafkaTopic = getKafkaTopic(emergencyType);
-    logger.info(
-      `[WORKER] Attempting to publish request ${result.id} to Kafka topic ${kafkaTopic}`
-    );
-
-    const published = await publishWithRetry(kafkaTopic, {
-      key: result.id,
-      value: JSON.stringify({
-        type: EVENT_TYPES.REQUEST_CREATED,
-        requestId: result.id,
-        userId: result.userId,
-        emergencyType: result.emergencyType,
-        emergencyDescription: result.emergencyDescription,
-        emergencyLocation: result.emergencyLocation,
-        status: result.status,
-        h3Index: h3Index,
-        searchRadius: result.searchRadius,
-        expiresAt: result.expiresAt,
-        source: 'sms',
-      }),
-    });
-
-    if (published) {
-      logger.info(
-        `[WORKER] Successfully published request ${result.id} to Kafka`
-      );
-      // mark outbox event as published
-      await db
-        .update(outbox)
-        .set({ status: 'published', publishedAt: new Date().toISOString() })
-        .where(eq(outbox.aggregateId, result.id));
-    } else {
-      logger.warn(
-        `[WORKER] Kafka unavailable, event queued in outbox for request ${result.id}`
-      );
-    }
 
     return {
       success: true,

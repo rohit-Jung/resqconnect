@@ -21,13 +21,11 @@ import {
 } from '@/constants';
 import {
   AGGREGATE_TYPES,
-  EVENT_TYPES,
   OUTBOX_EVENT_TYPES,
 } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { postJsonWithRetry } from '@/services/internal-http.service';
-import { publishWithRetry } from '@/services/kafka/kafka.utils';
 import {
   acquireLock,
   clearEmergencyProviders,
@@ -123,35 +121,6 @@ const createEmergencyRequest = asyncHandler(
 
         return newRequest;
       });
-
-      const published = await publishWithRetry(getKafkaTopic(emergencyType), {
-        key: result.id,
-        value: JSON.stringify({
-          type: EVENT_TYPES.REQUEST_CREATED,
-          requestId: result.id,
-          userId: result.userId,
-          emergencyType: result.emergencyType,
-          emergencyDescription: result.emergencyDescription,
-          emergencyLocation: result.emergencyLocation,
-          status: result.status,
-          h3Index: h3Index,
-          searchRadius: result.searchRadius,
-          expiresAt: result.expiresAt,
-        }),
-      });
-
-      if (published) {
-        await db
-          .update(outbox)
-          .set({ status: 'published', publishedAt: new Date().toISOString() })
-          .where(eq(outbox.aggregateId, result.id));
-      } else {
-        console.warn(
-          `Kafka unavailable, event queued in outbox for request ${result.id}`
-        );
-      }
-
-      console.log('[CONTROLLER], Created, Published', result, published);
 
       res.status(201).json(
         new ApiResponse(201, 'Emergency request created', {

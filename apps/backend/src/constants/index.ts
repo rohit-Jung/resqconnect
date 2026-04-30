@@ -22,7 +22,7 @@ export const EXPANDED_K_RING_RADIUS = 20;
 export const MAX_PROVIDERS_TO_BROADCAST = 10;
 export const AVERAGE_SPEED_KM_PER_MIN = 0.5; // 30 km/h
 
-export const OUTBOX_POLL_INTERVAL = 1000; // 1 second
+export const OUTBOX_POLL_INTERVAL = 200; // 200ms
 export const TIMEOUT_CHECK_INTERVAL = 10000; // 10 seconds
 export const DISCONNECT_CHECK_INTERVAL = 5000; // 5 seconds
 export const MAX_SEARCH_RADIUS = 5;
