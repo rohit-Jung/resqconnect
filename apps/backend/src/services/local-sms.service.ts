@@ -14,8 +14,7 @@ export enum SmsRoutes {
 export async function postSMS(
   body: string,
   path: string = '/messages',
-  to?: string,
-  deviceId?: string
+  to?: string
 ): Promise<{ success: boolean; data: any }> {
   try {
     const params = {
@@ -28,7 +27,7 @@ export async function postSMS(
           textMessage: {
             text: body,
           },
-          // deviceId: 'yVULogr4Y1ksRfnos1Dsw',
+          deviceId: envConfig.sms_device_id,
           phoneNumbers: [to],
           simNumber: 1,
           ttl: 3600,
@@ -42,18 +41,14 @@ export async function postSMS(
       'Content-Type': 'application/json',
     };
 
-    const response = await axios.post(
-      `${envConfig.sms_uri_base}${path}`,
-      payload,
-      {
-        params,
-        headers,
-        auth: {
-          username: envConfig.sms_username,
-          password: envConfig.sms_password,
-        },
-      }
-    );
+    const response = await axios.post(`${envConfig.sms_uri}${path}`, payload, {
+      params,
+      headers,
+      auth: {
+        username: envConfig.sms_username,
+        password: envConfig.sms_password,
+      },
+    });
 
     return {
       success: true,
