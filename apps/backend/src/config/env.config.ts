@@ -71,15 +71,16 @@ const envSchema = z.object({
   KAFKA_BROKERS: z.string().default('localhost:9092'),
 });
 
-function normalizeVars(
-  env: z.infer<typeof envSchema>
-): Record<string, string | number | string[]> {
+type LowercaseKeys<T> = {
+  [K in keyof T as Lowercase<K & string>]: T[K];
+};
+
+function normalizeVars<T extends Record<string, any>>(
+  env: T
+): LowercaseKeys<T> {
   return Object.fromEntries(
-    Object.entries(env).map(([key, val]) => [
-      key.toLocaleLowerCase().trim(),
-      val,
-    ])
-  );
+    Object.entries(env).map(([key, val]) => [key.toLowerCase().trim(), val])
+  ) as LowercaseKeys<T>;
 }
 
 function parseCliFlags(parsedEnv: z.infer<typeof envSchema>) {
@@ -107,7 +108,7 @@ function createEnvConfig() {
   }
 
   parseCliFlags(parsedEnv.data);
-  return normalizeVars(parsedEnv.data);
+  return normalizeVars<z.infer<typeof envSchema>>(parsedEnv.data);
 }
 
 export const envConfig = createEnvConfig();
