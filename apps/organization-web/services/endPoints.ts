@@ -17,14 +17,16 @@ export const orgEndpoints = {
   list: `/organization/list`,
   // Dashboard analytics
   dashboardAnalytics: `/organization/dashboard-analytics`,
-  // Service Provider management by organization
+
+  // service provider management by organization
   serviceProviders: `/organization/service-providers`,
   getProvider: (id: string) => `/organization/service-providers/${id}`,
   updateProvider: (id: string) => `/organization/service-providers/${id}`,
   deleteProvider: (id: string) => `/organization/service-providers/${id}`,
   verifyProvider: (id: string) =>
     `/organization/service-providers/${id}/verify`,
-  // Document verification
+
+  // document verification
   pendingVerifications: `/organization/verifications/pending`,
   getProviderDocuments: (providerId: string) =>
     `/organization/verifications/${providerId}`,

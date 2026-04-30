@@ -148,7 +148,7 @@ export default function ServiceProvidersPage() {
             </Button>
           </Link>
         </div>
-        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-3 h-0.5 w-full bg-primary dark:bg-primary" />
         <div className="mt-4">
           <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
             Responders
