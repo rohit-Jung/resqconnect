@@ -39,7 +39,6 @@ import { getKafkaTopic } from '@/utils';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import '@/validations/';
 
 const createEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
