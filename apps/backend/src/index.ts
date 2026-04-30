@@ -17,7 +17,6 @@ import { startEmergencyRequestService } from './workers/request.worker';
 const port = Number(envConfig.port);
 const host = String(envConfig.dev_ip);
 const mode = String(envConfig.mode);
-const sector = String(envConfig.sector);
 
 // validate sector early so misconfiguration fails fast.
 // Platform runtime is not sector-bound.
