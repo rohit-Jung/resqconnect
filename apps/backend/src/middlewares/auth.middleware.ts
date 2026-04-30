@@ -129,8 +129,8 @@ const validateQueryParams = <T>(schema: ZodSchema<T>) => {
           .json(ApiError.validationError(parsedValues.error));
       }
 
-      // Store validated query in a custom property (req.query is readonly in Express 5)
-      (req as any).validatedQuery = parsedValues.data;
+      // store validated query in a custom property (req.query is readonly in express 5)
+      req.validatedQuery = parsedValues.data;
       next();
     }
   );
@@ -147,8 +147,8 @@ const validateRouteParams = <T>(schema: ZodSchema<T>) => {
           .json(ApiError.validationError(parsedValues.error));
       }
 
-      // Store validated params in a custom property (req.params is readonly in Express 5)
-      (req as any).validatedParams = parsedValues.data;
+      // store validated params in a custom property (req.params is readonly in express 5)
+      req.validatedParams = parsedValues.data;
       next();
     }
   );

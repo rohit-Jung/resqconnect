@@ -1,6 +1,8 @@
 import { faker } from '@faker-js/faker';
 import { serviceProvider } from '@repo/db/schemas';
 
+import { sql } from 'drizzle-orm';
+
 import { ServiceTypeEnum } from '@/constants';
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import db from '@/db';
@@ -54,11 +56,16 @@ export const createServiceProvider = async (location: LatLng) => {
         serviceType: randomOrganization.serviceCategory,
         isVerified: true,
         organizationId: randomOrganization.id,
+        h3Index: BigInt('0'),
         currentLocation: {
           latitude: location.latitude.toString(),
           longitude: location.longitude.toString(),
         },
         serviceStatus: 'available',
+        documentStatus: 'pending',
+        panCardUrl: '',
+        citizenshipUrl: '',
+        lastLocation: sql`ST_SetSRID(ST_MakePoint(85.3240, 27.7172), 4326)`,
       })
       .returning({
         id: serviceProvider.id,
@@ -79,7 +86,10 @@ export const createNearServiceProviders = async (
   destLocation: LatLng,
   count: number
 ) => {
-  const createdServiceProviders = [];
+  const createdServiceProviders: Array<
+    Awaited<ReturnType<typeof createServiceProvider>>
+  > = [];
+
   for (let i = 0; i < count; i++) {
     const distance = 0.04 + Math.random() * 0.01;
     const angle = Math.random() * 2 * Math.PI;
@@ -90,10 +100,12 @@ export const createNearServiceProviders = async (
     });
     createdServiceProviders.push(serviceProvider);
   }
+
   return createdServiceProviders;
 };
 
-export function getKafkaTopic(emergencyType: ServiceTypeEnum) {
+type ServiceTypeValue = `${ServiceTypeEnum}`;
+export function getKafkaTopic(emergencyType: ServiceTypeValue) {
   switch (emergencyType) {
     case ServiceTypeEnum.AMBULANCE:
       return KAFKA_TOPICS.MEDICAL_EVENTS;

@@ -34,6 +34,7 @@ async function startEmergencyRequestService() {
   logger.info(`Kafka connected in ${Date.now() - startTime}ms`);
 
   await assignResponderConsumer.subscribe({
+    // TODO: since we are deploy each sector differently this is a baaad strategy for topic distri
     topics: [
       KAFKA_TOPICS.MEDICAL_EVENTS,
       KAFKA_TOPICS.FIRE_EVENTS,
@@ -68,7 +69,7 @@ async function startEmergencyRequestService() {
       const { requestId, emergencyLocation, emergencyType, userId } =
         parsedData.data;
 
-      // Parallel fetch: check request exists AND get user info at the same time
+      // parallel fetch: check request exists AND get user info at the same time
       const [existingRequest, userInfo] = await Promise.all([
         db.query.emergencyRequest.findFirst({
           where: eq(emergencyRequest.id, requestId),
@@ -217,6 +218,7 @@ async function startEmergencyRequestService() {
           where: eq(serviceProvider.id, result.providerId),
         });
 
+        // inform others that it's accepted
         io.to(SocketRoom.EMERGENCY(requestId)).emit(
           SocketEvents.REQUEST_ACCEPTED,
           {

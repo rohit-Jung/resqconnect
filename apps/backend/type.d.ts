@@ -4,6 +4,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: IJWTToken;
+      validatedQuery?: unknown;
+      validatedParams?: unknown;
     }
   }
 }
