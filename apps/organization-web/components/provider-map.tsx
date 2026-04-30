@@ -124,7 +124,7 @@ export default function ProviderMap({
       : [27.7172, 85.324];
 
   return (
-    <div className="h-[500px] w-full">
+    <div className="h-125 w-full">
       <MapContainer
         center={center}
         zoom={13}
@@ -155,7 +155,7 @@ export default function ProviderMap({
               }}
             >
               <Popup>
-                <div className="min-w-[180px]">
+                <div className="min-w-45">
                   <p className="font-semibold">{responder.name}</p>
                   <p className="text-sm text-gray-500">
                     {serviceTypeLabels[responder.serviceType]}
