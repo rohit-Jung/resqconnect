@@ -5,6 +5,7 @@ export const getOtpMessage = (otpCode: string) => {
 };
 
 export const phoneRegex = /^[0-9]{10}$/;
+export const NEPAL_COUNTRY_CODE = '977';
 
 // Default location (Kathmandu, Nepal) if user doesn't provide location
 export const DEFAULT_LATITUDE = 27.7172;

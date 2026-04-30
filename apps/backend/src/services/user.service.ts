@@ -3,7 +3,19 @@ import { user } from '@repo/db/schemas';
 import { eq } from 'drizzle-orm';
 
 import { logger } from '@/config';
+import { NEPAL_COUNTRY_CODE } from '@/constants';
 import db from '@/db';
+
+function normalizePhoneNumber(phone: string | number): number {
+  let cleaned = phone.toString().replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.startsWith(NEPAL_COUNTRY_CODE)) {
+    cleaned = cleaned.substring(NEPAL_COUNTRY_CODE.length);
+  }
+  return parseInt(cleaned, 10);
+}
 
 export interface UserLookupResult {
   found: boolean;
@@ -21,14 +33,7 @@ export async function findUserByPhoneNumber(
   phoneNumber: string
 ): Promise<UserLookupResult> {
   try {
-    // remove all non-numeric characters except leading +
-    let cleaned = phoneNumber.replace(/[^\d+]/g, '');
-
-    if (cleaned.startsWith('+')) {
-      cleaned = cleaned.substring(1);
-    }
-
-    const phoneNumeric = parseInt(cleaned, 10);
+    const phoneNumeric = normalizePhoneNumber(phoneNumber);
 
     if (isNaN(phoneNumeric)) {
       return {
@@ -120,15 +125,12 @@ export async function verifyUserIdentity(
       };
     }
 
-    let cleaned = phoneNumber.replace(/[^\d+]/g, '');
-    if (cleaned.startsWith('+')) {
-      cleaned = cleaned.substring(1);
-    }
-    const phoneNumeric = parseInt(cleaned, 10);
+    const smsPhone = normalizePhoneNumber(phoneNumber);
+    const registeredPhone = userResult.user.phoneNumber;
 
-    if (userResult.user.phoneNumber !== phoneNumeric) {
+    if (registeredPhone !== smsPhone) {
       logger.warn(
-        `Phone mismatch: SMS from ${phoneNumber}, user registered with ${userResult.user.phoneNumber}`
+        `Phone mismatch: SMS from ${phoneNumber} (normalized: ${smsPhone}), user registered with ${registeredPhone}`
       );
       return {
         verified: false,
