@@ -40,5 +40,5 @@ const emergencyRequestValidations = {
 } as const;
 
 export { emergencyRequestValidations };
-
 export type IEmergencyRequestPayload = z.infer<typeof EmergencyRequestPayload>;
+export type ICreateNewUserRequest = z.infer<typeof CreateNewRequestSchema>;

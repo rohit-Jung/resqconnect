@@ -1,16 +1,16 @@
 import z from 'zod';
 
-export const getRouteParamSchema = z.object({
+export const generalRouteParamSchema = z.object({
   page: z.coerce.number().default(1),
   limit: z.coerce.number().default(40),
   sortBy: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const getRouteParamSchema = generalRouteParamSchema.extend({
   sortField: z.enum(['createdAt', 'name', 'email']).default('createdAt'),
 });
 
-export const getHistoryQuerySchema = z.object({
-  page: z.coerce.number().default(1),
-  limit: z.coerce.number().default(10),
-  sortBy: z.enum(['asc', 'desc']).default('desc'),
+export const getHistoryQuerySchema = generalRouteParamSchema.extend({
   status: z
     .enum([
       'completed',
@@ -22,6 +22,8 @@ export const getHistoryQuerySchema = z.object({
     ])
     .optional(),
 });
+
+export type IRouteParams = z.infer<typeof generalRouteParamSchema>;
 
 const routeParamsValidations = {
   getRouteParamSchema,
