@@ -314,7 +314,8 @@ export async function cacheRoute(
   destLat: number,
   destLng: number,
   profile: string,
-  emergencyType?: string
+  emergencyType: string,
+  routeData: any
 ): Promise<void> {
   const key = ROUTE_CACHE_KEY(
     originLat,
