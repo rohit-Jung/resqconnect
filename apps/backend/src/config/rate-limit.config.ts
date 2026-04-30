@@ -31,7 +31,7 @@ const createRateLimitErrorResponse = (req: Request, res: Response) => {
 };
 
 export const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 1 * 1000, // 1 sec
   max: 100, // max 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later',
   standardHeaders: true, // return rate limit info in `ratelimit-*` headers
@@ -52,7 +52,7 @@ export const globalLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // max 5 attempts per windowms
+  max: 10, // max 10 attempts per windowms
   message:
     'Too many authentication attempts, please try again after 15 minutes',
   standardHeaders: true,
