@@ -14,9 +14,13 @@ import { buildErrorCauseChain, unwrapPgError } from '@/utils/pg-error';
 
 const app = express();
 
+const allowedorigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['*'];
+
 app.use(
   cors({
-    origin: ['http://localhost:3001', 'http://localhost:3002'],
+    origin: allowedorigins,
     credentials: true,
   })
 );
