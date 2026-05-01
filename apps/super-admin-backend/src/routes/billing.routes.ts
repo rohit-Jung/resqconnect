@@ -14,29 +14,42 @@ import {
 } from '@/controllers/billing.controller';
 import { requireAdminAuth } from '@/middlewares/admin-auth.middleware';
 import { requireOrgAuth } from '@/middlewares/org-auth.middleware';
+import { asyncHandler } from '@/utils/async-handler';
 
-// Billing endpoints from control plane.
 export const billingRouter = Router();
 
-billingRouter.post('/webhooks/khalti', khaltiWebhook);
+billingRouter.post('/webhooks/khalti', asyncHandler(khaltiWebhook));
 
-// Organization-scoped billing endpoints.
-billingRouter.post('/my/checkout', requireOrgAuth, initiateCheckoutMy);
-billingRouter.get('/my/subscription', requireOrgAuth, getMyActiveSubscription);
-billingRouter.get('/my/payments', requireOrgAuth, listMyPayments);
-billingRouter.get('/my/payments/:id', requireOrgAuth, getMyPaymentById);
-billingRouter.post('/my/payments/verify', requireOrgAuth, verifyMyPayment);
+billingRouter.post(
+  '/my/checkout',
+  requireOrgAuth,
+  asyncHandler(initiateCheckoutMy)
+);
+billingRouter.get(
+  '/my/subscription',
+  requireOrgAuth,
+  asyncHandler(getMyActiveSubscription)
+);
+billingRouter.get('/my/payments', requireOrgAuth, asyncHandler(listMyPayments));
+billingRouter.get(
+  '/my/payments/:id',
+  requireOrgAuth,
+  asyncHandler(getMyPaymentById)
+);
+billingRouter.post(
+  '/my/payments/verify',
+  requireOrgAuth,
+  asyncHandler(verifyMyPayment)
+);
 billingRouter.get(
   '/my/payments/by-pidx/:pidx',
   requireOrgAuth,
-  getMyPaymentByPidx
+  asyncHandler(getMyPaymentByPidx)
 );
 
-// Other billing endpoints are admin-only.
 billingRouter.use(requireAdminAuth);
 
-billingRouter.post('/checkout', initiateCheckout);
+billingRouter.post('/checkout', asyncHandler(initiateCheckout));
 
-// Admin payment history endpoints.
-billingRouter.get('/payments', listPaymentsAdmin);
-billingRouter.get('/payments/:id', getPaymentByIdAdmin);
+billingRouter.get('/payments', asyncHandler(listPaymentsAdmin));
+billingRouter.get('/payments/:id', asyncHandler(getPaymentByIdAdmin));
