@@ -8,40 +8,88 @@ Real-time emergency response coordination platform for Nepal. Users request help
 flowchart TB
     subgraph Clients
         A["Mobile App\n(Expo / React Native)"]
+        B["Responder App\n(Expo / React Native)"]
         C["Organization Web\n(Next.js)"]
         D["Super Admin Panel\n(Next.js)"]
     end
 
-    B["Backend API\n(Express.js)"]
+    subgraph Platform["Platform Backend"]
+        P["REST API\n+ User Socket"]
+    end
 
-    A --> B
-    C --> B
-    D --> B
+    subgraph Silos
+        S1["Fire Silo"]
+        S2["Ambulance Silo"]
+        S3["Police Silo"]
+    end
+
+    A --> P
+    B --> S1
+    B --> S2
+    B --> S3
+    C --> P
+    D --> P
+
+    P <-->|"HTTP dispatch"| S1
+    P <-->|"HTTP dispatch"| S2
+    P <-->|"HTTP dispatch"| S3
 ```
 
-### Mobile App (`apps/mobile`)
+### Mobile Apps
 
-React Native / Expo — the primary product users interact with.
+Two separate React Native / Expo apps:
 
+#### User App (`apps/mobile-user`)
 - **One-tap emergency requests** — ambulance, police, fire, rescue
 - **Real-time location sharing** via expo-location
 - **Live tracking** of assigned responders on Mapbox maps
 - **SMS fallback** — request help even without internet
-- **Offline support** for emergency requests
 - **Push notifications** via socket.io for status updates
 - **User authentication** with OTP verification
 
-### Backend API (`apps/backend`)
+#### Responder App (`apps/mobile-responder`)
+- **Receive emergency alerts** with vibration
+- **Accept/reject requests** from nearby users
+- **Navigation** to emergency location with route
+- **Real-time location broadcast** to user
+- **Confirm arrival** to complete emergency
 
-Express.js + PostgreSQL + Drizzle ORM.
+### Backend API (`apps/backend`) — Platform + Silo Architecture
 
-- JWT authentication with OTP (Twilio)
-- Organization and service provider management
-- Emergency request lifecycle (create → assign → complete)
-- Real-time socket events for live tracking
-- Khalti payment integration for subscription billing
-- Email notifications (Nodemailer + Mailtrap)
-- Mapbox integration for geocoding and routing
+**Two running modes** (controlled via `MODE` flag):
+- `MODE=platform` — User-facing REST API + user WebSocket
+- `MODE=silo` — Provider management + provider WebSocket
+
+```mermaid
+flowchart LR
+    subgraph Platform["PLATFORM (MODE=platform)"]
+        API1[REST API]
+        WS1[User WebSocket]
+    end
+
+    subgraph Silo["SILO (MODE=silo)"]
+        API2[REST API]
+        WS2[Provider WebSocket]
+        Kafka[Kafka Consumer]
+    end
+
+    subgraph Dispatch["Internal HTTP"]
+        H[HTTP Bridge]
+    end
+
+    API1 -->|"dispatch"| H
+    H -->|"incoming"| API2
+    WS2 -->|"notify"| H
+    H -->|"update"| WS1
+```
+
+**Key design decisions:**
+1. **Internal HTTP over Kafka** for immediate events (accept, location, completion)
+   - Lower latency, better ACK, simpler than Kafka for socket events
+2. **Redis for route caching** — shared across Platform + Silo
+   - Cache includes emergency type for sector-wise routing
+3. **Platform notifies user** when provider accepts/updates/completes
+4. **Socket event forwarding** via HTTP POST to `/internal/incidents/:id/update`
 
 ### Organization Web (`apps/organization-web`)
 
@@ -75,6 +123,8 @@ Next.js portal for platform-wide administration.
 | Maps            | Mapbox (mobile), Leaflet + OpenStreetMap (web)  |
 | Payments        | Khalti (Sandbox)                                |
 | Auth            | JWT + OTP (Twilio) + Email (Nodemailer)         |
+| Cache           | Redis (Valkey)                                 |
+| Message Queue  | Kafka                                          |
 | Package Manager | Bun                                             |
 | Monorepo        | Turborepo                                       |
 
@@ -83,13 +133,18 @@ Next.js portal for platform-wide administration.
 ```
 project/
 ├── apps/
-│   ├── mobile/            # Expo/React Native mobile app
-│   ├── backend/           # Express.js API server
-│   ├── organization-web/  # Next.js org dashboard
-│   └── super-admin-web/   # Next.js admin portal
-└── packages/
-    ├── eslint-config/     # Shared ESLint rules
-    └── typescript-config/ # Shared TS configs
+│   ├── mobile-user/          # Expo/React Native - user mobile app
+│   ├── mobile-responder/     # Expo/React Native - responder mobile app
+│   ├── backend/             # Express.js API server (platform + silo)
+│   ├── organization-web/    # Next.js org dashboard
+│   └── super-admin-web/       # Next.js admin portal
+├── packages/
+│   ├── db/                 # Drizzle schemas
+│   ├── types/              # Shared types
+│   ├── config/             # Shared config
+│   └── utils/              # Shared utilities
+├── deploy/                  # Docker Compose configs
+└── docs/                   # Architecture docs
 ```
 
 ## Getting Started
@@ -117,12 +172,15 @@ Edit `apps/backend/.env`:
 
 ```env
 PORT=4000
+MODE=platform                               # platform | silo
+SECTOR=fire                               # fire | hospital | police (for silo)
 DATABASE_URL=postgresql://admin:root@localhost:5432/resq_db
+REDIS_HOST=localhost
+REDIS_PORT=6379
 JWT_SECRET=my_jwt_secret
-KHALTI_SECRET_KEY=test_secret_key_xxxxxxxxxxxx
-KHALTI_BASE_URL=https://dev.khalti.com/api/v2
-KHALTI_RETURN_URL=http://localhost:4000/api/v1/payments/callback
-KHALTI_WEBSITE_URL=http://localhost:3000
+MAPBOX_ACCESS_TOKEN=pk.xxxxx
+PLATFORM_BASE_URL=http://localhost:4001          # for silo to notify platform
+INTERNAL_API_KEY=your_internal_api_key
 ```
 
 ### 3. Set up database
@@ -134,29 +192,54 @@ bun run db:migrate
 bun run db:seed
 ```
 
-### 4. Run all apps
+### 4. Run Backend
 
+**Platform mode** (user-facing):
 ```bash
-bun run dev
+bun run dev:platform
+# or: MODE=platform PORT=4001 bun run dev:backend
 ```
 
-Or run individually:
+**Silo mode** (provider-facing):
+```bash
+bun run dev:silo
+# or: MODE=silo SECTOR=fire bun run dev:backend
+```
+
+### 5. Run Mobile Apps
 
 ```bash
-bun run dev --filter=backend
+bun run dev --filter=mobile-user
+bun run dev --filter=mobile-responder
+```
+
+Or run web dashboards:
+```bash
 bun run dev --filter=organization-web
 bun run dev --filter=super-admin-web
-bun run dev --filter=mobile       # then press 'a' for Android or 'i' for iOS
 ```
 
 ### Access
 
 | App                    | URL(DEV)              | 
 | ---------------------- | --------------------- |
+| User App              | Expo Dev Tools (LAN IP) |
+| Responder App        | Expo Dev Tools (LAN IP) |
 | Organization Dashboard | http://localhost:3000 |
 | Super Admin Portal     | http://localhost:3001 |
-| Backend API            | http://localhost:4000 |
-| Mobile App             | Expo Dev Tools        |
+| Platform API         | http://localhost:4001 |
+| Silo API             | http://localhost:4000 |
+
+## Internal API Endpoints
+
+Platform ↔ Silo communication via internal HTTP:
+
+| Endpoint | From | Description |
+| -------- |------|------------|
+| `POST /api/v1/internal/incidents/incoming` | Platform | Dispatch request to silo |
+| `POST /api/v1/internal/incidents/:id/update` | Silo | Notify platform of status update |
+
+**Headers required:** `x-internal-api-key: your_internal_api_key`
 
 ## Some of the API Overview
 
@@ -186,6 +269,47 @@ bun run dev --filter=mobile       # then press 'a' for Android or 'i' for iOS
 - `GET /api/v1/payments/callback` — Khalti callback
 - `GET /api/v1/payments/history` — Payment history
 - `GET /api/v1/payments/subscription` — Active subscription
+
+## Design Decisions
+
+### Why Platform + Silo Architecture?
+
+1. **Separation of concerns** — User-facing and provider-facing scaled independently
+2. **Fault isolation** — Silo issues don't affect platform users
+3. **Sector-specific logic** — Fire, ambulance, police have different workflows
+4. **Scalability** — Each silo can be deployed to separate servers
+
+### Internal HTTP vs Kafka
+
+| Event Type | Transport | Reason |
+|-----------|----------|--------|
+| Request dispatch | HTTP | Immediate, synchronous dispatch |
+| Provider matching | Kafka | Async processing, queue-based |
+| Location updates | HTTP | Low latency, high frequency |
+| Accept/Complete | HTTP | Requires immediate ACK |
+| Provider alerts | Kafka | Broadcast to all providers in area |
+
+### Route Caching
+
+- Routes cached in Redis with key: `route:{emergencyType}:{origin}:{dest}:{profile}`
+- Emergency type included for sector-specific routes
+- Both Platform and Silo share same Redis for cache hits
+
+### Socket Event Flow
+
+1. User creates request → Platform → dispatches to Silo via HTTP
+2. Provider accepts → Silo socket → notifies Platform via HTTP
+3. Provider location → Silo socket → forwards to Platform → emits to User
+4. Provider completes → Silo socket → forwards completion to Platform
+
+The web dashboards follow a Swiss-inspired editorial design:
+
+- Monospace uppercase labels (`font-mono text-[10px] uppercase tracking-[0.15em]`)
+- No rounded corners — sharp, architectural precision
+- Hairline borders (`border-b border-border`) for structural division
+- Signal red primary accent used sparingly
+- Left-aligned hierarchy, generous whitespace
+- Geist font family
 
 ## Design System
 
