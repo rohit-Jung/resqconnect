@@ -1,6 +1,6 @@
 import { envConfig } from '@/config';
 
-export const allowedOrigins = envConfig.allowed_origins;
+export const allowedOrigins = envConfig.allowed_origins as string[];
 
 export const corsOptions = {
   origin: function (origin: any, callback: any) {
