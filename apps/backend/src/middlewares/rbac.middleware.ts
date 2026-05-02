@@ -14,7 +14,7 @@ export const enforceRbac = asyncHandler(
 
     const path = req.originalUrl ?? req.path;
     if (ADMIN_ONLY_PREFIXES.some(p => path.startsWith(p))) {
-      if (role !== 'admin') throw new ApiError(403, 'Not authorized');
+      if (role !== 'admin') throw ApiError.forbidden('Not authorized');
     }
 
     next();

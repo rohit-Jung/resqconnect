@@ -1,6 +1,5 @@
 import compression from 'compression';
 import type { Express, Request, Response } from 'express';
-import mongoSanitize from 'express-mongo-sanitize';
 import helmet from 'helmet';
 import hpp from 'hpp';
 
@@ -39,7 +38,7 @@ export const configureSecurityMiddlewares = (app: Express): void => {
     })
   );
 
-  // Compression middleware - compresses response bodies for faster transmission
+  // compression middleware - compresses response bodies for faster transmission
   // reduces bandwidth usage especially for large JSON responses
   app.use(
     compression({

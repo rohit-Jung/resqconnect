@@ -47,12 +47,12 @@ export const requireAnalyticsEnabled = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     const loggedIn = req.user;
     if (!loggedIn?.id || loggedIn.role !== 'organization') {
-      throw new ApiError(403, 'Not authorized');
+      throw ApiError.forbidden('Not authorized');
     }
 
     const ent = await loadEntitlements(loggedIn.id);
     if (!ent.analytics_enabled) {
-      throw new ApiError(403, 'Analytics not enabled for this organization');
+      throw ApiError.forbidden('Analytics not enabled for this organization');
     }
     next();
   }
@@ -63,14 +63,13 @@ export const enforceProviderCountLimit = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     const loggedIn = req.user;
     if (!loggedIn?.id || loggedIn.role !== 'organization') {
-      throw new ApiError(403, 'Not authorized');
+      throw ApiError.forbidden('Not authorized');
     }
 
     const ent = await loadEntitlements(loggedIn.id);
     const limit = ent.provider_count_limit;
     if (!Number.isFinite(limit) || limit <= 0) {
-      throw new ApiError(
-        403,
+      throw ApiError.forbidden(
         'Provider registration is not enabled for this organization'
       );
     }
@@ -82,7 +81,7 @@ export const enforceProviderCountLimit = asyncHandler(
     const current = rows[0]?.c ?? 0;
 
     if (current >= limit) {
-      throw new ApiError(403, `Provider limit reached (${limit})`);
+      throw ApiError.forbidden(`Provider limit reached (${limit})`);
     }
 
     next();
