@@ -36,8 +36,6 @@ import { TEST_CORDS } from '@/constants/test.constants';
 import { usePulseAnimation } from '@/hooks/usePulseAnimation';
 import { useSocketHandlers } from '@/hooks/useSocketHandlers';
 import {
-  useCancelEmergencyRequest,
-  useConfirmProviderArrival,
   useGetEmergencyRequest,
   useGetNearbyProviders,
 } from '@/services/emergency/emergency.api';
@@ -107,8 +105,11 @@ export default function EmergencyTrackingScreen() {
     isProvider ? EmergencyStatus.ACCEPTED : EmergencyStatus.PENDING
   );
 
-  const [isProcessingConfirmation, setIsProcessingConfirmation] =
-    useState(false);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [isConfirmingArrival, setIsConfirmingArrival] =
+    useState<boolean>(false);
+
+  const [, setIsProcessingConfirmation] = useState(false);
 
   const { socket, isConnected } = useSocketStore();
   const pulseAnim = usePulseAnimation(localStatus);
@@ -129,11 +130,6 @@ export default function EmergencyTrackingScreen() {
       !!userLocation.longitude &&
       !!emergencyType
   );
-
-  const { mutate: cancelRequest, isPending: isCancelling } =
-    useCancelEmergencyRequest();
-  const { mutate: confirmArrival, isPending: isConfirmingArrival } =
-    useConfirmProviderArrival();
 
   const emergencyRequest = requestData?.data?.data;
   const nearbyProviders = useMemo(
@@ -524,6 +520,7 @@ export default function EmergencyTrackingScreen() {
                 return;
               }
 
+              setIsCancelling(true);
               // TODO: Re-enable retry logic after testing
               // For now, single attempt with simple timeout
               await new Promise<void>((resolve, reject) => {
@@ -557,6 +554,8 @@ export default function EmergencyTrackingScreen() {
                 'Error',
                 'Failed to cancel request. Please check your connection and try again.'
               );
+            } finally {
+              setIsCancelling(false);
             }
           },
         },
@@ -583,6 +582,7 @@ export default function EmergencyTrackingScreen() {
 
             // Mark confirmation as in progress to prevent accidental navigation
             setIsProcessingConfirmation(true);
+            setIsConfirmingArrival(true);
 
             try {
               // Get raw socket for emit with callback support
@@ -630,7 +630,9 @@ export default function EmergencyTrackingScreen() {
                 'Error',
                 'Failed to confirm arrival. Please check your connection and try again.'
               );
+            } finally {
               setIsProcessingConfirmation(false);
+              setIsConfirmingArrival(false);
             }
           },
         },
