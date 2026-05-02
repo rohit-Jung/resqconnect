@@ -72,7 +72,7 @@ export const serviceProviderApi = {
   // Get provider profile
   getProfile: async (): Promise<ServiceProviderProfile> => {
     const response = await api.get(serviceProviderEndpoints.profile);
-    return response.data.data.serviceProvider;
+    return response.data?.data?.user;
   },
 
   // Update provider profile
