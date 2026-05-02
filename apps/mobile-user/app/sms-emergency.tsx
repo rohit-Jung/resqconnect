@@ -189,7 +189,6 @@ export default function SMSEmergencyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header - Swiss style */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
