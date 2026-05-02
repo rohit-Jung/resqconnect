@@ -1,6 +1,6 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { type NextFunction, type Request } from 'express';
+import express from 'express';
 
 import {
   configureSecurityMiddlewares,
