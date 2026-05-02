@@ -6,7 +6,7 @@ import {
 } from '@repo/db/schemas';
 import { EmergencyRequestPayload } from '@repo/types/validations';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Server } from 'socket.io';
 
 import { logger } from '@/config';
@@ -19,12 +19,14 @@ import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { assignResponderConsumer } from '@/services/kafka/kafka.service';
+import { sendLocalSMS } from '@/services/local-sms.service';
 import {
   calculateDistancesAndSort,
   findNearbyProviders,
 } from '@/services/matching.service';
 import { cacheEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
+import { SMS_TEMPLATES } from '@/utils/sms/sms.parser';
 
 async function startEmergencyRequestService() {
   logger.info('Starting Kafka consumer connection...');
@@ -68,29 +70,35 @@ async function startEmergencyRequestService() {
 
       const { requestId, emergencyLocation, emergencyType, userId } =
         parsedData.data;
+      const source =
+        typeof (data as { source?: unknown }).source === 'string'
+          ? (data as { source?: string }).source
+          : undefined;
 
-      // parallel fetch: check request exists AND get user info at the same time
-      const [existingRequest, userInfo] = await Promise.all([
-        db.query.emergencyRequest.findFirst({
-          where: eq(emergencyRequest.id, requestId),
-        }),
+      // claim request atomically so duplicate kafka deliveries cannot process
+      // the same pending request concurrently.
+      const [claimedRows, userInfo] = await Promise.all([
+        db
+          .update(emergencyRequest)
+          .set({ requestStatus: 'in_progress' })
+          .where(
+            and(
+              eq(emergencyRequest.id, requestId),
+              eq(emergencyRequest.requestStatus, 'pending')
+            )
+          )
+          .returning({ id: emergencyRequest.id }),
         db.query.user.findFirst({
           where: eq(user.id, userId),
         }),
       ]);
 
-      if (!existingRequest || existingRequest.requestStatus !== 'pending') {
+      if (claimedRows.length === 0) {
         logger.info(
-          `Request ${requestId} not pending, skipping. Status: ${existingRequest?.requestStatus}`
+          `Request ${requestId} already claimed or not pending, skipping`
         );
         return;
       }
-
-      // Update status (don't await if not critical for next step)
-      const updateStatusPromise = db
-        .update(emergencyRequest)
-        .set({ requestStatus: 'in_progress' })
-        .where(eq(emergencyRequest.id, requestId));
 
       const { latitude, longitude } = emergencyLocation;
 
@@ -119,9 +127,6 @@ async function startEmergencyRequestService() {
       logger.info(
         `Provider search took ${Date.now() - providerSearchStart}ms, found ${providers.length}`
       );
-
-      // Wait for status update now
-      await updateStatusPromise;
 
       if (providers.length === 0) {
         logger.warn(`No providers available for request ${requestId}`);
@@ -210,8 +215,14 @@ async function startEmergencyRequestService() {
             .where(eq(emergencyRequest.id, requestId)),
         ]);
 
-        io.in(result.providerId).socketsJoin(SocketRoom.EMERGENCY(requestId));
-        io.in(userId).socketsJoin(SocketRoom.EMERGENCY(requestId));
+        // Join the already-connected sockets for both parties to the emergency room.
+        // Use the role-prefixed rooms for consistency with the rest of the codebase.
+        io.in(SocketRoom.PROVIDER(result.providerId)).socketsJoin(
+          SocketRoom.EMERGENCY(requestId)
+        );
+        io.in(SocketRoom.USER(userId)).socketsJoin(
+          SocketRoom.EMERGENCY(requestId)
+        );
 
         // Get provider info to include in notification
         const providerData = await db.query.serviceProvider.findFirst({
@@ -240,6 +251,24 @@ async function startEmergencyRequestService() {
         logger.info(
           `Request ${requestId} assigned to provider ${result.providerId}`
         );
+
+        if (source === 'sms' && userInfo?.phoneNumber) {
+          const emergencyTypeLabel =
+            emergencyType === 'ambulance'
+              ? 'Medical/Ambulance'
+              : emergencyType === 'fire_truck'
+                ? 'Fire'
+                : emergencyType === 'rescue_team'
+                  ? 'Rescue'
+                  : 'Police';
+          await sendLocalSMS(
+            userInfo.phoneNumber.toString(),
+            SMS_TEMPLATES.PROVIDER_ASSIGNED(
+              emergencyTypeLabel,
+              providerData?.name || 'Responder'
+            )
+          );
+        }
       } else if (result.decision === 'TIMEOUT') {
         await db
           .update(emergencyRequest)
