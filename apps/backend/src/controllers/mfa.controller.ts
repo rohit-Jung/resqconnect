@@ -14,10 +14,10 @@ const otpKey = (userId: string) => `mfa_otp:${userId}`;
 export const requestMfaOtp = asyncHandler(
   async (req: Request, res: Response) => {
     const u = req.user;
-    if (!u?.id || !u.email) throw new ApiError(401, 'Unauthorized');
+    if (!u?.id || !u.email) throw ApiError.unauthorized('Unauthorized');
 
     const otpToken = await sendOTP(u.email);
-    if (!otpToken) throw new ApiError(500, 'Failed to generate OTP');
+    if (!otpToken) throw ApiError.internalServerError('Failed to generate OTP');
 
     await redis.set(otpKey(u.id), otpToken, 'EX', MFA_OTP_TTL_SECONDS);
 
@@ -33,16 +33,16 @@ export const requestMfaOtp = asyncHandler(
 export const verifyMfaOtp = asyncHandler(
   async (req: Request, res: Response) => {
     const u = req.user;
-    if (!u?.id) throw new ApiError(401, 'Unauthorized');
+    if (!u?.id) throw ApiError.unauthorized('Unauthorized');
 
     const { otpToken } = (req.body ?? {}) as { otpToken?: unknown };
     if (typeof otpToken !== 'string' || otpToken.length === 0) {
-      throw new ApiError(400, 'OTP token is required');
+      throw ApiError.badRequest('OTP token is required');
     }
 
     const expected = await redis.get(otpKey(u.id));
-    if (!expected) throw new ApiError(400, 'OTP expired');
-    if (expected !== otpToken) throw new ApiError(400, 'Invalid OTP');
+    if (!expected) throw ApiError.badRequest('OTP expired');
+    if (expected !== otpToken) throw ApiError.badRequest('Invalid OTP');
 
     await redis.del(otpKey(u.id));
     const token = await issueMfaToken({ userId: u.id });

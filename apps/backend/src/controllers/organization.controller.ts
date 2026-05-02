@@ -31,19 +31,14 @@ const registerOrganization = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = registerOrganizationSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new ApiError(
-        400,
-        'Validation error',
-        parsed.error.issues.map(i => i.message)
-      );
+      throw ApiError.validationError(parsed.error);
     }
 
     // Check if the user is a super admin
     const loggedInUser = req.user;
 
     if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
-      throw new ApiError(
-        401,
+      throw ApiError.unauthorized(
         'Unauthorized: Only super admins can register organizations'
       );
     }
@@ -59,7 +54,7 @@ const registerOrganization = asyncHandler(
     });
 
     if (existingOrganization) {
-      throw new ApiError(400, 'Organization already exists');
+      throw ApiError.badRequest('Organization already exists');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -81,7 +76,7 @@ const registerOrganization = asyncHandler(
       });
 
     if (!newOrganization) {
-      throw new ApiError(500, 'Error creating organization');
+      throw ApiError.internalServerError('Error creating organization');
     }
 
     res.status(201).json(
@@ -97,7 +92,7 @@ const getAllOrganizations = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
-      throw new ApiError(401, 'Unauthorized to perform this action');
+      throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
     const organizations = await db.query.organization.findMany();
@@ -113,7 +108,7 @@ const getOrganizationById = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(401, 'Unauthorized to perform this action');
+      throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
     const rawOrganizationId = (req.params as any)?.id as unknown;
@@ -122,7 +117,7 @@ const getOrganizationById = asyncHandler(
       : rawOrganizationId;
 
     if (!organizationId || typeof organizationId !== 'string') {
-      throw new ApiError(401, 'Organiztion Id required in params');
+      throw ApiError.unauthorized('Organiztion Id required in params');
     }
 
     const organizationDetails = await db.query.organization.findFirst({
@@ -130,7 +125,7 @@ const getOrganizationById = asyncHandler(
     });
 
     if (!organizationDetails) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     res
@@ -149,7 +144,7 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const rawOrganizationId = (req.params as any)?.id as unknown;
@@ -158,7 +153,7 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
     : rawOrganizationId;
 
   if (!organizationId || typeof organizationId !== 'string') {
-    throw new ApiError(401, 'Organiztion Id required in params');
+    throw ApiError.unauthorized('Organiztion Id required in params');
   }
 
   const organizationDetails = await db.query.organization.findFirst({
@@ -166,7 +161,7 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!organizationDetails) {
-    throw new ApiError(404, 'Organization not found');
+    throw ApiError.notFound('Organization not found');
   }
 
   const deletedOrganization = await db
@@ -180,7 +175,7 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!deletedOrganization) {
-    throw new ApiError(500, 'Error deleting organization');
+    throw ApiError.internalServerError('Error deleting organization');
   }
 
   res.status(200).json(
@@ -194,7 +189,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || loggedInUser.role !== 'admin' || !loggedInUser.id) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const rawOrganizationId = (req.params as any)?.id as unknown;
@@ -203,7 +198,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
     : rawOrganizationId;
 
   if (!organizationId || typeof organizationId !== 'string') {
-    throw new ApiError(401, 'Organiztion Id required in params');
+    throw ApiError.unauthorized('Organiztion Id required in params');
   }
 
   const organizationDetails = await db.query.organization.findFirst({
@@ -211,13 +206,13 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!organizationDetails) {
-    throw new ApiError(404, 'Organization not found');
+    throw ApiError.notFound('Organization not found');
   }
 
   const updateData = req.body;
 
   if (Object.keys(updateData).length === 0) {
-    throw new ApiError(400, 'No data to update');
+    throw ApiError.badRequest('No data to update');
   }
 
   const invalidKeys = Object.keys(updateData).filter(
@@ -225,8 +220,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (invalidKeys.length > 0) {
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       `Invalid data to update. Invalid keys: ${invalidKeys}`
     );
   }
@@ -243,7 +237,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!updatedOrganization) {
-    throw new ApiError(500, 'Error updating organization');
+    throw ApiError.internalServerError('Error updating organization');
   }
 
   res.status(200).json(
@@ -258,8 +252,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
 
   if (typeof email === 'string' && email.includes('@')) {
     if (await isLoginLocked(email)) {
-      throw new ApiError(
-        429,
+      throw ApiError.tooManyRequest(
         'Too many failed login attempts. Try again later.'
       );
     }
@@ -280,7 +273,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   if (!existingOrg) {
     console.log('User not found');
     if (typeof email === 'string') await recordLoginFailure(email);
-    throw new ApiError(400, 'User not found');
+    throw ApiError.badRequest('User not found');
   }
 
   const isPasswordValid = await bcrypt.compare(password, existingOrg.password);
@@ -288,14 +281,13 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   if (!isPasswordValid) {
     console.log('Invalid credentials');
     if (typeof email === 'string') await recordLoginFailure(email);
-    throw new ApiError(400, 'Invalid credentials');
+    throw ApiError.badRequest('Invalid credentials');
   }
 
   if (typeof email === 'string') await clearLoginFailures(email);
 
   if (!existingOrg.isVerified) {
-    throw new ApiError(
-      403,
+    throw ApiError.forbidden(
       'Super admin has not verified your organization yet. Please contact support.'
     );
   }
@@ -367,15 +359,14 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(400, 'User not found');
+    throw ApiError.badRequest('User not found');
   }
 
   if (!existingUser.tokenExpiry) {
     console.log(
       'Verification token expiry not registered. Please verify again.'
     );
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       'Verification token expiry not registered. Please verify again.'
     );
   }
@@ -386,12 +377,12 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
 
   if (currentTime.getTime() > tokenExpiry.getTime()) {
     console.log('Verification token expired');
-    throw new ApiError(400, 'Verification token expired');
+    throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.verificationToken) {
     console.log('Invalid OTP');
-    throw new ApiError(400, 'Invalid OTP');
+    throw ApiError.badRequest('Invalid OTP');
   }
 
   const updatedUser = await db
@@ -413,7 +404,7 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
     (updatedUser[0] && !updatedUser[0].isVerified)
   ) {
     console.log('Failed to verify user');
-    throw new ApiError(500, 'Failed to verify user');
+    throw ApiError.internalServerError('Failed to verify user');
   }
 
   res.status(200).json(
@@ -451,7 +442,9 @@ const resendOrganizationVerificationOTP = asyncHandler(
 
     const otpToken = await sendOTP(existingOrg.email);
     if (!otpToken) {
-      throw new ApiError(500, 'Error sending OTP token. Please try again');
+      throw ApiError.internalServerError(
+        'Error sending OTP token. Please try again'
+      );
     }
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -476,7 +469,7 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInOrg || !loggedInOrg.id) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const existingOrg = await db.query.organization.findFirst({
@@ -490,7 +483,7 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingOrg) {
     console.log('User not found');
-    throw new ApiError(404, 'User not found');
+    throw ApiError.notFound('User not found');
   }
 
   const entitlements = await getLatestOrgEntitlements(loggedInOrg.id);
@@ -514,7 +507,7 @@ const updateOrgProfile = asyncHandler(async (req: Request, res: Response) => {
   const loggedInOrg = req.user;
 
   if (!loggedInOrg || !loggedInOrg.id) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const { name, email, serviceCategory, generalNumber } = req.body;
@@ -538,7 +531,7 @@ const updateOrgProfile = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!updatedOrg || updatedOrg.length === 0) {
-    throw new ApiError(500, 'Error updating organization profile');
+    throw ApiError.internalServerError('Error updating organization profile');
   }
 
   res.status(200).json(
@@ -577,7 +570,7 @@ const getOrgServiceProviders = asyncHandler(
     console.log('[DEBUG] getOrgProviders', loggedInOrg);
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const providers = await db.query.serviceProvider.findMany({
@@ -605,11 +598,11 @@ const getOrgServiceProviderById = asyncHandler(
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const provider = await db.query.serviceProvider.findFirst({
@@ -625,7 +618,7 @@ const getOrgServiceProviderById = asyncHandler(
     });
 
     if (!provider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     res
@@ -640,7 +633,7 @@ const registerOrgServiceProvider = asyncHandler(
     const loggedInOrg = req.user;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const {
@@ -663,12 +656,11 @@ const registerOrgServiceProvider = asyncHandler(
     });
 
     if (!org) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     if (org.serviceCategory !== serviceType) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         `Service type must match organization category: ${org.serviceCategory}`
       );
     }
@@ -682,8 +674,7 @@ const registerOrgServiceProvider = asyncHandler(
     });
 
     if (existingProvider) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Service provider with this email or phone number already exists'
       );
     }
@@ -750,11 +741,11 @@ const updateOrgServiceProvider = asyncHandler(
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -765,7 +756,7 @@ const updateOrgServiceProvider = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     const { name, age, primaryAddress, serviceArea, vehicleInformation } =
@@ -806,11 +797,11 @@ const deleteOrgServiceProvider = asyncHandler(
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -821,7 +812,7 @@ const deleteOrgServiceProvider = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     await db.delete(serviceProvider).where(eq(serviceProvider.id, id));
@@ -840,11 +831,11 @@ const verifyOrgServiceProvider = asyncHandler(
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -855,7 +846,7 @@ const verifyOrgServiceProvider = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     await db
@@ -875,7 +866,7 @@ const getOrgDashboardAnalytics = asyncHandler(
     const loggedInOrg = req.user;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const orgId = loggedInOrg.id;
@@ -897,7 +888,7 @@ const getOrgDashboardAnalytics = asyncHandler(
     });
 
     if (!org) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     // Get service providers for this organization

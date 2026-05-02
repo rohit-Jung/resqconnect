@@ -72,22 +72,22 @@ const registerServiceProvider = asyncHandler(
       !serviceType ||
       !organizationId
     ) {
-      throw new ApiError(400, 'Missing required fields');
+      throw ApiError.badRequest('Missing required fields');
     }
 
     if (typeof email !== 'string' || !email.includes('@')) {
-      throw new ApiError(400, 'Invalid email format');
+      throw ApiError.badRequest('Invalid email format');
     }
 
     // Tests sometimes pass phone/serviceType as strings. Normalize/validate.
     const normalizedPhoneNumber =
       typeof phoneNumber === 'string' ? Number(phoneNumber) : phoneNumber;
     if (!Number.isFinite(normalizedPhoneNumber)) {
-      throw new ApiError(400, 'Invalid phone number');
+      throw ApiError.badRequest('Invalid phone number');
     }
 
     if (!Object.values(ServiceTypeEnum).includes(serviceType as any)) {
-      throw new ApiError(400, 'Invalid service type');
+      throw ApiError.badRequest('Invalid service type');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -98,8 +98,7 @@ const registerServiceProvider = asyncHandler(
     });
 
     if (existingServiceProvider) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Service Provider with this email or phone number already exists'
       );
     }
@@ -109,12 +108,11 @@ const registerServiceProvider = asyncHandler(
     });
 
     if (!existingOrganization) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     if (existingOrganization.serviceCategory !== serviceType) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Service Type does not match with organization service category'
       );
     }
@@ -133,8 +131,7 @@ const registerServiceProvider = asyncHandler(
     const entRaw = (latestEnt?.entitlements ?? {}) as Record<string, unknown>;
     const limit = Number(entRaw.provider_count_limit ?? 0) || 0;
     if (limit <= 0) {
-      throw new ApiError(
-        403,
+      throw ApiError.forbidden(
         'Provider registration is not enabled for this organization'
       );
     }
@@ -144,7 +141,7 @@ const registerServiceProvider = asyncHandler(
       .where(eq(serviceProvider.organizationId, organizationId));
     const current = rows[0]?.c ?? 0;
     if (current >= limit) {
-      throw new ApiError(403, `Provider limit reached (${limit})`);
+      throw ApiError.forbidden(`Provider limit reached (${limit})`);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -186,7 +183,7 @@ const registerServiceProvider = asyncHandler(
       });
 
     if (!newServiceProvider) {
-      throw new ApiError(400, 'Failed to register serviceProvider');
+      throw ApiError.badRequest('Failed to register serviceProvider');
     }
 
     res.status(201).json(
@@ -202,16 +199,15 @@ const loginServiceProvider = asyncHandler(
     const { email, password, currentLocation } = req.body;
 
     if (!email || !password) {
-      throw new ApiError(400, 'Email and password are required');
+      throw ApiError.badRequest('Email and password are required');
     }
 
     if (typeof email !== 'string' || !email.includes('@')) {
-      throw new ApiError(400, 'Invalid email format');
+      throw ApiError.badRequest('Invalid email format');
     }
 
     if (await isLoginLocked(email)) {
-      throw new ApiError(
-        429,
+      throw ApiError.tooManyRequest(
         'Too many failed login attempts. Try again later.'
       );
     }
@@ -222,8 +218,7 @@ const loginServiceProvider = asyncHandler(
 
     if (!existingServiceProvider) {
       await recordLoginFailure(email);
-      throw new ApiError(
-        404,
+      throw ApiError.notFound(
         'ServiceProvider not found with given credentials'
       );
     }
@@ -235,7 +230,7 @@ const loginServiceProvider = asyncHandler(
 
     if (!isPasswordValid) {
       await recordLoginFailure(email);
-      throw new ApiError(400, 'Invalid Credentials Provided');
+      throw ApiError.badRequest('Invalid Credentials Provided');
     }
 
     await clearLoginFailures(email);
@@ -244,7 +239,9 @@ const loginServiceProvider = asyncHandler(
       const otpToken = await sendOTP(existingServiceProvider.email);
 
       if (!otpToken) {
-        throw new ApiError(300, 'Error Sending OTP token. Please try again');
+        throw ApiError.serviceUnavailable(
+          'Error Sending OTP token. Please try again'
+        );
       }
 
       const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -258,7 +255,7 @@ const loginServiceProvider = asyncHandler(
         .where(eq(serviceProvider.id, existingServiceProvider.id));
 
       if (!servicePerson) {
-        throw new ApiError(400, 'Error setting verfication token');
+        throw ApiError.badRequest('Error setting verfication token');
       }
 
       return res.status(200).json(
@@ -321,7 +318,7 @@ const loginServiceProvider = asyncHandler(
       const latitude = Number(currentLocation?.latitude);
       const longitude = Number(currentLocation?.longitude);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        throw new ApiError(400, 'Invalid location');
+        throw ApiError.badRequest('Invalid location');
       }
       if (
         latitude < -90 ||
@@ -329,7 +326,7 @@ const loginServiceProvider = asyncHandler(
         longitude < -180 ||
         longitude > 180
       ) {
-        throw new ApiError(400, 'Invalid location');
+        throw ApiError.badRequest('Invalid location');
       }
 
       const locationPoint = `POINT(${longitude} ${latitude})`;
@@ -405,7 +402,7 @@ const logoutServiceProvider = asyncHandler(
     const loggedInServiceProvider = req.user;
 
     if (!loggedInServiceProvider || !loggedInServiceProvider.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -421,7 +418,7 @@ const logoutServiceProvider = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(401, 'Unauthorized Service Provider');
+      throw ApiError.unauthorized('Unauthorized Service Provider');
     }
 
     // Set status to off_duty when logging out
@@ -454,19 +451,18 @@ const verifyServiceProvider = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(400, 'ServiceProvider not found');
+      throw ApiError.badRequest('ServiceProvider not found');
     }
 
     if (
       !existingServiceProvider.verificationToken ||
       !existingServiceProvider.tokenExpiry
     ) {
-      throw new ApiError(400, 'Verification token not found');
+      throw ApiError.badRequest('Verification token not found');
     }
 
     if (!existingServiceProvider.tokenExpiry) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Verification token expiry not registered. Please verify again.'
       );
     }
@@ -477,11 +473,11 @@ const verifyServiceProvider = asyncHandler(
 
     if (currentTime.getTime() > tokenExpiry.getTime()) {
       console.log('Verification token expired');
-      throw new ApiError(400, 'Verification token expired');
+      throw ApiError.badRequest('Verification token expired');
     }
 
     if (otpToken !== existingServiceProvider.verificationToken) {
-      throw new ApiError(400, 'Invalid OTP');
+      throw ApiError.badRequest('Invalid OTP');
     }
 
     const updatedServiceProvider = await db
@@ -499,7 +495,7 @@ const verifyServiceProvider = asyncHandler(
       });
 
     if (!updatedServiceProvider.length) {
-      throw new ApiError(500, 'Failed to verify serviceProvider');
+      throw ApiError.internalServerError('Failed to verify serviceProvider');
     }
 
     res.status(200).json(
@@ -538,7 +534,9 @@ const resendServiceProviderVerificationOTP = asyncHandler(
 
     const otpToken = await sendOTP(existingServiceProvider.email);
     if (!otpToken) {
-      throw new ApiError(500, 'Error sending OTP token. Please try again');
+      throw ApiError.internalServerError(
+        'Error sending OTP token. Please try again'
+      );
     }
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -563,12 +561,12 @@ const updateServiceProvider = asyncHandler(
     const loggedInServiceProvider = req.user;
 
     if (!loggedInServiceProvider || !loggedInServiceProvider.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const body = req.body;
     if (!body || Object.keys(body).length === 0) {
-      throw new ApiError(400, 'No data to update');
+      throw ApiError.badRequest('No data to update');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -576,7 +574,7 @@ const updateServiceProvider = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const {
@@ -604,7 +602,7 @@ const updateServiceProvider = asyncHandler(
       updateData.vehicleInformation = vehicleInformation;
 
     if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No data to update');
+      throw ApiError.badRequest('No data to update');
     }
 
     const updatedServiceProvider = await db
@@ -626,7 +624,7 @@ const updateServiceProvider = asyncHandler(
       });
 
     if (!updatedServiceProvider.length) {
-      throw new ApiError(500, 'Failed to update serviceProvider');
+      throw ApiError.internalServerError('Failed to update serviceProvider');
     }
 
     res.status(200).json(
@@ -649,7 +647,7 @@ const forgotServiceProviderPassword = asyncHandler(
 
     // Tests expect 400 if missing phone number.
     if (!email && !phoneNumber) {
-      throw new ApiError(400, 'Phone number or email is required');
+      throw ApiError.badRequest('Phone number or email is required');
     }
 
     const whereClause = email
@@ -661,13 +659,15 @@ const forgotServiceProviderPassword = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(404, 'ServiceProvider not found with given email');
+      throw ApiError.notFound('ServiceProvider not found with given email');
     }
 
     const otpToken = await sendOTP(existingServiceProvider.email);
 
     if (!otpToken) {
-      throw new ApiError(300, 'Error Sending OTP token. Please try again');
+      throw ApiError.serviceUnavailable(
+        'Error Sending OTP token. Please try again'
+      );
     }
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -678,7 +678,7 @@ const forgotServiceProviderPassword = asyncHandler(
     });
 
     if (!servicePerson) {
-      throw new ApiError(400, 'Error setting reset password token');
+      throw ApiError.badRequest('Error setting reset password token');
     }
 
     res.status(200).json(
@@ -702,19 +702,18 @@ const resetServiceProviderPassword = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(400, 'ServiceProvider not found');
+      throw ApiError.badRequest('ServiceProvider not found');
     }
 
     if (
       !existingServiceProvider.resetPasswordToken ||
       !existingServiceProvider.resetPasswordTokenExpiry
     ) {
-      throw new ApiError(400, 'Reset password token not found');
+      throw ApiError.badRequest('Reset password token not found');
     }
 
     if (!existingServiceProvider.resetPasswordTokenExpiry) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Reset password token expiry not registered. Please verify again.'
       );
     }
@@ -725,11 +724,11 @@ const resetServiceProviderPassword = asyncHandler(
     const currentTime = new Date(Date.now()).toISOString();
 
     if (new Date(currentTime) < tokenExpiry) {
-      throw new ApiError(400, 'Reset password token expired');
+      throw ApiError.badRequest('Reset password token expired');
     }
 
     if (otpToken !== existingServiceProvider.resetPasswordToken) {
-      throw new ApiError(400, 'Invalid OTP');
+      throw ApiError.badRequest('Invalid OTP');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -748,7 +747,7 @@ const resetServiceProviderPassword = asyncHandler(
       });
 
     if (!updatedServiceProvider.length) {
-      throw new ApiError(500, 'Failed to reset password');
+      throw ApiError.internalServerError('Failed to reset password');
     }
 
     res.status(200).json(
@@ -765,7 +764,7 @@ const getServiceProviderProfile = asyncHandler(
     const loggedInServiceProvider = req.user;
 
     if (!loggedInServiceProvider || !loggedInServiceProvider.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -773,7 +772,7 @@ const getServiceProviderProfile = asyncHandler(
     });
 
     if (!existingServiceProvider) {
-      throw new ApiError(404, 'Service Provider not found');
+      throw ApiError.notFound('Service Provider not found');
     }
 
     res.status(200).json(
@@ -794,11 +793,11 @@ const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
     !loggedInServiceProvider.id ||
     loggedInServiceProvider.role !== 'admin'
   ) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   if (!id || typeof id !== 'string') {
-    throw new ApiError(400, 'Service Provider ID is required');
+    throw ApiError.badRequest('Service Provider ID is required');
   }
 
   const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -806,7 +805,7 @@ const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingServiceProvider) {
-    throw new ApiError(404, 'Service Provider not found');
+    throw ApiError.notFound('Service Provider not found');
   }
 
   res.status(200).json(
@@ -822,11 +821,11 @@ const updateServiceProviderStatus = asyncHandler(
     const { serviceStatus } = req.body;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'Please login to perform this action');
+      throw ApiError.badRequest('Please login to perform this action');
     }
 
     if (!serviceStatus) {
-      throw new ApiError(400, 'Status is required');
+      throw ApiError.badRequest('Status is required');
     }
 
     // Check for cooldown (30 seconds)
@@ -841,7 +840,7 @@ const updateServiceProviderStatus = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     // If same status, no need to update
@@ -863,8 +862,7 @@ const updateServiceProviderStatus = asyncHandler(
         const remainingSeconds = Math.ceil(
           (STATUS_COOLDOWN_MS - timeSinceLastUpdate) / 1000
         );
-        throw new ApiError(
-          429,
+        throw ApiError.tooManyRequest(
           `Please wait ${remainingSeconds} seconds before changing status again`
         );
       }
@@ -881,7 +879,7 @@ const updateServiceProviderStatus = asyncHandler(
       .returning();
 
     if (!updatedProvider || updatedProvider.length === 0) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     // Emit socket event for status update
@@ -907,8 +905,7 @@ const updateServiceProviderStatus = asyncHandler(
 const getNearbyProviders = asyncHandler(async (req: Request, res: Response) => {
   const { latitude, longitude, serviceType } = req.query;
   if (!latitude || !longitude || !serviceType) {
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       'latitude, longitude, and serviceType are required'
     );
   }
@@ -923,7 +920,7 @@ const getNearbyProviders = asyncHandler(async (req: Request, res: Response) => {
 
   const serviceTypeValue = serviceTypeMap[serviceType as string];
   if (!serviceTypeValue) {
-    throw new ApiError(400, 'Invalid service type');
+    throw ApiError.badRequest('Invalid service type');
   }
 
   const providers = await db.query.serviceProvider.findMany({
@@ -969,17 +966,17 @@ const changeProviderPassword = asyncHandler(
 
     if (!loggedInProvider || !loggedInProvider.id) {
       console.log('Unauthorized');
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword) {
-      throw new ApiError(400, 'Old password is required');
+      throw ApiError.badRequest('Old password is required');
     }
 
     if (!newPassword) {
-      throw new ApiError(400, 'New password is required');
+      throw ApiError.badRequest('New password is required');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -998,7 +995,7 @@ const changeProviderPassword = asyncHandler(
 
     if (!existingProvider) {
       console.log('Unauthorized');
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -1008,7 +1005,7 @@ const changeProviderPassword = asyncHandler(
 
     if (!isPasswordValid) {
       console.log('Invalid credentials');
-      throw new ApiError(400, 'Invalid credentials');
+      throw ApiError.badRequest('Invalid credentials');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -1030,7 +1027,7 @@ const changeProviderPassword = asyncHandler(
       });
 
     if (!updatedProvider.length) {
-      throw new ApiError(500, 'Failed to update user');
+      throw ApiError.internalServerError('Failed to update user');
     }
 
     res.status(200).json(
@@ -1046,7 +1043,7 @@ const updateServiceProviderLocation = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider || !loggedInProvider.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     // Tests send `{ currentLocation: { latitude, longitude } }`.
@@ -1056,19 +1053,19 @@ const updateServiceProviderLocation = asyncHandler(
     const longitude = loc?.longitude;
 
     if (latitude === undefined || longitude === undefined) {
-      throw new ApiError(400, 'Location data is required');
+      throw ApiError.badRequest('Location data is required');
     }
 
     const latNum = Number(latitude);
     const lngNum = Number(longitude);
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-      throw new ApiError(400, 'Invalid location');
+      throw ApiError.badRequest('Invalid location');
     }
     if (latNum < -90 || latNum > 90) {
-      throw new ApiError(400, 'Invalid latitude');
+      throw ApiError.badRequest('Invalid latitude');
     }
     if (lngNum < -180 || lngNum > 180) {
-      throw new ApiError(400, 'Invalid longitude');
+      throw ApiError.badRequest('Invalid longitude');
     }
 
     // Create PostGIS POINT geometry string
@@ -1097,7 +1094,7 @@ const updateServiceProviderLocation = asyncHandler(
       });
 
     if (!updatedProvider) {
-      throw new ApiError(500, 'Failed to update location');
+      throw ApiError.internalServerError('Failed to update location');
     }
 
     // Recursively convert BigInt fields to string for JSON serialization
@@ -1115,7 +1112,7 @@ const uploadVerificationDocuments = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider || !loggedInProvider.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const { panCardUrl, citizenshipUrl } = (req.body ?? {}) as Partial<{
@@ -1124,18 +1121,18 @@ const uploadVerificationDocuments = asyncHandler(
     }>;
 
     if (!panCardUrl || typeof panCardUrl !== 'string') {
-      throw new ApiError(400, 'PAN card URL is required');
+      throw ApiError.badRequest('PAN card URL is required');
     }
     if (!citizenshipUrl || typeof citizenshipUrl !== 'string') {
-      throw new ApiError(400, 'Citizenship URL is required');
+      throw ApiError.badRequest('Citizenship URL is required');
     }
 
     // Basic sanity check: enforce Cloudinary URLs for documents as well
     if (!panCardUrl.includes('cloudinary.com')) {
-      throw new ApiError(400, 'Invalid PAN card URL');
+      throw ApiError.badRequest('Invalid PAN card URL');
     }
     if (!citizenshipUrl.includes('cloudinary.com')) {
-      throw new ApiError(400, 'Invalid citizenship URL');
+      throw ApiError.badRequest('Invalid citizenship URL');
     }
 
     // update provider with document urls and set status to pending
@@ -1155,7 +1152,7 @@ const uploadVerificationDocuments = asyncHandler(
       });
 
     if (!updatedProvider) {
-      throw new ApiError(500, 'Failed to upload documents');
+      throw ApiError.internalServerError('Failed to upload documents');
     }
 
     res.status(200).json(
@@ -1175,11 +1172,13 @@ const getDocumentUploadSignatures = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!isCloudinaryConfigured()) {
-      throw new ApiError(503, 'Document upload service is not configured');
+      throw ApiError.serviceUnavailable(
+        'Document upload service is not configured'
+      );
     }
 
     // Use predictable public IDs so re-uploads replace the same asset.
@@ -1219,7 +1218,7 @@ const getDocumentStatus = asyncHandler(async (req: Request, res: Response) => {
   const loggedInProvider = req.user;
 
   if (!loggedInProvider || !loggedInProvider.id) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const provider = await db.query.serviceProvider.findFirst({
@@ -1234,7 +1233,7 @@ const getDocumentStatus = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!provider) {
-    throw new ApiError(404, 'Service provider not found');
+    throw ApiError.notFound('Service provider not found');
   }
 
   res.status(200).json(
@@ -1252,11 +1251,13 @@ const getProfilePictureUploadSignature = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!isCloudinaryConfigured()) {
-      throw new ApiError(503, 'Image upload service is not configured');
+      throw ApiError.serviceUnavailable(
+        'Image upload service is not configured'
+      );
     }
 
     // Predictable public ID so new uploads replace the same asset.
@@ -1278,15 +1279,15 @@ const updateProfilePicture = asyncHandler(
     const { profilePictureUrl } = req.body as { profilePictureUrl: string };
 
     if (!loggedInProvider?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!profilePictureUrl || typeof profilePictureUrl !== 'string') {
-      throw new ApiError(400, 'Profile picture URL is required');
+      throw ApiError.badRequest('Profile picture URL is required');
     }
 
     if (!profilePictureUrl.includes('cloudinary.com')) {
-      throw new ApiError(400, 'Invalid profile picture URL');
+      throw ApiError.badRequest('Invalid profile picture URL');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -1298,7 +1299,7 @@ const updateProfilePicture = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     // Delete old profile picture from Cloudinary if it exists.
@@ -1324,7 +1325,7 @@ const updateProfilePicture = asyncHandler(
       });
 
     if (!updatedProvider) {
-      throw new ApiError(500, 'Failed to update profile picture');
+      throw ApiError.internalServerError('Failed to update profile picture');
     }
 
     res.status(200).json(
@@ -1340,7 +1341,7 @@ const deleteProfilePicture = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -1352,11 +1353,11 @@ const deleteProfilePicture = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     if (!existingProvider.profilePicture) {
-      throw new ApiError(400, 'No profile picture to delete');
+      throw ApiError.badRequest('No profile picture to delete');
     }
 
     const publicId = extractPublicIdFromUrl(existingProvider.profilePicture);
@@ -1377,7 +1378,7 @@ const deleteProfilePicture = asyncHandler(
       });
 
     if (!updatedProvider) {
-      throw new ApiError(500, 'Failed to delete profile picture');
+      throw ApiError.internalServerError('Failed to delete profile picture');
     }
 
     res.status(200).json(
@@ -1393,7 +1394,7 @@ const getPendingVerifications = asyncHandler(
     const loggedInOrg = req.user;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const pendingProviders = await db.query.serviceProvider.findMany({
@@ -1432,11 +1433,11 @@ const getProviderDocuments = asyncHandler(
       : rawProviderId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!providerId || typeof providerId !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const provider = await db.query.serviceProvider.findFirst({
@@ -1461,8 +1462,7 @@ const getProviderDocuments = asyncHandler(
     });
 
     if (!provider) {
-      throw new ApiError(
-        404,
+      throw ApiError.notFound(
         'Service provider not found or does not belong to your organization'
       );
     }
@@ -1484,11 +1484,11 @@ const verifyProviderDocuments = asyncHandler(
       : rawProviderId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!providerId || typeof providerId !== 'string') {
-      throw new ApiError(400, 'Provider ID is required');
+      throw ApiError.badRequest('Provider ID is required');
     }
 
     const parsedBody = verifyDocumentsSchema.safeParse(req.body);
@@ -1500,8 +1500,7 @@ const verifyProviderDocuments = asyncHandler(
 
     // Validate rejection reason is provided when rejecting
     if (action === 'reject' && !rejectionReason) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Rejection reason is required when rejecting documents'
       );
     }
@@ -1515,14 +1514,13 @@ const verifyProviderDocuments = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(
-        404,
+      throw ApiError.notFound(
         'Service provider not found or does not belong to your organization'
       );
     }
 
     if (existingProvider.documentStatus !== 'pending') {
-      throw new ApiError(400, 'Documents are not pending verification');
+      throw ApiError.badRequest('Documents are not pending verification');
     }
 
     // Update document status
@@ -1544,7 +1542,7 @@ const verifyProviderDocuments = asyncHandler(
       });
 
     if (!updatedProvider) {
-      throw new ApiError(500, 'Failed to update document status');
+      throw ApiError.internalServerError('Failed to update document status');
     }
 
     const message =

@@ -1,30 +1,19 @@
 import {
   emergencyRequest,
   emergencyResponse,
-  outbox,
   requestEvents,
   serviceProvider,
   user,
 } from '@repo/db/schemas';
-import type { ICreateNewUserRequest } from '@repo/types/validations';
 
 import { HttpStatusCode } from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
-import { latLngToCell } from 'h3-js';
 
 import { envConfig } from '@/config';
-import {
-  H3_RESOLUTION,
-  INITIAL_SEARCH_RADIUS,
-  REQUEST_TIMEOUT_MS,
-} from '@/constants';
-import {
-  AGGREGATE_TYPES,
-  OUTBOX_EVENT_TYPES,
-} from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
+import emergencyRequestService from '@/services/emergency/emergency-request.service';
 import { postJsonWithRetry } from '@/services/internal-http.service';
 import {
   acquireLock,
@@ -33,104 +22,40 @@ import {
   releaseLock,
 } from '@/services/redis.service';
 import { getIo } from '@/socket';
-import { getKafkaTopic } from '@/utils';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
-const createEmergencyRequest = asyncHandler(
+const handleEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { emergencyType, emergencyDescription, userLocation } =
-      req.body as ICreateNewUserRequest;
+    const { emergencyType, emergencyDescription, userLocation } = req.body;
 
     const loggedInUser = req.user;
 
-    const h3Index = latLngToCell(
-      userLocation.latitude,
-      userLocation.longitude,
-      H3_RESOLUTION
-    );
-
-    const h3IndexBigInt = BigInt(`0x${h3Index}`);
-    const locationPoint = `POINT(${userLocation.longitude} ${userLocation.latitude})`;
-    const expiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
-
-    try {
-      const result = await db.transaction(async tx => {
-        const [newRequest] = await tx
-          .insert(emergencyRequest)
-          .values({
-            userId: loggedInUser!.id,
-            serviceType: emergencyType,
-            description: emergencyDescription,
-            location: {
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-            },
-            geoLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
-            h3Index: h3IndexBigInt,
-            searchRadius: INITIAL_SEARCH_RADIUS,
-            expiresAt: expiresAt.toISOString(),
-            requestStatus: 'pending',
-          })
-          .returning({
-            id: emergencyRequest.id,
-            userId: emergencyRequest.userId,
-            emergencyType: emergencyRequest.serviceType,
-            emergencyDescription: emergencyRequest.description,
-            emergencyLocation: emergencyRequest.location,
-            status: emergencyRequest.requestStatus,
-            searchRadius: emergencyRequest.searchRadius,
-            expiresAt: emergencyRequest.expiresAt,
-          });
-
-        if (!newRequest?.id) {
-          throw new ApiError(500, 'Error creating emergency request');
-        }
-
-        const eventPayload = {
-          requestId: newRequest.id,
-          userId: newRequest.userId,
-          emergencyType: newRequest.emergencyType,
-          emergencyDescription: newRequest.emergencyDescription,
-          emergencyLocation: newRequest.emergencyLocation,
-          status: newRequest.status,
-          h3Index: h3Index,
-          searchRadius: newRequest.searchRadius,
-          expiresAt: newRequest.expiresAt,
-        };
-
-        await tx.insert(outbox).values({
-          aggregateId: newRequest.id,
-          aggregateType: AGGREGATE_TYPES.EMERGENCY_REQUEST,
-          eventType: OUTBOX_EVENT_TYPES.CREATED,
-          kafkaTopic: getKafkaTopic(emergencyType),
-          payload: JSON.stringify(eventPayload),
-          status: 'pending',
-        });
-
-        await tx
-          .update(user)
-          .set({
-            currentLocation: {
-              latitude: userLocation.latitude.toString(),
-              longitude: userLocation.longitude.toString(),
-            },
-          })
-          .where(eq(user.id, loggedInUser!.id));
-
-        return newRequest;
-      });
-
-      res.status(201).json(
-        new ApiResponse(201, 'Emergency request created', {
-          emergencyRequest: result,
-        })
-      );
-    } catch (error) {
-      console.error('Error creating emergency request:', error);
-      throw new ApiError(500, 'Failed to create emergency request');
+    if (!loggedInUser?.id) {
+      throw ApiError.unauthorized('Unauthorized');
     }
+
+    const { success, requestId, error, requestInfo } =
+      await emergencyRequestService.create(
+        loggedInUser?.id,
+        {
+          emergencyType,
+          description: emergencyDescription,
+          location: userLocation,
+        },
+        'inapp'
+      );
+
+    if (!success) {
+      throw ApiError.badRequest(`${error}`);
+    }
+
+    res.status(201).json(
+      new ApiResponse(201, 'Emergency request created', {
+        emergencyRequest: requestInfo,
+      })
+    );
   }
 );
 
@@ -139,7 +64,7 @@ const getEmergencyRequest = asyncHandler(
     const id = req.params.id as string;
 
     if (!id) {
-      throw new ApiError(400, 'Emergency request ID is required');
+      throw ApiError.badRequest('Emergency request ID is required');
     }
 
     const emergencyRequestData = await db.query.emergencyRequest.findFirst({
@@ -159,7 +84,7 @@ const getUsersEmergencyRequests = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'User ID is required');
+      throw ApiError.badRequest('User ID is required');
     }
 
     const emergencyRequests = await db.query.emergencyRequest.findMany({
@@ -180,13 +105,13 @@ const updateEmergencyRequest = asyncHandler(
     // const { status } = req.body;
 
     if (!id) {
-      throw new ApiError(400, 'Emergency request ID is required');
+      throw ApiError.badRequest('Emergency request ID is required');
     }
 
     const updateData = req.body;
 
     if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No data to update');
+      throw ApiError.badRequest('No data to update');
     }
 
     const invalidKeys = Object.keys(updateData).filter(
@@ -194,8 +119,7 @@ const updateEmergencyRequest = asyncHandler(
     );
 
     if (invalidKeys.length > 0) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         `Invalid data to update. Invalid keys: ${invalidKeys}`
       );
     }
@@ -205,7 +129,7 @@ const updateEmergencyRequest = asyncHandler(
     });
 
     if (!existingEmergencyRequest) {
-      throw new ApiError(404, 'Emergency request not found');
+      throw ApiError.notFound('Emergency request not found');
     }
 
     const updatedEmergencyRequest = await db
@@ -222,7 +146,7 @@ const updateEmergencyRequest = asyncHandler(
       });
 
     if (!updatedEmergencyRequest) {
-      throw new ApiError(500, 'Error updating emergency request');
+      throw ApiError.internalServerError('Error updating emergency request');
     }
 
     res
@@ -243,15 +167,15 @@ const deleteEmergencyRequest = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'User ID is required');
+      throw ApiError.badRequest('User ID is required');
     }
 
     if (!loggedInUser.role) {
-      throw new ApiError(400, 'User role is required');
+      throw ApiError.badRequest('User role is required');
     }
 
     if (!id) {
-      throw new ApiError(400, 'Emergency request ID is required');
+      throw ApiError.badRequest('Emergency request ID is required');
     }
 
     const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
@@ -259,7 +183,7 @@ const deleteEmergencyRequest = asyncHandler(
     });
 
     if (!existingEmergencyRequest) {
-      throw new ApiError(404, 'Emergency request not found');
+      throw ApiError.notFound('Emergency request not found');
     }
 
     const deletedEmergencyRequest = await db
@@ -275,7 +199,7 @@ const deleteEmergencyRequest = asyncHandler(
       });
 
     if (!deletedEmergencyRequest) {
-      throw new ApiError(500, 'Error deleting emergency request');
+      throw ApiError.internalServerError('Error deleting emergency request');
     }
 
     res
@@ -319,11 +243,11 @@ const cancelEmergencyRequest = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'User ID is required');
+      throw ApiError.badRequest('User ID is required');
     }
 
     if (!id) {
-      throw new ApiError(400, 'Emergency request ID is required');
+      throw ApiError.badRequest('Emergency request ID is required');
     }
 
     const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
@@ -334,7 +258,7 @@ const cancelEmergencyRequest = asyncHandler(
     });
 
     if (!existingEmergencyRequest) {
-      throw new ApiError(404, 'Emergency request not found or not authorized');
+      throw ApiError.notFound('Emergency request not found or not authorized');
     }
 
     if (existingEmergencyRequest.requestStatus === 'cancelled') {
@@ -408,20 +332,17 @@ const acceptEmergencyRequest = asyncHandler(
     const providerId = req.user?.id;
 
     if (!providerId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!requestId) {
-      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+      throw ApiError.badRequest('Request ID is required');
     }
 
     const lockAcquired = await acquireLock(requestId, providerId, 30);
 
     if (!lockAcquired) {
-      throw new ApiError(
-        HttpStatusCode.Conflict,
-        'Request already taken by another provider'
-      );
+      throw ApiError.conflict('Request already taken by another provider');
     }
 
     try {
@@ -431,20 +352,17 @@ const acceptEmergencyRequest = asyncHandler(
 
       if (!existingRequest) {
         await releaseLock(requestId, providerId);
-        throw new ApiError(
-          HttpStatusCode.NotFound,
-          'Emergency request not found'
-        );
+        throw ApiError.notFound('Emergency request not found');
       }
 
       if (existingRequest.requestStatus === 'assigned') {
         await releaseLock(requestId, providerId);
-        throw new ApiError(HttpStatusCode.Conflict, 'Request already assigned');
+        throw ApiError.conflict('Request already assigned');
       }
 
       if (existingRequest.requestStatus === 'cancelled') {
         await releaseLock(requestId, providerId);
-        throw new ApiError(HttpStatusCode.Gone, 'Request was cancelled');
+        throw ApiError.gone('Request was cancelled');
       }
 
       await Promise.all([
@@ -523,7 +441,7 @@ const acceptEmergencyRequest = asyncHandler(
           SocketRoom.EMERGENCY(requestId)
         );
 
-        // Fetch provider details once for both local and platform emit
+        // fetch provider details once for both local and platform emit
         const providerData = await db.query.serviceProvider.findFirst({
           where: eq(serviceProvider.id, providerId),
         });
@@ -544,7 +462,7 @@ const acceptEmergencyRequest = asyncHandler(
           }
         );
 
-        // Notify platform (silently, don't fail the request)
+        // notify platform (silently, don't fail the request)
         const platformUrl = envConfig.platform_base_url;
         if (platformUrl && existingRequest.userId) {
           // Fire async - don't await
@@ -602,11 +520,11 @@ const rejectEmergencyRequest = asyncHandler(
     const { reason } = req.body;
 
     if (!providerId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!requestId) {
-      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+      throw ApiError.badRequest('Request ID is required');
     }
 
     await db.insert(requestEvents).values({
@@ -638,11 +556,11 @@ const completeEmergencyRequest = asyncHandler(
     const providerId = req.user?.id;
 
     if (!providerId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!requestId) {
-      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+      throw ApiError.badRequest('Request ID is required');
     }
 
     const existingRequest = await db.query.emergencyRequest.findFirst({
@@ -650,17 +568,11 @@ const completeEmergencyRequest = asyncHandler(
     });
 
     if (!existingRequest) {
-      throw new ApiError(
-        HttpStatusCode.NotFound,
-        'Emergency request not found'
-      );
+      throw ApiError.notFound('Emergency request not found');
     }
 
     if (existingRequest.requestStatus !== 'assigned') {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
-        'Request is not in assigned status'
-      );
+      throw ApiError.badRequest('Request is not in assigned status');
     }
 
     await Promise.all([
@@ -703,11 +615,11 @@ const confirmProviderArrival = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!requestId) {
-      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+      throw ApiError.badRequest('Request ID is required');
     }
 
     const existingRequest = await db.query.emergencyRequest.findFirst({
@@ -718,18 +630,14 @@ const confirmProviderArrival = asyncHandler(
     });
 
     if (!existingRequest) {
-      throw new ApiError(
-        HttpStatusCode.NotFound,
-        'Emergency request not found or not authorized'
-      );
+      throw ApiError.notFound('Emergency request not found or not authorized');
     }
 
     if (
       existingRequest.requestStatus !== 'accepted' &&
       existingRequest.requestStatus !== 'assigned'
     ) {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
+      throw ApiError.badRequest(
         'Request is not in accepted or assigned status'
       );
     }
@@ -776,11 +684,11 @@ const providerConfirmedArrival = asyncHandler(
     const providerId = req.user?.id;
 
     if (!providerId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!requestId) {
-      throw new ApiError(HttpStatusCode.BadRequest, 'Request ID is required');
+      throw ApiError.badRequest('Request ID is required');
     }
 
     const existingRequest = await db.query.emergencyRequest.findFirst({
@@ -788,18 +696,14 @@ const providerConfirmedArrival = asyncHandler(
     });
 
     if (!existingRequest) {
-      throw new ApiError(
-        HttpStatusCode.NotFound,
-        'Emergency request not found or not authorized'
-      );
+      throw ApiError.notFound('Emergency request not found or not authorized');
     }
 
     if (
       existingRequest.requestStatus !== 'accepted' &&
       existingRequest.requestStatus !== 'assigned'
     ) {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
+      throw ApiError.badRequest(
         'Request is not in accepted or assigned status'
       );
     }
@@ -1100,7 +1004,7 @@ const controllers = {
   cancelEmergencyRequest,
   completeEmergencyRequest,
   confirmProviderArrival,
-  createEmergencyRequest,
+  createEmergencyRequest: handleEmergencyRequest,
   deleteEmergencyRequest,
   getEmergencyRequest,
   getProviderEmergencyHistory,
