@@ -227,7 +227,7 @@ export const useSocketHandlers = ({
     [isProvider, router]
   );
 
-  // Setup socket listeners
+  // setup socket listeners
   const setupSocketListeners = useCallback(() => {
     socketManager.emit(SocketEvents.USER_JOIN_ROOM, {
       requestId,

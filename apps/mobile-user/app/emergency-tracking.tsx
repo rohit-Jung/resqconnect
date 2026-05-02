@@ -166,7 +166,7 @@ export default function EmergencyTrackingScreen() {
     }
   }, [currentStatus, isProvider]);
 
-  // Sync local status with server data on initial load
+  // sync local status with server data on initial load
   useEffect(() => {
     if (emergencyRequest?.status) {
       setLocalStatus(emergencyRequest.status as EmergencyStatus);
@@ -281,7 +281,7 @@ export default function EmergencyTrackingScreen() {
         return;
       }
 
-      // Calculate new location along route
+      // calculate new location along route
       const newLocation = getPointAtProgress(
         routeCoordinates,
         simulationProgressRef.current
@@ -294,6 +294,7 @@ export default function EmergencyTrackingScreen() {
           ).toFixed(1)}%`,
           newLocation
         );
+
         // Update provider's location for real-time display
         setMyLocation(newLocation);
         setProviderLocation(newLocation);
@@ -393,7 +394,7 @@ export default function EmergencyTrackingScreen() {
       }
     };
 
-    // Broadcast immediately
+    // broadcast immediately
     broadcastLocation();
 
     // Set up interval for periodic broadcasts

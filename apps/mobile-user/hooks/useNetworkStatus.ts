@@ -180,9 +180,7 @@ export const useNetworkStatus = (options: UseNetworkStatusOptions = {}) => {
   };
 };
 
-/**
- * Simple function to check if currently online (for one-time checks)
- */
+// simple function to check if currently online (for one-time checks)
 export const checkNetworkStatus = async (): Promise<boolean> => {
   try {
     const controller = new AbortController();
