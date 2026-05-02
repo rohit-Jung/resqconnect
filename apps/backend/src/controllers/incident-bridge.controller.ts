@@ -1,9 +1,4 @@
-import {
-  emergencyRequest,
-  emergencyResponse,
-  requestEvents,
-  serviceProvider,
-} from '@repo/db/schemas';
+import { emergencyRequest, requestEvents } from '@repo/db/schemas';
 import { EmergencyRequestPayload } from '@repo/types/validations';
 
 import { eq } from 'drizzle-orm';
@@ -54,6 +49,7 @@ const platformIncidentUpdate = asyncHandler(
 
     // best-effort: keep platform db status in sync if requested.
     if (typeof requestStatus === 'string' && requestStatus.length > 0) {
+      console.log('UPdating STATUS', requestStatus);
       await db
         .update(emergencyRequest)
         .set({ requestStatus: requestStatus as any })
