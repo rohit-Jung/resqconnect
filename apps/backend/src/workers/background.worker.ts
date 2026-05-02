@@ -17,7 +17,7 @@ import {
   TIMEOUT_CHECK_INTERVAL,
 } from '@/constants';
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
-import { SocketEvents } from '@/constants/socket.constants';
+import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { safeSend } from '@/services/kafka/kafka.service';
 import { getEmergencyProviders } from '@/services/redis.service';
@@ -96,6 +96,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
   return setInterval(async () => {
     try {
       const now = new Date();
+      const nowIso = now.toISOString();
 
       // query timed-out pending requests
       const timedOutRequests = await db
@@ -104,7 +105,7 @@ export function startTimeoutHandler(): NodeJS.Timeout {
         .where(
           and(
             eq(emergencyRequest.requestStatus, 'pending'),
-            lt(emergencyRequest.expiresAt, now.toISOString())
+            lt(emergencyRequest.expiresAt, nowIso)
           )
         );
 
@@ -176,15 +177,30 @@ export function startTimeoutHandler(): NodeJS.Timeout {
             )
           );
 
-        // update request with new radius and expiry
+        // Update request with new radius and expiry.
+        // Guard against races (e.g. request accepted/completed after our select).
         const newExpiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
-        await db
+        const updated = await db
           .update(emergencyRequest)
           .set({
             searchRadius: newRadius,
             expiresAt: newExpiresAt.toISOString(),
           })
-          .where(eq(emergencyRequest.id, req.id));
+          .where(
+            and(
+              eq(emergencyRequest.id, req.id),
+              eq(emergencyRequest.requestStatus, 'pending'),
+              lt(emergencyRequest.expiresAt, nowIso)
+            )
+          )
+          .returning({ id: emergencyRequest.id });
+
+        if (updated.length === 0) {
+          logger.debug(
+            `[ESCALATION] Skipping ${req.id}: status changed since select`
+          );
+          continue;
+        }
 
         // log escalation event
         await db.insert(requestEvents).values({
@@ -196,7 +212,11 @@ export function startTimeoutHandler(): NodeJS.Timeout {
         // broadcast to newly found providers
         if (io && newProviders.length > 0) {
           for (const provider of newProviders) {
-            io.to(provider.id).emit(SocketEvents.NEW_EMERGENCY, {
+            const roomName = SocketRoom.PROVIDER(provider.id);
+            logger.debug(
+              `[ESCALATION] Emitting NEW_EMERGENCY for ${req.id} to ${roomName}`
+            );
+            io.to(roomName).emit(SocketEvents.NEW_EMERGENCY, {
               requestId: req.id,
               emergencyType: req.serviceType,
               emergencyLocation: req.location,
@@ -230,6 +250,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
   return setInterval(async () => {
     try {
       const now = new Date();
+      const nowIso = now.toISOString();
 
       // query stale accepted requests (accepted but never connected)
       const staleRequests = await db
@@ -239,7 +260,7 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           and(
             eq(emergencyRequest.requestStatus, 'accepted'),
             isNull(emergencyRequest.providerConnectedAt),
-            lt(emergencyRequest.mustConnectBy, now.toISOString())
+            lt(emergencyRequest.mustConnectBy, nowIso)
           )
         );
 
@@ -256,9 +277,10 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
           `[CONNECTED] Provider accepted request ${req.id} but never connected`
         );
 
-        // reset request to pending
+        // Reset request to pending.
+        // Guard against races (e.g. request completed while we were processing).
         const newExpiresAt = new Date(Date.now() + REQUEST_TIMEOUT_MS);
-        await db
+        const updated = await db
           .update(emergencyRequest)
           .set({
             requestStatus: 'pending',
@@ -266,7 +288,22 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
             providerConnectedAt: null,
             expiresAt: newExpiresAt.toISOString(),
           })
-          .where(eq(emergencyRequest.id, req.id));
+          .where(
+            and(
+              eq(emergencyRequest.id, req.id),
+              eq(emergencyRequest.requestStatus, 'accepted'),
+              isNull(emergencyRequest.providerConnectedAt),
+              lt(emergencyRequest.mustConnectBy, nowIso)
+            )
+          )
+          .returning({ id: emergencyRequest.id });
+
+        if (updated.length === 0) {
+          logger.debug(
+            `[REBROADCAST] Skipping ${req.id}: status changed since select`
+          );
+          continue;
+        }
 
         // log event
         await db.insert(requestEvents).values({
@@ -282,7 +319,11 @@ export function startDisconnectionHandler(): NodeJS.Timeout {
         if (io && providerIds.length > 0) {
           // re-broadcast to original providers
           for (const pId of providerIds) {
-            io.to(pId).emit(SocketEvents.NEW_EMERGENCY, {
+            const roomName = SocketRoom.PROVIDER(pId);
+            logger.debug(
+              `[REBROADCAST] Emitting NEW_EMERGENCY for ${req.id} to ${roomName}`
+            );
+            io.to(roomName).emit(SocketEvents.NEW_EMERGENCY, {
               requestId: req.id,
               emergencyType: req.serviceType,
               emergencyLocation: req.location,
