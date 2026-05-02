@@ -250,14 +250,14 @@ const updateContactPushToken = asyncHandler(
 );
 
 const emergencyContactsController = {
-  createEmergencyContact,
-  updateEmergencyContact,
-  deleteEmergencyContact,
-  getEmergencyContact,
-  getUserEmergencyContacts,
-  getCommonEmergencyContacts,
-  toggleContactNotification,
-  updateContactPushToken,
+  create: createEmergencyContact,
+  update: updateEmergencyContact,
+  remove: deleteEmergencyContact,
+  getById: getEmergencyContact,
+  getForUser: getUserEmergencyContacts,
+  getCommon: getCommonEmergencyContacts,
+  toggleNotification: toggleContactNotification,
+  updatePushToken: updateContactPushToken,
 } as const;
 
 export default emergencyContactsController;

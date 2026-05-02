@@ -12,10 +12,7 @@ const emergencyResponseRouter = Router();
 emergencyResponseRouter
   .route('/')
   // .get(validateRoleAuth(["user"]), getEmergencyResponse)
-  .post(
-    validateRoleAuth([UserRoles.USER]),
-    emergencyResponseController.createEmergencyResponse
-  );
+  .post(validateRoleAuth([UserRoles.USER]), emergencyResponseController.create);
 
 emergencyResponseRouter
   .route('/provider-responses')
@@ -26,11 +23,11 @@ emergencyResponseRouter
 
 emergencyResponseRouter
   .route('/:id')
-  .get(emergencyResponseController.getEmergencyResponse)
-  .put(emergencyResponseController.updateEmergencyResponse)
+  .get(emergencyResponseController.getById)
+  .put(emergencyResponseController.update)
   .delete(
     validateRoleAuth([UserRoles.ADMIN]),
-    emergencyResponseController.deleteEmergencyResponse
+    emergencyResponseController.remove
   );
 
 export default emergencyResponseRouter;

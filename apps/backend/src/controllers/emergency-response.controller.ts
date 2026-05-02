@@ -411,10 +411,10 @@ const getProviderResponses = asyncHandler(
 );
 
 const emergencyResponseController = {
-  createEmergencyResponse,
-  getEmergencyResponse,
-  updateEmergencyResponse,
-  deleteEmergencyResponse,
+  create: createEmergencyResponse,
+  getById: getEmergencyResponse,
+  update: updateEmergencyResponse,
+  remove: deleteEmergencyResponse,
   getProviderResponses,
 } as const;
 

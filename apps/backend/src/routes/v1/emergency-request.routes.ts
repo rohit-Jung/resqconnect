@@ -21,26 +21,26 @@ emergencyRequestRouter
   .get(
     validateRoleAuth([UserRoles.USER]),
     requireAuthenticatedUser,
-    emergencyRequestController.getUsersEmergencyRequests
+    emergencyRequestController.getForUser
   )
   .post(
     emergencyLimiter,
     validateRoleAuth([UserRoles.USER]),
     validateRequestBody(emergencyRequestValidations.CreateNewRequestSchema),
     requireAuthenticatedUser,
-    emergencyRequestController.createEmergencyRequest
+    emergencyRequestController.create
   );
 
 emergencyRequestRouter.get(
   '/recent',
   validateRoleAuth([UserRoles.USER]),
-  emergencyRequestController.getRecentEmergencyRequests
+  emergencyRequestController.getRecent
 );
 
 emergencyRequestRouter.patch(
   '/:id/cancel',
   validateRoleAuth([UserRoles.USER]),
-  emergencyRequestController.cancelEmergencyRequest
+  emergencyRequestController.cancel
 );
 
 emergencyRequestRouter.patch(
@@ -58,19 +58,19 @@ emergencyRequestRouter.patch(
 emergencyRequestRouter.patch(
   '/:id/accept',
   validateServiceProvider,
-  emergencyRequestController.acceptEmergencyRequest
+  emergencyRequestController.accept
 );
 
 emergencyRequestRouter.patch(
   '/:id/reject',
   validateServiceProvider,
-  emergencyRequestController.rejectEmergencyRequest
+  emergencyRequestController.reject
 );
 
 emergencyRequestRouter.patch(
   '/:id/complete',
   validateServiceProvider,
-  emergencyRequestController.completeEmergencyRequest
+  emergencyRequestController.complete
 );
 
 emergencyRequestRouter.get(
@@ -78,23 +78,23 @@ emergencyRequestRouter.get(
   validateRoleAuth([UserRoles.USER]),
   validateQueryParams(routeParamsValidations.getHistoryQuerySchema),
   requireAuthenticatedUser,
-  emergencyRequestController.getUserEmergencyHistory
+  emergencyRequestController.getUserHistory
 );
 
 emergencyRequestRouter.get(
   '/provider/history',
   validateServiceProvider,
   validateQueryParams(routeParamsValidations.getHistoryQuerySchema),
-  emergencyRequestController.getProviderEmergencyHistory
+  emergencyRequestController.getProviderHistory
 );
 
 emergencyRequestRouter
   .route('/:id')
-  .get(emergencyRequestController.getEmergencyRequest)
-  .put(emergencyRequestController.updateEmergencyRequest)
+  .get(emergencyRequestController.getById)
+  .put(emergencyRequestController.update)
   .delete(
     validateRoleAuth([UserRoles.ADMIN]),
-    emergencyRequestController.deleteEmergencyRequest
+    emergencyRequestController.remove
   );
 
 export default emergencyRequestRouter;

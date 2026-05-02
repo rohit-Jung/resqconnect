@@ -8,30 +8,24 @@ const emergencyContactsRouter = express.Router();
 
 emergencyContactsRouter
   .route('/')
-  .post(
-    validateRoleAuth([UserRoles.USER]),
-    emergencyContactsController.createEmergencyContact
-  )
+  .post(validateRoleAuth([UserRoles.USER]), emergencyContactsController.create)
   .get(
     validateRoleAuth([UserRoles.USER]),
-    emergencyContactsController.getUserEmergencyContacts
+    emergencyContactsController.getForUser
   );
 
 emergencyContactsRouter.get(
   '/common/all',
-  emergencyContactsController.getCommonEmergencyContacts
+  emergencyContactsController.getCommon
 );
 
 emergencyContactsRouter
   .route('/:id')
-  .get(emergencyContactsController.getEmergencyContact)
-  .put(
-    validateRoleAuth([UserRoles.USER]),
-    emergencyContactsController.updateEmergencyContact
-  )
+  .get(emergencyContactsController.getById)
+  .put(validateRoleAuth([UserRoles.USER]), emergencyContactsController.update)
   .delete(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    emergencyContactsController.deleteEmergencyContact
+    emergencyContactsController.remove
   );
 
 // Toggle notification for a specific contact
@@ -39,7 +33,7 @@ emergencyContactsRouter
   .route('/:id/toggle-notification')
   .patch(
     validateRoleAuth([UserRoles.USER]),
-    emergencyContactsController.toggleContactNotification
+    emergencyContactsController.toggleNotification
   );
 
 // Update push token for emergency contact (if they have the app)
@@ -47,7 +41,7 @@ emergencyContactsRouter
   .route('/:id/push-token')
   .patch(
     validateRoleAuth([UserRoles.USER]),
-    emergencyContactsController.updateContactPushToken
+    emergencyContactsController.updatePushToken
   );
 
 export default emergencyContactsRouter;

@@ -8,11 +8,7 @@ const uploadRouter = express.Router();
 const validateUser = validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]);
 
 // get signed url
-uploadRouter.get(
-  '/signature',
-  validateUser,
-  uploadController.getUploadSignature
-);
+uploadRouter.get('/signature', validateUser, uploadController.getSignature);
 
 // update profile picture url after successful upload
 uploadRouter.put(
