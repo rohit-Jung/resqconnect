@@ -46,6 +46,7 @@ export const serviceProviderEndpoints = {
 export const emergencyRequestEndpoints = {
   create: `/emergency-request`,
   getAll: `/emergency-request`,
+  recent: `/emergency-request/recent`,
   getById: (id: string) => `/emergency-request/${id}`,
   cancel: (id: string) => `/emergency-request/${id}/cancel`,
   status: (id: string) => `/emergency-request/${id}/status`,

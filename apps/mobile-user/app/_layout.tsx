@@ -1,16 +1,19 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { TOKEN_KEY } from '@/constants';
+import { getActiveEmergency } from '@/hooks/useEmergencyRoom';
 import { useLoadFonts } from '@/hooks/useLoadFonts';
+import { checkNetworkStatus, useNetworkStatus } from '@/hooks/useNetworkStatus';
 import TanstackQueryClientProvider from '@/providers/react-query.provider';
 import api from '@/services/axiosInstance';
-import { userEndpoints } from '@/services/endPoints';
+import { emergencyRequestEndpoints, userEndpoints } from '@/services/endPoints';
 import { connectToSocketServer } from '@/socket';
 import { useAuthStore } from '@/store/authStore';
+import { EmergencyStatus } from '@/types/emergency.types';
 
 import '../global.css';
 
@@ -23,6 +26,15 @@ export default function RootLayout() {
   const { user, setUser, isLoading, setUserType, userType } = useAuthStore();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const hasCheckedAuth = useRef(false);
+  const router = useRouter();
+  const lastOnlineRef = useRef<boolean | null>(null);
+  const isActiveEmergencyCheckInFlight = useRef(false);
+
+  // monitor connectivity so we can re-check when coming back online.
+  const { isConnected } = useNetworkStatus({
+    pollInterval: 10000,
+    autoSync: false,
+  });
 
   useEffect(() => {
     // Wait for store to rehydrate before checking auth
@@ -122,6 +134,110 @@ export default function RootLayout() {
 
     initSocket();
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (isCheckingAuth || isLoading) return;
+
+    const maybeRedirectToActiveEmergency = async () => {
+      if (isActiveEmergencyCheckInFlight.current) return;
+      isActiveEmergencyCheckInFlight.current = true;
+
+      const isOnline = await checkNetworkStatus();
+      console.log('online Check', isOnline);
+
+      if (!isOnline) {
+        isActiveEmergencyCheckInFlight.current = false;
+        return;
+      }
+
+      // 1) prefer local persisted active emergency (app restart scenario)
+      const stored = await getActiveEmergency();
+      const storedRequestId = stored?.requestId;
+      console.log('Found stored', isOnline);
+
+      if (storedRequestId) {
+        try {
+          const resp = await api.get(
+            emergencyRequestEndpoints.getById(storedRequestId)
+          );
+          const req = resp.data?.data;
+          const status = req?.requestStatus as EmergencyStatus | undefined;
+
+          if (
+            status &&
+            status !== EmergencyStatus.COMPLETED &&
+            status !== EmergencyStatus.CANCELLED
+          ) {
+            router.replace({
+              pathname: '/emergency-tracking',
+              params: {
+                requestId: storedRequestId,
+                // emergency tracking screen defaults safely if missing
+                emergencyType: req?.serviceType,
+                role: 'user',
+              },
+            });
+            isActiveEmergencyCheckInFlight.current = false;
+            return;
+          }
+        } catch (e) {
+          // If validation fails, fall through to server-side lookup.
+          console.log('[ActiveEmergency] Stored request validation failed:', e);
+        }
+      }
+
+      // 2) Ask backend if user has any active request
+      // Use /recent (no query schema restrictions) and pick the latest active status.
+      try {
+        const resp = await api.get(emergencyRequestEndpoints.recent);
+        const recent = resp.data?.data;
+        const list = Array.isArray(recent) ? recent : [];
+
+        const active = list.find(r => {
+          const s = r?.requestStatus;
+          return (
+            s === 'pending' ||
+            s === 'accepted' ||
+            s === 'assigned' ||
+            s === 'in_progress'
+          );
+        });
+
+        if (active?.id) {
+          router.replace({
+            pathname: '/emergency-tracking',
+            params: {
+              requestId: active.id,
+              emergencyType: active?.serviceType,
+              role: 'user',
+            },
+          });
+          isActiveEmergencyCheckInFlight.current = false;
+          return;
+        }
+      } catch (e) {
+        console.log('[ActiveEmergency] Failed to fetch recent requests', e);
+      }
+
+      isActiveEmergencyCheckInFlight.current = false;
+    };
+
+    // On first run, check if online.
+    // If we were offline and just became online, re-check.
+    const wasOnline = lastOnlineRef.current;
+    lastOnlineRef.current = isConnected;
+    console.log('was Online', wasOnline);
+
+    if (wasOnline === null) {
+      if (isConnected) maybeRedirectToActiveEmergency();
+      return;
+    }
+
+    if (wasOnline === false && isConnected === true) {
+      maybeRedirectToActiveEmergency();
+    }
+  }, [user, isCheckingAuth, isLoading, router, isConnected]);
 
   if (!loaded && !error) {
     return null;
