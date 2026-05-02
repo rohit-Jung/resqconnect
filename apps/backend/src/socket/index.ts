@@ -35,7 +35,7 @@ async function authenticateUser(socket: Socket, next: (err?: Error) => void) {
   }
 
   if (!token) {
-    throw new ApiError(HttpStatusCode.Unauthorized, 'Token not found for user');
+    throw ApiError.unauthorized('Token not found for user');
   }
 
   const decoded = await verifyAndDecodeToken(token);

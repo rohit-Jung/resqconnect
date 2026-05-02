@@ -3,7 +3,7 @@ import z from 'zod';
 import { logger } from '@/config';
 import { ServiceTypeEnum } from '@/constants';
 
-export interface ParsedSMSEmergency {
+export interface ParsedEmergency {
   emergencyType: ServiceTypeEnum;
   location: {
     latitude: number;
@@ -18,7 +18,7 @@ export interface ParsedSMSEmergency {
 
 export interface SMSParseResult {
   success: boolean;
-  data?: ParsedSMSEmergency;
+  data?: ParsedEmergency;
   error?: string;
   rawMessage?: string;
 }
@@ -104,7 +104,7 @@ function parseLocation(
 
 function parseEmergencyType(
   text: string
-): ParsedSMSEmergency['emergencyType'] | null {
+): ParsedEmergency['emergencyType'] | null {
   const typeField = extractField(text, 'Type');
   if (typeField) {
     const normalized = typeField.toLowerCase().trim();
@@ -166,7 +166,7 @@ function isEmergencySMS(text: string): boolean {
  */
 export function parseSMSMessage(messageBody: string): SMSParseResult {
   try {
-    // Check if this is a valid emergency SMS
+    // check if this is a valid emergency sms
     if (!isEmergencySMS(messageBody)) {
       return {
         success: false,
@@ -175,7 +175,7 @@ export function parseSMSMessage(messageBody: string): SMSParseResult {
       };
     }
 
-    // Parse location (required)
+    // parse location (required)
     const location = parseLocation(messageBody);
     if (!location) {
       return {
@@ -202,7 +202,7 @@ export function parseSMSMessage(messageBody: string): SMSParseResult {
     const description = extractField(messageBody, 'Details');
     const timestamp = parseTimestamp(messageBody);
 
-    const parsedData: ParsedSMSEmergency = {
+    const parsedData: ParsedEmergency = {
       emergencyType,
       location,
       userId,
@@ -219,14 +219,14 @@ export function parseSMSMessage(messageBody: string): SMSParseResult {
       logger.warn('SMS validation failed:', errors);
       return {
         success: false,
-        error: `Validation failed: ${errors.map((e: z.ZodIssue) => e.message).join(', ')}`,
+        error: `Validation failed: ${errors.map(e => e.message).join(', ')}`,
         rawMessage: messageBody,
       };
     }
 
     return {
       success: true,
-      data: validation.data as ParsedSMSEmergency,
+      data: validation.data as ParsedEmergency,
       rawMessage: messageBody,
     };
   } catch (error) {

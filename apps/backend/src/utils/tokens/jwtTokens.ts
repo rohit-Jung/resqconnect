@@ -86,24 +86,24 @@ const verifyJWT = (token: string): IJWTToken => {
     const decoded = jwt.verify(token, envConfig.jwt_secret!) as IJWTToken;
 
     if (!decoded.id) {
-      throw new ApiError(401, 'Invalid token');
+      throw ApiError.unauthorized('Invalid token');
     }
 
     return decoded;
   } catch (error) {
     // Handle specific JWT errors
     if (error instanceof TokenExpiredError) {
-      throw new ApiError(401, 'Token expired');
+      throw ApiError.unauthorized('Token expired');
     }
     if (error instanceof JsonWebTokenError) {
-      throw new ApiError(401, 'Invalid token');
+      throw ApiError.unauthorized('Invalid token');
     }
     // Re-throw ApiError as is
     if (error instanceof ApiError) {
       throw error;
     }
     // Unknown error
-    throw new ApiError(401, 'Token verification failed');
+    throw ApiError.unauthorized('Token verification failed');
   }
 };
 
@@ -111,12 +111,12 @@ const verifyAndDecodeToken = async (
   token: string
 ): Promise<IJWTToken | null> => {
   if (!token) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const decoded = verifyJWT(token);
   if (!decoded.id) {
-    throw new ApiError(401, 'Invalid token');
+    throw ApiError.unauthorized('Invalid token');
   }
 
   const [row] = await db
