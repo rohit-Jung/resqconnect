@@ -43,6 +43,7 @@ import {
 } from '@/services/emergency/emergency.api';
 import { fetchRoute } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
+import { useProviderStore } from '@/store/providerStore';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
 import {
@@ -83,6 +84,8 @@ export default function EmergencyTrackingScreen() {
   );
 
   const isProvider = role === 'provider';
+  const provider = useProviderStore(s => s.provider);
+  const didProviderConnectRef = useRef<string | null>(null);
   const initialUserLocation = TEST_CORDS;
 
   const [userLocation, setUserLocation] =
@@ -112,6 +115,23 @@ export default function EmergencyTrackingScreen() {
 
   const { socket, isConnected } = useSocketStore();
   const pulseAnim = usePulseAnimation(localStatus);
+
+  // Provider must connect to the request so backend sets providerConnectedAt
+  // and the disconnection worker doesn't rebroadcast the same request.
+  useEffect(() => {
+    if (!isProvider) return;
+    if (!requestId) return;
+    if (!provider?.id) return;
+    if (!isConnected) return;
+
+    if (didProviderConnectRef.current === requestId) return;
+    didProviderConnectRef.current = requestId;
+
+    socketManager.emit(SocketEvents.PROVIDER_CONNECT, {
+      requestId,
+      providerId: provider.id,
+    });
+  }, [isProvider, requestId, provider?.id, isConnected]);
 
   // Fetch emergency request status
   const { data: requestData, isLoading: isLoadingRequest } =
