@@ -81,6 +81,8 @@ export default function EmergencyTrackingScreen() {
     null
   );
 
+  const isSimulatingRef = useRef<boolean>(false);
+
   const isProvider = role === 'provider';
   const provider = useProviderStore(s => s.provider);
   const didProviderConnectRef = useRef<string | null>(null);
@@ -211,6 +213,7 @@ export default function EmergencyTrackingScreen() {
   const fetchAndUpdateRoute = useCallback(async () => {
     if (!routeOrigin || !routeDestination || isRouteRefetchingRef.current)
       return;
+    if (isSimulatingRef.current) return;
 
     // Check if we need to refetch (significant movement)
     if (lastRouteFetchLocation.current) {
@@ -280,6 +283,8 @@ export default function EmergencyTrackingScreen() {
       '[SIMULATION] Starting simulated location movement along route'
     );
 
+    isSimulatingRef.current = true;
+
     // Start simulation
     simulationTimerRef.current = setInterval(() => {
       simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
@@ -289,6 +294,7 @@ export default function EmergencyTrackingScreen() {
         simulationProgressRef.current = 1;
         if (simulationTimerRef.current) {
           clearInterval(simulationTimerRef.current);
+          isSimulatingRef.current = false;
           simulationTimerRef.current = null;
         }
         console.log('[SIMULATION] Reached destination');
@@ -310,6 +316,7 @@ export default function EmergencyTrackingScreen() {
           ).toFixed(1)}%`,
           newLocation
         );
+
         // Update provider's location for real-time display
         setMyLocation(newLocation);
         setProviderLocation(newLocation);
@@ -319,6 +326,7 @@ export default function EmergencyTrackingScreen() {
           routeCoordinates,
           simulationProgressRef.current
         );
+        console.log('Remaining', remaining);
         setRemainingRouteCoordinates(remaining);
       }
     }, LOCATION_TRACKING.SIMULATION_INTERVAL);
@@ -326,6 +334,7 @@ export default function EmergencyTrackingScreen() {
     return () => {
       if (simulationTimerRef.current) {
         clearInterval(simulationTimerRef.current);
+        isSimulatingRef.current = false;
         simulationTimerRef.current = null;
       }
     };
@@ -448,6 +457,41 @@ export default function EmergencyTrackingScreen() {
     const cleanup = setupSocketListeners();
     return cleanup;
   }, [requestId, setupSocketListeners]);
+
+  // Update remaining route when my location changes (real-time polyline trimming for provider)
+  useEffect(() => {
+    if (
+      isProvider &&
+      myLocation &&
+      routeCoordinates.length > 0 &&
+      currentStatus === EmergencyStatus.ACCEPTED
+    ) {
+      // Find the closest point on the route to current location
+      let minDist = Infinity;
+      let closestIndex = 0;
+
+      for (let i = 0; i < routeCoordinates.length; i++) {
+        const dist = haversineDistance(
+          myLocation.latitude,
+          myLocation.longitude,
+          routeCoordinates[i].latitude,
+          routeCoordinates[i].longitude
+        );
+        if (dist < minDist) {
+          minDist = dist;
+          closestIndex = i;
+        }
+      }
+
+      // Calculate progress based on closest point
+      const progress = closestIndex / (routeCoordinates.length - 1);
+      const remaining = getRemainingRouteAfterProgress(
+        routeCoordinates,
+        progress
+      );
+      setRemainingRouteCoordinates(remaining);
+    }
+  }, [myLocation, routeCoordinates, isProvider, currentStatus]);
 
   // Fetch route when status changes or when locations become available
   // For user: Only fetch if route wasn't already set from acceptance event
@@ -650,6 +694,8 @@ export default function EmergencyTrackingScreen() {
                 'Failed to confirm arrival. Please check your connection and try again.'
               );
               setIsProcessingConfirmation(false);
+            } finally {
+              setIsProcessingConfirmation(false);
             }
           },
         },
@@ -820,32 +866,6 @@ export default function EmergencyTrackingScreen() {
         <Ionicons name="locate" size={24} color="#374151" />
       </TouchableOpacity>
 
-      {/* Route Info Badge */}
-      {routeInfo && (
-        <View style={styles.routeInfoBadge}>
-          <View style={styles.routeInfoItem}>
-            <Ionicons name="time-outline" size={16} color="#10B981" />
-            <Text style={styles.routeInfoText}>
-              {formatDuration(routeInfo.duration)}
-            </Text>
-          </View>
-          <View style={styles.routeInfoDivider} />
-          <View style={styles.routeInfoItem}>
-            <Ionicons name="navigate-outline" size={16} color="#3B82F6" />
-            <Text style={styles.routeInfoText}>
-              {formatDistance(routeInfo.distance)}
-            </Text>
-          </View>
-          {isLoadingRoute && (
-            <ActivityIndicator
-              size="small"
-              color="#6B7280"
-              style={{ marginLeft: 8 }}
-            />
-          )}
-        </View>
-      )}
-
       {/* Status Card */}
       <View style={styles.statusCard}>
         {/* Emergency Type Badge */}
@@ -896,24 +916,47 @@ export default function EmergencyTrackingScreen() {
             </Text>
           )}
 
-        {/* Route ETA and Distance */}
+        {/* Swiss-style Route Info */}
         {routeInfo &&
           (currentStatus === EmergencyStatus.ACCEPTED ||
             currentStatus === EmergencyStatus.IN_PROGRESS) && (
-            <View style={styles.etaSection}>
-              <View style={styles.etaBox}>
-                <Text style={styles.etaValue}>
-                  {Math.round(routeInfo.duration)}
+            <View style={styles.routeInfoSwiss}>
+              <View style={styles.routeInfoSwissItem}>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={COLORS.MID_GRAY}
+                />
+                <Text style={styles.routeInfoSwissText}>
+                  {formatDuration(routeInfo.duration)}
                 </Text>
-                <Text style={styles.etaLabel}>min away</Text>
               </View>
-              <View style={styles.distanceBox}>
-                <Text style={styles.distanceValue}>
-                  {routeInfo.distance.toFixed(1)}
+              <View style={styles.routeInfoSwissDivider} />
+              <View style={styles.routeInfoSwissItem}>
+                <Ionicons
+                  name="navigate-outline"
+                  size={16}
+                  color={COLORS.MID_GRAY}
+                />
+                <Text style={styles.routeInfoSwissText}>
+                  {formatDistance(routeInfo.distance)}
                 </Text>
-                <Text style={styles.distanceLabel}>km</Text>
               </View>
+              {isLoadingRoute && (
+                <ActivityIndicator
+                  size="small"
+                  color={COLORS.MID_GRAY}
+                  style={{ marginLeft: 8 }}
+                />
+              )}
             </View>
+          )}
+
+        {/* Hairline below route info */}
+        {routeInfo &&
+          (currentStatus === EmergencyStatus.ACCEPTED ||
+            currentStatus === EmergencyStatus.IN_PROGRESS) && (
+            <View style={styles.hairline} />
           )}
 
         {/* Assigned Responder Info (for user) */}
@@ -921,7 +964,7 @@ export default function EmergencyTrackingScreen() {
           <View style={styles.providerInfo}>
             <View style={styles.providerHeader}>
               <View style={styles.providerAvatar}>
-                <MaterialCommunityIcons name="account" size={24} color="#fff" />
+                <MaterialCommunityIcons name="account" size={20} color="#fff" />
               </View>
               <View style={styles.providerDetails}>
                 <Text style={styles.providerName}>{assignedProvider.name}</Text>
@@ -1056,10 +1099,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 24,
-    paddingTop:
-      Platform.OS === 'ios'
-        ? UI_CONFIG.HEADER_PADDING_TOP_IOS
-        : UI_CONFIG.HEADER_PADDING_TOP_ANDROID,
+    paddingTop: 12,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.LIGHT_GRAY,
@@ -1109,11 +1149,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
-    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
-    elevation: UI_CONFIG.ELEVATION,
   },
   providerMarker: {
     ...MARKER_SIZES.PROVIDER_MARKER,
@@ -1125,11 +1160,6 @@ const styles = StyleSheet.create({
     ...MARKER_SIZES.ASSIGNED_PROVIDER_MARKER,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
-    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
-    elevation: UI_CONFIG.ELEVATION,
   },
   recenterButton: {
     position: 'absolute',
@@ -1137,48 +1167,11 @@ const styles = StyleSheet.create({
     right: 16,
     width: 44,
     height: 44,
-    borderRadius: 22,
     backgroundColor: COLORS.OFF_WHITE,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  routeInfoBadge: {
-    position: 'absolute',
-    top: 60,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.OFF_WHITE,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  routeInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeInfoText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.BLACK,
-    marginLeft: 4,
-    letterSpacing: 1,
-  },
-  routeInfoDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: COLORS.LIGHT_GRAY,
-    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: COLORS.LIGHT_GRAY,
   },
   statusCard: {
     position: 'absolute',
@@ -1186,181 +1179,174 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: COLORS.OFF_WHITE,
-    borderTopLeftRadius: UI_CONFIG.BORDER_RADIUS_XLARGE,
-    borderTopRightRadius: UI_CONFIG.BORDER_RADIUS_XLARGE,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-    maxHeight: '50%',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.LIGHT_GRAY,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    maxHeight: '40%',
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_LARGE,
-    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: COLORS.BLACK,
+    marginBottom: 10,
   },
   typeBadgeText: {
     color: COLORS.OFF_WHITE,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
-    marginLeft: 8,
-    letterSpacing: 1,
+    marginLeft: 6,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   roleBadge: {
     backgroundColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
     marginLeft: 8,
   },
   roleBadgeText: {
     color: COLORS.OFF_WHITE,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   statusSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   statusText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    marginLeft: 12,
+    marginLeft: 8,
     letterSpacing: 1,
     color: COLORS.BLACK,
+    textTransform: 'uppercase',
   },
   providersCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.MID_GRAY,
-    marginBottom: 16,
+    marginBottom: 8,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  etaSection: {
+  routeInfoSwiss: {
     flexDirection: 'row',
-    marginBottom: 16,
-  },
-  etaBox: {
-    backgroundColor: COLORS.GREEN,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
+    marginBottom: 8,
+    gap: 16,
   },
-  etaValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.OFF_WHITE,
-  },
-  etaLabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 1,
-  },
-  distanceBox: {
-    backgroundColor: COLORS.BLUE,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
+  routeInfoSwissItem: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  distanceValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.OFF_WHITE,
-  },
-  distanceLabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
+  routeInfoSwissText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.BLACK,
+    marginLeft: 4,
     letterSpacing: 1,
+  },
+  routeInfoSwissDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: COLORS.LIGHT_GRAY,
+  },
+  hairline: {
+    height: 1,
+    backgroundColor: COLORS.LIGHT_GRAY,
+    marginBottom: 10,
   },
   providerInfo: {
-    backgroundColor: COLORS.LIGHT_GRAY,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: COLORS.OFF_WHITE,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.LIGHT_GRAY,
+    paddingTop: 8,
+    marginBottom: 8,
   },
   providerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   providerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.BLUE,
+    width: 36,
+    height: 36,
+    backgroundColor: COLORS.BLACK,
     justifyContent: 'center',
     alignItems: 'center',
   },
   providerDetails: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 8,
   },
   providerName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.BLACK,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   providerVehicle: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.MID_GRAY,
+    letterSpacing: 0.5,
   },
   callButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.GREEN,
-    paddingVertical: 12,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: COLORS.BLACK,
     marginTop: 12,
   },
   callButtonText: {
-    color: COLORS.OFF_WHITE,
-    fontSize: 14,
-    fontWeight: '700',
+    color: COLORS.BLACK,
+    fontSize: 12,
+    fontWeight: '600',
     marginLeft: 8,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   cancelButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: COLORS.SIGNAL_RED,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   cancelButtonText: {
     color: COLORS.SIGNAL_RED,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     marginLeft: 8,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   confirmArrivalButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    backgroundColor: COLORS.GREEN,
-    borderRadius: UI_CONFIG.BORDER_RADIUS_SMALL,
-    marginBottom: 12,
+    paddingVertical: 14,
+    backgroundColor: COLORS.SIGNAL_RED,
+    marginBottom: 8,
   },
   confirmArrivalButtonText: {
     color: COLORS.OFF_WHITE,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     marginLeft: 8,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   connectionStatus: {
     flexDirection: 'row',
