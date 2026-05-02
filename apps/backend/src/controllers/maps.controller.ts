@@ -16,28 +16,30 @@ const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
   const { q: searchQuery, lat: currentLat, lg: currentLong } = req.query;
 
   if (!searchQuery || searchQuery === '') {
-    throw new ApiError(400, 'Search query is required');
+    throw ApiError.badRequest('Search query is required');
   }
 
   if (typeof searchQuery !== 'string') {
-    throw new ApiError(400, 'Search query must be a string');
+    throw ApiError.badRequest('Search query must be a string');
   }
 
   if (
     (currentLat && typeof currentLat !== 'string') ||
     (currentLong && typeof currentLong !== 'string')
   ) {
-    throw new ApiError(400, 'Current latitude and longitude must be strings');
+    throw ApiError.badRequest('Current latitude and longitude must be strings');
   }
 
   if (searchQuery.length < 3) {
-    throw new ApiError(400, 'Search query must be at least 3 characters long');
+    throw ApiError.badRequest(
+      'Search query must be at least 3 characters long'
+    );
   }
 
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    throw new ApiError(400, 'Unauthorized to perform this action');
+    throw ApiError.badRequest('Unauthorized to perform this action');
   }
 
   let userLat, userLong, searchAutoCompleteResult;
@@ -47,14 +49,14 @@ const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
     });
 
     if (!userInDb) {
-      throw new ApiError(404, 'User not found');
+      throw ApiError.notFound('User not found');
     }
 
     userLat = userInDb?.currentLocation?.latitude;
     userLong = userInDb?.currentLocation?.longitude;
 
     if (!userLat || !userLong) {
-      throw new ApiError(404, 'User location not found');
+      throw ApiError.notFound('User location not found');
     }
 
     searchAutoCompleteResult = await compeletAutoSearch({
@@ -71,7 +73,7 @@ const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (!searchAutoCompleteResult) {
-    throw new ApiError(404, 'No results found');
+    throw ApiError.notFound('No results found');
   }
 
   res
@@ -86,8 +88,7 @@ const getOptimalRouteForUser = asyncHandler(
     const { srcLat, srcLng, dstLat, dstLng, mode } = req.query;
 
     if (!srcLat || !srcLng || !dstLat || !dstLng) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Source and destination coordinates are required'
       );
     }
@@ -99,8 +100,7 @@ const getOptimalRouteForUser = asyncHandler(
       typeof dstLng !== 'string' ||
       typeof mode !== 'string'
     ) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Source and destination coordinates must be strings'
       );
     }
@@ -108,12 +108,12 @@ const getOptimalRouteForUser = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'Unauthorized to perform this action');
+      throw ApiError.badRequest('Unauthorized to perform this action');
     }
 
     if (mode) {
       if (mode !== 'DRIVING' && mode !== 'WALKING' && mode !== 'BICYCLING') {
-        throw new ApiError(400, 'Invalid mode parameter');
+        throw ApiError.badRequest('Invalid mode parameter');
       }
     }
 
@@ -126,7 +126,7 @@ const getOptimalRouteForUser = asyncHandler(
     });
 
     if (!optimalRoute) {
-      throw new ApiError(404, 'No route found');
+      throw ApiError.notFound('No route found');
     }
 
     res

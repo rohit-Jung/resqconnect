@@ -32,22 +32,19 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 
   // Validate required fields first so tests (and mocks) don't hit bcrypt/db.
   if (!req.body?.name || !email || !password || !phoneNumber) {
-    throw new ApiError(HttpStatusCode.BadRequest, 'Missing required fields');
+    throw ApiError.badRequest('Missing required fields');
   }
 
   if (typeof email !== 'string' || !email.includes('@')) {
-    throw new ApiError(HttpStatusCode.BadRequest, 'Invalid email format');
+    throw ApiError.badRequest('Invalid email format');
   }
 
   if (role && role == UserRoles.ADMIN && !adminEmails.includes(email)) {
-    throw new ApiError(
-      HttpStatusCode.Unauthorized,
-      'Admin email not authorized'
-    );
+    throw ApiError.unauthorized('Admin email not authorized');
   }
 
   if (phoneNumber && phoneRegex.exec(phoneNumber.toString()) === null) {
-    throw new ApiError(HttpStatusCode.BadRequest, 'Invalid phone number');
+    throw ApiError.badRequest('Invalid phone number');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -56,8 +53,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (existingUser) {
     console.log('User with this email or phone number already exists');
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       'User with this email or phone number already exists'
     );
   }
@@ -100,7 +96,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!newUser) {
     console.log('Error registering user. Please try again');
-    throw new ApiError(400, 'Error registering user. Please try again');
+    throw ApiError.badRequest('Error registering user. Please try again');
   }
 
   console.log('User registered');
@@ -115,18 +111,17 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    throw new ApiError(
-      HttpStatusCode.BadRequest,
-      'Email and password are required'
-    );
+    throw ApiError.badRequest('Email and password are required');
   }
 
   if (typeof email !== 'string' || !email.includes('@')) {
-    throw new ApiError(HttpStatusCode.BadRequest, 'Invalid email format');
+    throw ApiError.badRequest('Invalid email format');
   }
 
   if (await isLoginLocked(email)) {
-    throw new ApiError(429, 'Too many failed login attempts. Try again later.');
+    throw ApiError.tooManyRequest(
+      'Too many failed login attempts. Try again later.'
+    );
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -146,7 +141,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     await recordLoginFailure(email);
-    throw new ApiError(400, 'User not found');
+    throw ApiError.badRequest('User not found');
   }
 
   const isPasswordValid = await bcrypt.compare(password, existingUser.password);
@@ -154,7 +149,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   if (!isPasswordValid) {
     console.log('Invalid credentials');
     await recordLoginFailure(email);
-    throw new ApiError(400, 'Invalid credentials');
+    throw ApiError.badRequest('Invalid credentials');
   }
 
   await clearLoginFailures(email);
@@ -164,7 +159,9 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
     if (!otpToken) {
       console.log('Error Sending OTP token. Please try again');
-      throw new ApiError(300, 'Error Sending OTP token. Please try again');
+      throw ApiError.serviceUnavailable(
+        'Error Sending OTP token. Please try again'
+      );
     }
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -184,7 +181,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
     if (!updatedUser) {
       console.log('Error Updating user. Please try again');
-      throw new ApiError(400, 'Error Updating user. Please try again');
+      throw ApiError.badRequest('Error Updating user. Please try again');
     }
 
     console.log('OTP sent to user for verification', {
@@ -247,7 +244,9 @@ const resendUserVerificationOTP = asyncHandler(
 
     const otpToken = await sendOTP(existingUser.email);
     if (!otpToken) {
-      throw new ApiError(500, 'Error sending OTP token. Please try again');
+      throw ApiError.internalServerError(
+        'Error sending OTP token. Please try again'
+      );
     }
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -272,7 +271,7 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInUser || !loggedInUser.id) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   res
@@ -290,13 +289,13 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInUser || !loggedInUser.id) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const updateData = req.body;
   if (!updateData || Object.keys(updateData).length === 0) {
     console.log('No data to update');
-    throw new ApiError(400, 'No data to update');
+    throw ApiError.badRequest('No data to update');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -305,7 +304,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
   const invalidKeys = Object.keys(updateData).filter(
     key => !Object.keys(user).includes(key)
@@ -313,8 +312,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (invalidKeys.length > 0) {
     console.log(`Invalid data to update. Invalid keys: ${invalidKeys}`);
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       `Invalid data to update. Invalid keys: ${invalidKeys}`
     );
   }
@@ -334,7 +332,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!updatedUser.length) {
     console.log('Failed to update user');
-    throw new ApiError(500, 'Failed to update user');
+    throw ApiError.internalServerError('Failed to update user');
   }
 
   res.status(200).json(
@@ -349,7 +347,7 @@ const getProfile = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInUser || !loggedInUser.id) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -363,7 +361,7 @@ const getProfile = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(404, 'User not found');
+    throw ApiError.notFound('User not found');
   }
 
   res
@@ -381,7 +379,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInUser || loggedInUser.role !== 'admin') {
     console.log('User not authorized');
-    throw new ApiError(401, 'User not authorized');
+    throw ApiError.unauthorized('User not authorized');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -395,7 +393,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(404, 'User not found');
+    throw ApiError.notFound('User not found');
   }
 
   res
@@ -417,20 +415,19 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(400, 'User not found');
+    throw ApiError.badRequest('User not found');
   }
 
   if (!user.verificationToken || !user.tokenExpiry) {
     console.log('Verification token not found');
-    throw new ApiError(400, 'Verification token not found');
+    throw ApiError.badRequest('Verification token not found');
   }
 
   if (!existingUser.tokenExpiry) {
     console.log(
       'Verification token expiry not registered. Please verify again.'
     );
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       'Verification token expiry not registered. Please verify again.'
     );
   }
@@ -441,12 +438,12 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (currentTime.getTime() > tokenExpiry.getTime()) {
     console.log('Verification token expired');
-    throw new ApiError(400, 'Verification token expired');
+    throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.verificationToken) {
     console.log('Invalid OTP');
-    throw new ApiError(400, 'Invalid OTP');
+    throw ApiError.badRequest('Invalid OTP');
   }
 
   const updatedUser = await db
@@ -471,7 +468,7 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
     (updatedUser[0] && !updatedUser[0].isVerified)
   ) {
     console.log('Failed to verify user');
-    throw new ApiError(500, 'Failed to verify user');
+    throw ApiError.internalServerError('Failed to verify user');
   }
 
   const verifiedUser = updatedUser[0];
@@ -492,7 +489,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   const { email, phoneNumber } = req.body;
 
   if (!email && !phoneNumber) {
-    throw new ApiError(400, 'Please provide email or phone number');
+    throw ApiError.badRequest('Please provide email or phone number');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -501,14 +498,16 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found with given email or phone');
-    throw new ApiError(404, 'User not found with given email or phone');
+    throw ApiError.notFound('User not found with given email or phone');
   }
 
   const otpToken = await sendOTP(String(existingUser.email));
 
   if (!otpToken) {
     console.log('Error Sending OTP token. Please try again');
-    throw new ApiError(300, 'Error Sending OTP token. Please try again');
+    throw ApiError.serviceUnavailable(
+      'Error Sending OTP token. Please try again'
+    );
   }
 
   const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -523,7 +522,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!updatedUser) {
     console.log('Error setting verfication token');
-    throw new ApiError(400, 'Error setting verfication token');
+    throw ApiError.badRequest('Error setting verfication token');
   }
 
   res.status(200).json(
@@ -543,7 +542,7 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('User not found');
-    throw new ApiError(400, 'User not found');
+    throw ApiError.badRequest('User not found');
   }
 
   if (
@@ -551,15 +550,14 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     !existingUser.resetPasswordTokenExpiry
   ) {
     console.log('Reset Password token not found');
-    throw new ApiError(400, 'Reset Password token not found');
+    throw ApiError.badRequest('Reset Password token not found');
   }
 
   if (!existingUser.resetPasswordTokenExpiry) {
     console.log(
       'Verification token expiry not registered. Please verify again.'
     );
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       'Verification token expiry not registered. Please verify again.'
     );
   }
@@ -569,12 +567,12 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (new Date(currentTime) < tokenExpiry) {
     console.log('Verification token expired');
-    throw new ApiError(400, 'Verification token expired');
+    throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.resetPasswordToken) {
     console.log('Invalid OTP');
-    throw new ApiError(400, 'Invalid OTP');
+    throw ApiError.badRequest('Invalid OTP');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -595,7 +593,7 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!updatedUser.length) {
     console.log('Failed to update user');
-    throw new ApiError(500, 'Failed to update user');
+    throw ApiError.internalServerError('Failed to update user');
   }
 
   res.status(200).json(
@@ -610,17 +608,17 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!loggedInUser || !loggedInUser.id) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const { oldPassword, newPassword } = req.body;
 
   if (!oldPassword) {
-    throw new ApiError(400, 'Old password is required');
+    throw ApiError.badRequest('Old password is required');
   }
 
   if (!newPassword) {
-    throw new ApiError(400, 'New password is required');
+    throw ApiError.badRequest('New password is required');
   }
 
   const existingUser = await db.query.user.findFirst({
@@ -639,7 +637,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!existingUser) {
     console.log('Unauthorized');
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const isPasswordValid = await bcrypt.compare(
@@ -649,7 +647,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
 
   if (!isPasswordValid) {
     console.log('Invalid credentials');
-    throw new ApiError(400, 'Invalid credentials');
+    throw ApiError.badRequest('Invalid credentials');
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -671,7 +669,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!updatedUser.length) {
-    throw new ApiError(500, 'Failed to update user');
+    throw ApiError.internalServerError('Failed to update user');
   }
 
   res.status(200).json(
@@ -687,7 +685,7 @@ export const updatePushToken = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const updatedUser = await db
@@ -697,7 +695,7 @@ export const updatePushToken = asyncHandler(
       .returning();
 
     if (!updatedUser) {
-      throw new ApiError(404, 'User not found');
+      throw ApiError.notFound('User not found');
     }
 
     return res
@@ -714,7 +712,7 @@ export const updateEmergencySettings = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const updateData: Record<string, unknown> = {};
@@ -724,13 +722,13 @@ export const updateEmergencySettings = asyncHandler(
     if (emergencyNotificationMethod) {
       const valid = ['sms', 'push', 'both'];
       if (!valid.includes(emergencyNotificationMethod)) {
-        throw new ApiError(400, 'Invalid notification method');
+        throw ApiError.badRequest('Invalid notification method');
       }
       updateData.emergencyNotificationMethod = emergencyNotificationMethod;
     }
 
     if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No valid settings to update');
+      throw ApiError.badRequest('No valid settings to update');
     }
 
     const updatedUser = await db
@@ -744,7 +742,7 @@ export const updateEmergencySettings = asyncHandler(
       });
 
     if (!updatedUser.length) {
-      throw new ApiError(500, 'Failed to update settings');
+      throw ApiError.internalServerError('Failed to update settings');
     }
 
     return res
@@ -767,7 +765,7 @@ export const getEmergencySettings = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const userSettings = await db.query.user.findFirst({
@@ -779,7 +777,7 @@ export const getEmergencySettings = asyncHandler(
     });
 
     if (!userSettings) {
-      throw new ApiError(404, 'User not found');
+      throw ApiError.notFound('User not found');
     }
 
     return res

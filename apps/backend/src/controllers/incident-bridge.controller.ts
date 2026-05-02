@@ -27,12 +27,12 @@ type SiloIncomingAck = {
 const platformIncidentUpdate = asyncHandler(
   async (req: Request, res: Response) => {
     if (envConfig.mode !== 'platform') {
-      throw new ApiError(404, 'Not found');
+      throw ApiError.notFound('Not found');
     }
 
     const platformIncidentId = String(req.params.platformIncidentId || '');
     if (!platformIncidentId) {
-      throw new ApiError(400, 'platformIncidentId is required');
+      throw ApiError.badRequest('platformIncidentId is required');
     }
 
     const {
@@ -46,10 +46,10 @@ const platformIncidentUpdate = asyncHandler(
     } = (req.body ?? {}) as Record<string, any>;
 
     if (typeof userId !== 'string' || userId.length === 0) {
-      throw new ApiError(400, 'userId is required');
+      throw ApiError.badRequest('userId is required');
     }
     if (typeof eventType !== 'string' || eventType.length === 0) {
-      throw new ApiError(400, 'eventType is required');
+      throw ApiError.badRequest('eventType is required');
     }
 
     // best-effort: keep platform db status in sync if requested.
@@ -108,12 +108,12 @@ const platformIncidentUpdate = asyncHandler(
 const siloIncomingIncident = asyncHandler(
   async (req: Request, res: Response) => {
     if (envConfig.mode !== 'silo') {
-      throw new ApiError(404, 'Not found');
+      throw ApiError.notFound('Not found');
     }
 
     const parsed = EmergencyRequestPayload.safeParse(req.body);
     if (!parsed.success) {
-      throw new ApiError(400, 'Invalid incident payload');
+      throw ApiError.badRequest('Invalid incident payload');
     }
 
     const data = parsed.data;

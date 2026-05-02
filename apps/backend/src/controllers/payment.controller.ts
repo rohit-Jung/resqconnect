@@ -39,7 +39,7 @@ const initiateSubscription = asyncHandler(
     const loggedInOrg = req.user;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const parsedBody = initiateSubscriptionSchema.safeParse(req.body);
@@ -60,8 +60,7 @@ const initiateSubscription = asyncHandler(
       });
 
     if (existingSubscription) {
-      throw new ApiError(
-        400,
+      throw ApiError.badRequest(
         'Organization already has an active subscription'
       );
     }
@@ -70,7 +69,7 @@ const initiateSubscription = asyncHandler(
     const result = await initiatePayment(loggedInOrg.id, planId, returnUrl);
 
     if (!result.success) {
-      throw new ApiError(400, result.error || 'Failed to initiate payment');
+      throw ApiError.badRequest(result.error || 'Failed to initiate payment');
     }
 
     res.status(200).json(
@@ -106,13 +105,13 @@ const getPaymentStatus = asyncHandler(async (req: Request, res: Response) => {
   const loggedInOrg = req.user;
 
   if (!loggedInOrg || !loggedInOrg.id) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const { paymentId } = req.params;
 
   if (!paymentId || typeof paymentId !== 'string') {
-    throw new ApiError(400, 'Payment ID is required');
+    throw ApiError.badRequest('Payment ID is required');
   }
 
   const payment = await db.query.payments.findFirst({
@@ -130,7 +129,7 @@ const getPaymentStatus = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!payment) {
-    throw new ApiError(404, 'Payment not found');
+    throw ApiError.notFound('Payment not found');
   }
 
   res
@@ -142,7 +141,7 @@ const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => {
   const loggedInOrg = req.user;
 
   if (!loggedInOrg || !loggedInOrg.id) {
-    throw new ApiError(401, 'Unauthorized');
+    throw ApiError.unauthorized('Unauthorized');
   }
 
   const parsedQuery = paymentHistoryQuerySchema.safeParse(req.query);
@@ -198,7 +197,7 @@ const getActiveSubscription = asyncHandler(
     const loggedInOrg = req.user;
 
     if (!loggedInOrg || !loggedInOrg.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const subscription = await db.query.organizationSubscriptions.findFirst({
@@ -239,13 +238,13 @@ const createSubscriptionPlan = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || loggedInUser.role !== 'admin') {
-      throw new ApiError(401, 'Unauthorized to perform this action');
+      throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
     const { name, price, durationMonths, features } = req.body;
 
     if (!name || !price || !durationMonths) {
-      throw new ApiError(400, 'Name, price, and durationMonths are required');
+      throw ApiError.badRequest('Name, price, and durationMonths are required');
     }
 
     const [newPlan] = await db
@@ -270,12 +269,12 @@ const updateSubscriptionPlan = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || loggedInUser.role !== 'admin') {
-      throw new ApiError(401, 'Unauthorized to perform this action');
+      throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
     const { id } = req.params;
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'ID should be passed and should be string');
+      throw ApiError.badRequest('ID should be passed and should be string');
     }
 
     const { name, price, durationMonths, features, isActive } = req.body;
@@ -285,7 +284,7 @@ const updateSubscriptionPlan = asyncHandler(
     });
 
     if (!existingPlan) {
-      throw new ApiError(404, 'Subscription plan not found');
+      throw ApiError.notFound('Subscription plan not found');
     }
 
     const updateData: Record<string, unknown> = {};
@@ -297,7 +296,7 @@ const updateSubscriptionPlan = asyncHandler(
     if (isActive !== undefined) updateData.isActive = isActive;
 
     if (Object.keys(updateData).length === 0) {
-      throw new ApiError(400, 'No data to update');
+      throw ApiError.badRequest('No data to update');
     }
 
     const [updatedPlan] = await db
@@ -317,12 +316,12 @@ const deleteSubscriptionPlan = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || loggedInUser.role !== 'admin') {
-      throw new ApiError(401, 'Unauthorized to perform this action');
+      throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
     const { id } = req.params;
     if (!id || typeof id !== 'string') {
-      throw new ApiError(400, 'ID should be passed and should be string');
+      throw ApiError.badRequest('ID should be passed and should be string');
     }
 
     const existingPlan = await db.query.subscriptionPlans.findFirst({
@@ -330,7 +329,7 @@ const deleteSubscriptionPlan = asyncHandler(
     });
 
     if (!existingPlan) {
-      throw new ApiError(404, 'Subscription plan not found');
+      throw ApiError.notFound('Subscription plan not found');
     }
 
     await db.delete(subscriptionPlans).where(eq(subscriptionPlans.id, id));

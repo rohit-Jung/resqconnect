@@ -13,11 +13,11 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
 
   if (!userId) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   if (!serviceProviderId || !message || !serviceRatings) {
-    throw new ApiError(400, 'Missing required fields');
+    throw ApiError.badRequest('Missing required fields');
   }
 
   const createdFeedback = await db
@@ -39,7 +39,7 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!createdFeedback || createdFeedback.length === 0) {
-    throw new ApiError(500, 'Failed to create feedback');
+    throw ApiError.internalServerError('Failed to create feedback');
   }
 
   res.status(201).json(
@@ -50,12 +50,17 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const rawId = (req.params as any)?.id as unknown;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
   const userId = req.user?.id;
 
+  if (!id || typeof id !== 'string') {
+    throw ApiError.badRequest('Feedback ID is required');
+  }
+
   if (!userId) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const existingFeedback = await db.query.feedback.findFirst({
@@ -63,17 +68,17 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingFeedback) {
-    throw new ApiError(404, 'Feedback not found');
+    throw ApiError.notFound('Feedback not found');
   }
 
   if (existingFeedback?.userId !== userId) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const updateData = req.body;
 
   if (Object.keys(updateData).length === 0) {
-    throw new ApiError(400, 'No data to update');
+    throw ApiError.badRequest('No data to update');
   }
 
   const invalidKeys = Object.keys(updateData).filter(
@@ -81,8 +86,7 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (invalidKeys.length > 0) {
-    throw new ApiError(
-      400,
+    throw ApiError.badRequest(
       `Invalid data to update. Invalid keys: ${invalidKeys}`
     );
   }
@@ -94,7 +98,7 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
     .returning();
 
   if (!updatedFeedback) {
-    throw new ApiError(500, 'Failed to update feedback');
+    throw ApiError.internalServerError('Failed to update feedback');
   }
 
   res.status(200).json(
@@ -105,12 +109,17 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const rawId = (req.params as any)?.id as unknown;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const userId = req.user?.id;
   const role = req.user?.role;
 
+  if (!id || typeof id !== 'string') {
+    throw ApiError.badRequest('Feedback ID is required');
+  }
+
   if (!userId) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const existingFeedback = await db.query.feedback.findFirst({
@@ -118,11 +127,11 @@ const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingFeedback) {
-    throw new ApiError(404, 'Feedback not found');
+    throw ApiError.notFound('Feedback not found');
   }
 
   if (role !== 'admin' && existingFeedback?.userId !== userId) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const deletedFeedback = await db
@@ -131,7 +140,7 @@ const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
     .returning();
 
   if (!deletedFeedback) {
-    throw new ApiError(500, 'Failed to delete feedback');
+    throw ApiError.internalServerError('Failed to delete feedback');
   }
 
   res.status(200).json(
@@ -142,14 +151,19 @@ const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const getFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const rawId = (req.params as any)?.id as unknown;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
+
+  if (!id || typeof id !== 'string') {
+    throw ApiError.badRequest('Feedback ID is required');
+  }
 
   const existingFeedback = await db.query.feedback.findFirst({
     where: eq(feedback.id, id),
   });
 
   if (!existingFeedback) {
-    throw new ApiError(404, 'Feedback not found');
+    throw ApiError.notFound('Feedback not found');
   }
 
   res
@@ -161,7 +175,7 @@ const getUsersFeedback = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    throw new ApiError(401, 'Unauthorized to perform this action');
+    throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
   const feedbacks = await db.query.feedback.findMany({

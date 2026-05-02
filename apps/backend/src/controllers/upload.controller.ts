@@ -20,12 +20,11 @@ export const getUploadSignature = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!isCloudinaryConfigured()) {
-      throw new ApiError(
-        HttpStatusCode.ServiceUnavailable,
+      throw ApiError.serviceUnavailable(
         'Image upload service is not configured'
       );
     }
@@ -49,22 +48,16 @@ export const updateProfilePicture = asyncHandler(
     const { profilePictureUrl } = req.body;
 
     if (!userId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (!profilePictureUrl || typeof profilePictureUrl !== 'string') {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
-        'Profile picture URL is required'
-      );
+      throw ApiError.badRequest('Profile picture URL is required');
     }
 
     // Validate that the URL is a Cloudinary URL
     if (!profilePictureUrl.includes('cloudinary.com')) {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
-        'Invalid profile picture URL'
-      );
+      throw ApiError.badRequest('Invalid profile picture URL');
     }
 
     // Get the current user to check for existing profile picture
@@ -77,7 +70,7 @@ export const updateProfilePicture = asyncHandler(
     });
 
     if (!existingUser) {
-      throw new ApiError(HttpStatusCode.NotFound, 'User not found');
+      throw ApiError.notFound('User not found');
     }
 
     // Delete old profile picture from Cloudinary if it exists
@@ -101,10 +94,7 @@ export const updateProfilePicture = asyncHandler(
       });
 
     if (!updatedUser.length) {
-      throw new ApiError(
-        HttpStatusCode.InternalServerError,
-        'Failed to update profile picture'
-      );
+      throw ApiError.internalServerError('Failed to update profile picture');
     }
 
     res.status(200).json(
@@ -120,7 +110,7 @@ export const deleteProfilePicture = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      throw new ApiError(HttpStatusCode.Unauthorized, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     // Get the current user
@@ -133,14 +123,11 @@ export const deleteProfilePicture = asyncHandler(
     });
 
     if (!existingUser) {
-      throw new ApiError(HttpStatusCode.NotFound, 'User not found');
+      throw ApiError.notFound('User not found');
     }
 
     if (!existingUser.profilePicture) {
-      throw new ApiError(
-        HttpStatusCode.BadRequest,
-        'No profile picture to delete'
-      );
+      throw ApiError.badRequest('No profile picture to delete');
     }
 
     // Delete from Cloudinary
@@ -163,10 +150,7 @@ export const deleteProfilePicture = asyncHandler(
       });
 
     if (!updatedUser.length) {
-      throw new ApiError(
-        HttpStatusCode.InternalServerError,
-        'Failed to delete profile picture'
-      );
+      throw ApiError.internalServerError('Failed to delete profile picture');
     }
 
     res.status(200).json(

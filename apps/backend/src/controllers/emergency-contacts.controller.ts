@@ -12,15 +12,12 @@ const createEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
 
-    if (!userId) throw new ApiError(401, 'Unauthorized to perform this action');
+    if (!userId)
+      throw ApiError.unauthorized('Unauthorized to perform this action');
 
     const parsedData = newEmergencyContactSchema.safeParse(req.body);
     if (!parsedData.success) {
-      throw new ApiError(
-        400,
-        'Validation error',
-        parsedData.error.issues.map(i => i.message)
-      );
+      throw ApiError.validationError(parsedData.error);
     }
 
     const {
@@ -58,15 +55,15 @@ const updateEmergencyContact = asyncHandler(
     const userId = req.user?.id;
     const updateData = req.body;
 
-    if (!userId) throw new ApiError(401, 'Unauthorized');
-    if (!id) throw new ApiError(400, 'Contact ID is required');
+    if (!userId) throw ApiError.unauthorized('Unauthorized');
+    if (!id) throw ApiError.badRequest('Contact ID is required');
 
     const existing = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
     });
 
-    if (!existing) throw new ApiError(404, 'Contact not found');
-    if (existing.userId !== userId) throw new ApiError(403, 'Forbidden');
+    if (!existing) throw ApiError.notFound('Contact not found');
+    if (existing.userId !== userId) throw ApiError.forbidden('Forbidden');
 
     const allowedFields = [
       'name',
@@ -83,15 +80,14 @@ const updateEmergencyContact = asyncHandler(
     );
 
     if (invalidKeys.length > 0) {
-      throw new ApiError(400, `Invalid fields: ${invalidKeys.join(', ')}`);
+      throw ApiError.badRequest(`Invalid fields: ${invalidKeys.join(', ')}`);
     }
 
     // Validate notification method if provided
     if (updateData.notificationMethod) {
       const validMethods = ['sms', 'push', 'both'];
       if (!validMethods.includes(updateData.notificationMethod)) {
-        throw new ApiError(
-          400,
+        throw ApiError.badRequest(
           `Invalid notification method. Must be one of: ${validMethods.join(', ')}`
         );
       }
@@ -115,15 +111,15 @@ const deleteEmergencyContact = asyncHandler(
     const userId = req.user?.id;
     const role = req.user?.role;
 
-    if (!id) throw new ApiError(400, 'Contact ID is required');
+    if (!id) throw ApiError.badRequest('Contact ID is required');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
     });
 
-    if (!contact) throw new ApiError(404, 'Contact not found');
+    if (!contact) throw ApiError.notFound('Contact not found');
     if (role !== 'admin' && contact.userId !== userId) {
-      throw new ApiError(403, 'Unauthorized to delete this contact');
+      throw ApiError.forbidden('Unauthorized to delete this contact');
     }
 
     const deleted = await db
@@ -141,13 +137,13 @@ const getEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) throw new ApiError(400, 'Contact ID is required');
+    if (!id) throw ApiError.badRequest('Contact ID is required');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
     });
 
-    if (!contact) throw new ApiError(404, 'Contact not found');
+    if (!contact) throw ApiError.notFound('Contact not found');
 
     res
       .status(200)
@@ -159,7 +155,7 @@ const getUserEmergencyContacts = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
 
-    if (!userId) throw new ApiError(401, 'Unauthorized');
+    if (!userId) throw ApiError.unauthorized('Unauthorized');
 
     const contacts = await db
       .select()
@@ -193,15 +189,15 @@ const toggleContactNotification = asyncHandler(
     const id = req.params.id;
     const userId = req.user?.id;
 
-    if (!userId) throw new ApiError(401, 'Unauthorized');
-    if (!id) throw new ApiError(400, 'Contact ID is required');
+    if (!userId) throw ApiError.unauthorized('Unauthorized');
+    if (!id) throw ApiError.badRequest('Contact ID is required');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
     });
 
-    if (!contact) throw new ApiError(404, 'Contact not found');
-    if (contact.userId !== userId) throw new ApiError(403, 'Forbidden');
+    if (!contact) throw ApiError.notFound('Contact not found');
+    if (contact.userId !== userId) throw ApiError.forbidden('Forbidden');
 
     const updated = await db
       .update(emergencyContact)
@@ -227,16 +223,16 @@ const updateContactPushToken = asyncHandler(
     const { pushToken } = req.body;
     const userId = req.user?.id;
 
-    if (!userId) throw new ApiError(401, 'Unauthorized');
-    if (!id) throw new ApiError(400, 'Contact ID is required');
-    if (!pushToken) throw new ApiError(400, 'Push token is required');
+    if (!userId) throw ApiError.unauthorized('Unauthorized');
+    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!pushToken) throw ApiError.badRequest('Push token is required');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
     });
 
-    if (!contact) throw new ApiError(404, 'Contact not found');
-    if (contact.userId !== userId) throw new ApiError(403, 'Forbidden');
+    if (!contact) throw ApiError.notFound('Contact not found');
+    if (contact.userId !== userId) throw ApiError.forbidden('Forbidden');
 
     const updated = await db
       .update(emergencyContact)

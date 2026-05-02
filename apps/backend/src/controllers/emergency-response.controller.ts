@@ -34,13 +34,13 @@ const createEmergencyResponse = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser || !loggedInUser.id) {
-      throw new ApiError(400, 'Please login to perform this action');
+      throw ApiError.badRequest('Please login to perform this action');
     }
 
     let { emergencyRequestId, destLocation } = req.body;
 
     if (!emergencyRequestId) {
-      throw new ApiError(400, 'Emergency ID are required');
+      throw ApiError.badRequest('Emergency ID are required');
     }
 
     const existingEmergencyResponse =
@@ -51,7 +51,7 @@ const createEmergencyResponse = asyncHandler(
       });
 
     if (existingEmergencyResponse) {
-      throw new ApiError(400, 'Emergency response already exists');
+      throw ApiError.badRequest('Emergency response already exists');
     }
 
     if (!destLocation) {
@@ -66,13 +66,13 @@ const createEmergencyResponse = asyncHandler(
       isNaN(parseFloat(destLocation.latitude)) ||
       isNaN(parseFloat(destLocation.longitude))
     ) {
-      throw new ApiError(400, 'Invalid emergency location coordinates');
+      throw ApiError.badRequest('Invalid emergency location coordinates');
     }
 
     const emergencyRequestType = emergencyRequestDetails?.serviceType;
 
     if (!emergencyRequestType) {
-      throw new ApiError(400, 'Emergency request type not found');
+      throw ApiError.badRequest('Emergency request type not found');
     }
 
     // ! Simulating the nearby Location
@@ -98,14 +98,13 @@ const createEmergencyResponse = asyncHandler(
     });
 
     if (!assignedServiceProvider || !emergencyRequestDetails) {
-      throw new ApiError(
-        404,
+      throw ApiError.notFound(
         'Service provider or emergency request not found'
       );
     }
 
     if (!assignedServiceProvider.currentLocation) {
-      throw new ApiError(400, 'Service provider location not found');
+      throw ApiError.badRequest('Service provider location not found');
     }
 
     const optimalPath = await getOptimalRoute({
@@ -116,7 +115,7 @@ const createEmergencyResponse = asyncHandler(
     });
 
     if (!optimalPath) {
-      throw new ApiError(400, 'Error getting optimal path');
+      throw ApiError.badRequest('Error getting optimal path');
     }
 
     const newEmergencyResponse = await db
@@ -134,7 +133,7 @@ const createEmergencyResponse = asyncHandler(
       .returning();
 
     if (!newEmergencyResponse) {
-      throw new ApiError(500, 'Error creating emergency response');
+      throw ApiError.internalServerError('Error creating emergency response');
     }
 
     const updatedStatus = Promise.all([
@@ -166,8 +165,7 @@ const createEmergencyResponse = asyncHandler(
       logger.debug(
         'Error updating emergency request and service provider status'
       );
-      throw new ApiError(
-        500,
+      throw ApiError.internalServerError(
         'Error updating emergency request and service provider status'
       );
     }
@@ -190,7 +188,7 @@ const getEmergencyResponse = asyncHandler(
 
     if (!id) {
       logger.debug('Emergency response ID is required');
-      throw new ApiError(400, 'Emergency response ID is required');
+      throw ApiError.badRequest('Emergency response ID is required');
     }
 
     const existingEmergencyResponse =
@@ -200,7 +198,7 @@ const getEmergencyResponse = asyncHandler(
 
     if (!existingEmergencyResponse) {
       logger.debug('Emergency response not found');
-      throw new ApiError(404, 'Emergency response not found');
+      throw ApiError.notFound('Emergency response not found');
     }
 
     res
@@ -220,7 +218,7 @@ const updateEmergencyResponse = asyncHandler(
 
     if (!id) {
       logger.debug('Emergency response ID is required');
-      throw new ApiError(400, 'Emergency response ID is required');
+      throw ApiError.badRequest('Emergency response ID is required');
     }
 
     const existingEmergencyResponse =
@@ -230,7 +228,7 @@ const updateEmergencyResponse = asyncHandler(
 
     if (!existingEmergencyResponse) {
       logger.debug('Emergency response not found');
-      throw new ApiError(404, 'Emergency response not found');
+      throw ApiError.notFound('Emergency response not found');
     }
 
     const updatedEmergencyResponse = await db.transaction(async tx => {
@@ -253,7 +251,7 @@ const updateEmergencyResponse = asyncHandler(
         });
 
       if (!updatedResponse || updatedResponse.length === 0) {
-        throw new ApiError(500, 'Error updating emergency response');
+        throw ApiError.internalServerError('Error updating emergency response');
       }
 
       let requestStatus: (typeof requestStatusEnum.enumValues)[number];
@@ -283,7 +281,7 @@ const updateEmergencyResponse = asyncHandler(
         .returning();
 
       if (!updatedRequest || updatedRequest.length === 0) {
-        throw new ApiError(500, 'Error updating emergency request');
+        throw ApiError.internalServerError('Error updating emergency request');
       }
 
       return updatedResponse[0];
@@ -291,7 +289,7 @@ const updateEmergencyResponse = asyncHandler(
 
     if (!updatedEmergencyResponse) {
       logger.debug('Error updating emergency response');
-      throw new ApiError(500, 'Error updating emergency response');
+      throw ApiError.internalServerError('Error updating emergency response');
     }
 
     // Get the emergency request to get the user ID
@@ -304,7 +302,7 @@ const updateEmergencyResponse = asyncHandler(
 
     if (!emergencyRequestDetails) {
       logger.debug('Emergency request not found');
-      throw new ApiError(404, 'Emergency request not found');
+      throw ApiError.notFound('Emergency request not found');
     }
 
     res
@@ -325,7 +323,7 @@ const deleteEmergencyResponse = asyncHandler(
 
     if (!id) {
       logger.debug('Emergency response ID is required');
-      throw new ApiError(400, 'Emergency response ID is required');
+      throw ApiError.badRequest('Emergency response ID is required');
     }
 
     const existingEmergencyResponse =
@@ -335,7 +333,7 @@ const deleteEmergencyResponse = asyncHandler(
 
     if (!existingEmergencyResponse) {
       logger.debug('Emergency response not found');
-      throw new ApiError(404, 'Emergency response not found');
+      throw ApiError.notFound('Emergency response not found');
     }
 
     const deletedEmergencyResponse = await db
@@ -355,7 +353,7 @@ const deleteEmergencyResponse = asyncHandler(
 
     if (!deletedEmergencyResponse) {
       logger.debug('Error deleting emergency response');
-      throw new ApiError(500, 'Error deleting emergency response');
+      throw ApiError.internalServerError('Error deleting emergency response');
     }
 
     res
@@ -376,7 +374,7 @@ const getProviderResponses = asyncHandler(
 
     if (!loggedInUser || !loggedInUser.id) {
       logger.debug('Unauthorized');
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     const existingServiceProvider = await db.query.serviceProvider.findFirst({
@@ -393,7 +391,7 @@ const getProviderResponses = asyncHandler(
 
     if (!existingServiceProvider) {
       logger.debug('Unauthorized Service Provider');
-      throw new ApiError(401, 'Unauthorized Service Provider');
+      throw ApiError.unauthorized('Unauthorized Service Provider');
     }
 
     const providerResponses = await db.query.emergencyResponse.findMany({
