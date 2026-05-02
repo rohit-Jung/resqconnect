@@ -11,10 +11,10 @@ export const requireAuthenticatedAny = asyncHandler(
       (req.cookies?.token as string | undefined) ||
       (req.headers.authorization?.replace('Bearer ', '') as string | undefined);
 
-    if (!token) throw new ApiError(401, 'Authentication token required');
+    if (!token) throw ApiError.unauthorized('Authentication token required');
 
     const decoded = await verifyAndDecodeToken(token);
-    if (!decoded) throw new ApiError(401, 'Invalid or expired token');
+    if (!decoded) throw ApiError.unauthorized('Invalid or expired token');
 
     req.user = decoded;
     next();

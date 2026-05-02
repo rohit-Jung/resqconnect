@@ -14,19 +14,19 @@ export const requireActiveOrganization = asyncHandler(
     const loggedIn = req.user;
 
     if (!loggedIn?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized();
     }
 
     console.log(loggedIn);
 
     if (loggedIn.role !== 'organization') {
       // this guard is only for org endpoints.
-      throw new ApiError(403, 'Not authorized');
+      throw ApiError.forbidden('Not authorized');
     }
 
     // Fast path: token already marked restricted.
     if (loggedIn.restricted) {
-      throw new ApiError(403, 'Organization access restricted');
+      throw ApiError.forbidden('Organization access restricted');
     }
 
     const org = await db.query.organization.findFirst({
@@ -35,11 +35,11 @@ export const requireActiveOrganization = asyncHandler(
     });
 
     if (!org) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     if (org.lifecycleStatus !== 'active') {
-      throw new ApiError(403, 'Organization access restricted');
+      throw ApiError.forbidden('Organization access restricted');
     }
 
     next();
@@ -53,17 +53,17 @@ export const requireActiveProviderOrganization = asyncHandler(
     const loggedIn = req.user;
 
     if (!loggedIn?.id) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     if (loggedIn.role !== 'service_provider') {
       // This guard is only for provider endpoints.
-      throw new ApiError(403, 'Not authorized');
+      throw ApiError.forbidden('Not authorized');
     }
 
     // Fast path: token already marked restricted.
     if (loggedIn.restricted) {
-      throw new ApiError(403, 'Organization access restricted');
+      throw ApiError.forbidden('Organization access restricted');
     }
 
     const provider = await db.query.serviceProvider.findFirst({
@@ -72,7 +72,7 @@ export const requireActiveProviderOrganization = asyncHandler(
     });
 
     if (!provider?.organizationId) {
-      throw new ApiError(404, 'Service provider not found');
+      throw ApiError.notFound('Service provider not found');
     }
 
     const org = await db.query.organization.findFirst({
@@ -81,11 +81,11 @@ export const requireActiveProviderOrganization = asyncHandler(
     });
 
     if (!org) {
-      throw new ApiError(404, 'Organization not found');
+      throw ApiError.notFound('Organization not found');
     }
 
     if (org.lifecycleStatus !== 'active') {
-      throw new ApiError(403, 'Organization access restricted');
+      throw ApiError.forbidden('Organization access restricted');
     }
 
     next();

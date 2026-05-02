@@ -20,12 +20,12 @@ const validateServiceProvider = asyncHandler(
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      throw new ApiError(401, 'Authentication token required');
+      throw ApiError.unauthorized('Authentication token required');
     }
 
     const decoded = await verifyAndDecodeToken(token);
     if (!decoded || decoded == null) {
-      throw new ApiError(401, 'Invalid or expired token');
+      throw ApiError.unauthorized('Invalid or expired token');
     }
 
     req.user = decoded;
@@ -39,16 +39,16 @@ const validateRoleAuth = (allowedRoles: TUserRole[]) => {
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      throw new ApiError(401, 'Authentication token required');
+      throw ApiError.unauthorized('Authentication token required');
     }
 
     const decoded = await verifyAndDecodeToken(token);
     if (!decoded || decoded == null) {
-      throw new ApiError(401, 'Invalid or expired token');
+      throw ApiError.unauthorized('Invalid or expired token');
     }
 
     if (!allowedRoles.includes(decoded.role as TUserRole)) {
-      throw new ApiError(403, 'Not authorized to perform this action');
+      throw ApiError.forbidden('Not authorized to perform this action');
     }
 
     req.user = decoded;
@@ -62,12 +62,12 @@ const validateOrg = asyncHandler(
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      throw new ApiError(401, 'Authentication token required');
+      throw ApiError.unauthorized('Authentication token required');
     }
 
     const decoded = await verifyAndDecodeToken(token);
     if (!decoded || decoded == null) {
-      throw new ApiError(401, 'Invalid or expired token');
+      throw ApiError.unauthorized('Invalid or expired token');
     }
 
     req.user = decoded;
@@ -81,12 +81,12 @@ const validateUserOrProvider = asyncHandler(
       req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      throw new ApiError(401, 'Authentication token required');
+      throw ApiError.unauthorized('Authentication token required');
     }
 
     const decoded = await verifyAndDecodeToken(token);
     if (!decoded || decoded == null) {
-      throw new ApiError(401, 'Invalid or expired token');
+      throw ApiError.unauthorized('Invalid or expired token');
     }
 
     req.user = decoded;
@@ -159,7 +159,7 @@ const requireAuthenticatedUser = asyncHandler(
     const loggedInUser = req.user;
 
     if (!loggedInUser?.id) {
-      throw new ApiError(401, 'Unauthorized access');
+      throw ApiError.unauthorized('Unauthorized access');
     }
 
     const existingUser = await db.query.user.findFirst({
@@ -168,7 +168,7 @@ const requireAuthenticatedUser = asyncHandler(
     });
 
     if (!existingUser) {
-      throw new ApiError(400, 'User not found');
+      throw ApiError.badRequest('User not found');
     }
 
     next();
@@ -180,7 +180,7 @@ const requireAuthenticatedProvider = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider?.id) {
-      throw new ApiError(401, 'Unauthorized access');
+      throw ApiError.unauthorized('Unauthorized access');
     }
 
     const existingProvider = await db.query.serviceProvider.findFirst({
@@ -189,7 +189,7 @@ const requireAuthenticatedProvider = asyncHandler(
     });
 
     if (!existingProvider) {
-      throw new ApiError(400, 'Provider not found');
+      throw ApiError.badRequest('Provider not found');
     }
 
     next();

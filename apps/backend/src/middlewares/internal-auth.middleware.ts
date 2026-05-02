@@ -10,12 +10,12 @@ export const requireInternalAuth = asyncHandler(
   async (req: Request, _res: Response, next: NextFunction) => {
     const expected = envConfig.internal_api_key;
     if (!expected) {
-      throw new ApiError(503, 'Internal API not configured');
+      throw ApiError.serviceUnavailable('Internal API not configured');
     }
 
     const provided = req.header('x-internal-api-key');
     if (!provided || provided !== expected) {
-      throw new ApiError(401, 'Unauthorized');
+      throw ApiError.unauthorized('Unauthorized');
     }
 
     next();

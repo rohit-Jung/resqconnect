@@ -31,7 +31,7 @@ export const requireMfa = asyncHandler(
     });
 
     if (!ok) {
-      throw new ApiError(403, 'MFA required');
+      throw ApiError.forbidden('MFA required');
     }
 
     next();

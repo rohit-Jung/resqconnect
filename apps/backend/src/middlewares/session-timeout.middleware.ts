@@ -23,7 +23,7 @@ export const enforceSessionTimeout = asyncHandler(
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (nowSeconds - u.iat > seconds) {
-      throw new ApiError(401, 'Session expired');
+      throw ApiError.unauthorized('Session expired');
     }
 
     next();
