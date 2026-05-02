@@ -1,8 +1,4 @@
-import {
-  Events,
-  EventsEnum,
-  type SmsGatewayInterface,
-} from '@repo/types/validations';
+import { Events, type SmsGatewayInterface } from '@repo/types/validations';
 
 import axios, { HttpStatusCode } from 'axios';
 import type { Request, Response } from 'express';
@@ -12,16 +8,24 @@ import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 import { SMS_TEMPLATES, parseSMSMessage } from '@/utils/sms/sms.parser';
 
-import { SmsRoutes, postSMS, sendLocalSMS } from './local-sms.service';
-import { markMessageProcessed } from './redis.service';
-import { sendSMS } from './twilio.service';
+import { SmsRoutes, sendLocalSMS } from './local-sms.service';
+import { isMessageProcessed, markMessageProcessed } from './redis.service';
 import { findUserByPhoneNumber, verifyUserIdentity } from './user.service';
 
 const EMERGENCY_PHONE_NUMBER = envConfig.emergency_phone_number || '112';
 
 const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
-  const { payload, deviceId, event, id } = req.body as SmsGatewayInterface;
-  console.log('RECEIVED a hit');
+  const { payload, event, id } = req.body as SmsGatewayInterface;
+
+  // prevent duplicate processing on webhook retries.
+  // we intentionally do this before parsing/db calls.
+  if (await isMessageProcessed(id)) {
+    logger.warn(`[SMS WEBHOOK] Duplicate webhook delivery ignored: ${id}`);
+    return res.json({
+      success: true,
+      deduped: true,
+    });
+  }
 
   if (event != Events.SmsReceived) {
     return res.json(
@@ -61,7 +65,7 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       `[SMS WEBHOOK] Invalid SMS format from ${payload.sender}: ${parseResult.error}`
     );
 
-    // Mark as processed with invalid status
+    // mark as processed with invalid status
     await markMessageProcessed(id, {
       status: 'invalid',
       error: parseResult.error,
@@ -77,7 +81,8 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
   const parsedData = parseResult.data;
 
   // Lazy import to avoid worker init during tests/import.
-  const { createEmergencyRequest } = await import('@/workers/messaging.worker');
+  const emergencyRequestService =
+    await import('@/services/emergency/emergency-request.service');
 
   let userId: string;
   const userPhone: string = payload.sender;
@@ -124,7 +129,7 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
         error: 'User not found',
       });
 
-      // Send error SMS
+      // send error sms
       await sendLocalSMS(
         payload.sender,
         SMS_TEMPLATES.USER_NOT_FOUND(EMERGENCY_PHONE_NUMBER)
@@ -142,7 +147,11 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
 
   // Create the emergency request
   try {
-    const result = await createEmergencyRequest(userId, parsedData);
+    const result = await emergencyRequestService.default.create(
+      userId,
+      parsedData,
+      'sms'
+    );
 
     if (!result.success || !result.requestId) {
       await markMessageProcessed(id, {
@@ -208,7 +217,7 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       error: errorMessage,
     });
 
-    await sendSMS(
+    await sendLocalSMS(
       payload.sender,
       SMS_TEMPLATES.REQUEST_FAILED(
         'An unexpected error occurred',
