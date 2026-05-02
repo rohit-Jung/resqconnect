@@ -1,7 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
-import { Alert } from 'react-native';
 
 // Import response types
 import {
@@ -36,13 +35,6 @@ const useLoginServiceProvider = () => {
   >({
     mutationFn: loginData => {
       return api.post(serviceProviderEndpoints.login, loginData);
-    },
-    onError: (error: any) => {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message ||
-          'Login failed. Please check your credentials.'
-      );
     },
   });
 };
