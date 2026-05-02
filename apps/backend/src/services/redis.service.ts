@@ -211,18 +211,15 @@ export async function getAllActiveProviderLocations(): Promise<
 export { redis };
 
 // SMS Deduplication Functions
-/**
- * Check if an SMS message has already been processed
- */
+
+// check if an sms message has already been processed
 export async function isMessageProcessed(messageSid: string): Promise<boolean> {
   const key = SMS_PROCESSED_KEY(messageSid);
   const exists = await redis.exists(key);
   return exists === 1;
 }
 
-/**
- * Mark an SMS message as processed
- */
+// mark an sms message as processed
 export async function markMessageProcessed(
   messageSid: string,
   metadata?: {
@@ -240,9 +237,7 @@ export async function markMessageProcessed(
   await redis.set(key, value, 'EX', CACHE_EXPIRY.SMS_PROCESSED);
 }
 
-/**
- * Get processing metadata for a message
- */
+// get processing metadata for a message
 export async function getMessageProcessingInfo(messageSid: string): Promise<{
   processedAt: string;
   requestId?: string;
@@ -264,9 +259,7 @@ export async function getLastSMSPollTimestamp(): Promise<Date | null> {
   return timestamp ? new Date(timestamp) : null;
 }
 
-/**
- * Update the last poll timestamp for SMS messages
- */
+//  update the last poll timestamp for sms messages
 export async function setLastSMSPollTimestamp(timestamp: Date): Promise<void> {
   await redis.set(
     SMS_LAST_POLL_KEY,
@@ -305,8 +298,8 @@ export async function batchCheckMessagesProcessed(
 }
 
 /**
- * Cache a computed route to avoid re-computing the same route
- * Caches routes by emergency type (sector) for same origin-destination pairs
+ * cache a computed route to avoid re-computing the same route
+ * caches routes by emergency type (sector) for same origin-destination pairs
  */
 export async function cacheRoute(
   originLat: number,

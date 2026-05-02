@@ -11,6 +11,7 @@ function normalizePhoneNumber(phone: string | number): number {
   if (cleaned.startsWith('+')) {
     cleaned = cleaned.substring(1);
   }
+  // TODO: clean other country codes too
   if (cleaned.startsWith(NEPAL_COUNTRY_CODE)) {
     cleaned = cleaned.substring(NEPAL_COUNTRY_CODE.length);
   }
