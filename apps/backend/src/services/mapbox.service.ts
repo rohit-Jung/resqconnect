@@ -83,7 +83,7 @@ export async function getRouteFromMapbox(
       destination.lat,
       destination.lng,
       profile,
-      emergencyType || 'unknown',
+      emergencyType || 'default',
       processedRoute
     );
 
