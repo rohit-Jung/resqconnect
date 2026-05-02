@@ -222,10 +222,12 @@ async function handleAcceptRequest(
     // Get list of providers who received this request
     const providerIds = await getEmergencyProviders(requestId);
 
-    // Notify ALL providers (including this one)
+    // Notify ALL providers (including this one).
+    // Use provider rooms consistently (provider:${id}) so every socket receives it.
     for (const pId of providerIds) {
-      io.to(pId).emit(SocketEvents.REQUEST_TAKEN, {
+      io.to(SocketRoom.PROVIDER(pId)).emit(SocketEvents.REQUEST_TAKEN, {
         requestId,
+        providerId,
         takenBy: providerId,
         message:
           pId === providerId
