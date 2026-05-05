@@ -812,10 +812,11 @@ async function handleConfirmArrival(
       }
     );
 
-    // Forward completion to platform
+    // forward completion to platform
     if (envConfig.platform_base_url && emergReq.userId) {
       const { postJsonWithRetry } =
         await import('@/services/internal-http.service');
+
       postJsonWithRetry(
         `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
         {
@@ -829,6 +830,7 @@ async function handleConfirmArrival(
             payload: { completedBy: role, completedAt },
           },
           timeoutMs: 1000,
+          backoffMs: 500,
           retries: 1,
         }
       ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
