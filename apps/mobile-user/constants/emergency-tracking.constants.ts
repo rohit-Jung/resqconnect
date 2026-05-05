@@ -76,19 +76,19 @@ export const ANIMATION_CONFIG = {
 // Marker dimensions
 export const MARKER_SIZES = {
   USER_MARKER: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   PROVIDER_MARKER: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   ASSIGNED_PROVIDER_MARKER: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
 } as const;
 
