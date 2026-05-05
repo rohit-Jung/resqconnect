@@ -6,6 +6,12 @@ declare global {
       user?: IJWTToken;
       validatedQuery?: unknown;
       validatedParams?: unknown;
+      rateLimit?: {
+        limit: number;
+        current: number;
+        remaining: number;
+        resetTime?: Date;
+      };
     }
   }
 }
