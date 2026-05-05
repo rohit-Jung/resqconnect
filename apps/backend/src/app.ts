@@ -5,6 +5,7 @@ import express from 'express';
 import {
   configureSecurityMiddlewares,
   corsOptions,
+  envConfig,
   globalLimiter,
 } from '@/config';
 import { auditLogMiddleware } from '@/middlewares/audit-log.middleware';
@@ -40,9 +41,12 @@ app.use(phiMaskMiddleware);
 // global rate limiting to all routes (baseline DDoS protection)
 app.use(globalLimiter);
 
-// enforce org-tiered api limits (15m window).
-// uses redis so  works across instances.
-app.use(orgTierApiLimiter);
+// org limiter only on orgs
+if (envConfig.mode == 'silo') {
+  // enforce org-tiered api limits (15m window).
+  // uses redis so  works across instances.
+  app.use(orgTierApiLimiter);
+}
 
 // enforce compliance constraints after auth middleware populates req.user.
 // these middlewares are safe no-ops for unauthenticated requests.

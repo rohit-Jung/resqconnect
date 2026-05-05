@@ -32,7 +32,7 @@ const createRateLimitErrorResponse = (req: Request, res: Response) => {
 
 export const globalLimiter = rateLimit({
   windowMs: 1 * 1000, // 1 sec
-  max: 100, // max 100 requests per windowMs
+  max: 10000, // max 10000 requests per windowMs
   message: 'Too many requests from this IP, please try again later',
   standardHeaders: true, // return rate limit info in `ratelimit-*` headers
   legacyHeaders: false, // disable `x-ratelimit-*` headers
