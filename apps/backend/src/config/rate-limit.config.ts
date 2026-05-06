@@ -133,3 +133,14 @@ export const uploadLimiter = rateLimit({
   keyGenerator: getClientIp,
   handler: createRateLimitErrorResponse,
 });
+
+// route fetching is high-frequency during live tracking
+export const mapsRouteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 1200, // max 120 route fetches per minute per IP (just for test 1200)
+  message: 'Too many route requests, please try again shortly',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientIp,
+  handler: createRateLimitErrorResponse,
+});
