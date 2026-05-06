@@ -145,10 +145,13 @@ export default function ProviderDashboardScreen() {
     };
 
     const handleRequestTaken = (data: any) => {
-      if (data.providerId === provider?.id) return;
+      // Remove the request for everyone (including the accepting provider).
+      // If it was taken by someone else, also clear any selection state.
       removeIncomingRequest(data.requestId);
-      if (currentRequest?.requestId === data.requestId) {
-        setCurrentRequest(null);
+      if (data.providerId !== provider?.id) {
+        if (currentRequest?.requestId === data.requestId) {
+          setCurrentRequest(null);
+        }
       }
     };
 
@@ -173,6 +176,7 @@ export default function ProviderDashboardScreen() {
 
     socketManager.on(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
     socketManager.on(SocketEvents.REQUEST_ACCEPTED, handleRequestTaken);
+    socketManager.on(SocketEvents.REQUEST_TAKEN, handleRequestTaken);
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
     socketManager.on(SocketEvents.REQUEST_COMPLETED, handleRequestCompleted);
 
@@ -184,6 +188,7 @@ export default function ProviderDashboardScreen() {
       console.log('Dashboard unmounting - detaching socket listeners');
       socketManager.off(SocketEvents.NEW_EMERGENCY, handleNewEmergency);
       socketManager.off(SocketEvents.REQUEST_ACCEPTED, handleRequestTaken);
+      socketManager.off(SocketEvents.REQUEST_TAKEN, handleRequestTaken);
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
       socketManager.off(SocketEvents.REQUEST_COMPLETED, handleRequestCompleted);
     };
