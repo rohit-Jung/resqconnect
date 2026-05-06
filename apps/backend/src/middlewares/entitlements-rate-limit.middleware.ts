@@ -74,4 +74,8 @@ export const orgTierApiLimiter = rateLimit({
       timestamp: new Date().toISOString(),
     });
   },
+  skip: req => {
+    // route tracking requests are handled by a dedicated limiter
+    return req.path === '/api/v1/maps/optimal-route';
+  },
 });
