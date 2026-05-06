@@ -162,7 +162,7 @@ export const deleteProfilePicture = asyncHandler(
 );
 
 const uploadController = {
-  getUploadSignature,
+  getSignature: getUploadSignature,
   updateProfilePicture,
   deleteProfilePicture,
 } as const;

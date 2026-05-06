@@ -24,19 +24,19 @@ const serviceProviderRouter = Router();
 serviceProviderRouter.post(
   '/register',
   authLimiter,
-  serviceProviderController.registerServiceProvider
+  serviceProviderController.register
 );
 serviceProviderRouter.post(
   '/login',
   authLimiter,
   validateRequestBody(loginServiceProviderSchema),
-  serviceProviderController.loginServiceProvider
+  serviceProviderController.login
 );
 serviceProviderRouter.post(
   '/verify',
   otpLimiter,
   validateRequestBody(serviceProviderValidations.verifyServiceProviderSchema),
-  serviceProviderController.verifyServiceProvider
+  serviceProviderController.verify
 );
 
 serviceProviderRouter.post(
@@ -45,7 +45,7 @@ serviceProviderRouter.post(
   validateRequestBody(
     serviceProviderValidations.resendServiceProviderVerificationOTPSchema
   ),
-  serviceProviderController.resendServiceProviderVerificationOTP
+  serviceProviderController.resendVerificationOTP
 );
 serviceProviderRouter.post(
   '/forgot-password',
@@ -53,7 +53,7 @@ serviceProviderRouter.post(
   validateRequestBody(
     serviceProviderValidations.forgotServiceProviderPasswordSchema
   ),
-  serviceProviderController.forgotServiceProviderPassword
+  serviceProviderController.forgotPassword
 );
 serviceProviderRouter.post(
   '/reset-password',
@@ -61,7 +61,7 @@ serviceProviderRouter.post(
   validateRequestBody(
     serviceProviderValidations.resetServiceProviderPasswordSchema
   ),
-  serviceProviderController.resetServiceProviderPassword
+  serviceProviderController.resetPassword
 );
 serviceProviderRouter.get(
   '/nearby',
@@ -71,14 +71,8 @@ serviceProviderRouter.get(
 // protected routes
 serviceProviderRouter.use(validateServiceProvider);
 serviceProviderRouter.use(requireActiveProviderOrganization);
-serviceProviderRouter.post(
-  '/logout',
-  serviceProviderController.logoutServiceProvider
-);
-serviceProviderRouter.get(
-  '/profile',
-  serviceProviderController.getServiceProviderProfile
-);
+serviceProviderRouter.post('/logout', serviceProviderController.logout);
+serviceProviderRouter.get('/profile', serviceProviderController.profile);
 
 // profile picture (direct-to-Cloudinary signed upload)
 serviceProviderRouter.get(
@@ -101,19 +95,16 @@ serviceProviderRouter.delete(
 serviceProviderRouter.patch(
   '/update',
   validateRequestBody(serviceProviderValidations.updateServiceProviderSchema),
-  serviceProviderController.updateServiceProvider
+  serviceProviderController.update
 );
 serviceProviderRouter.patch(
   '/update-location',
   validateRequestBody(
     serviceProviderValidations.updateServiceProviderLocationSchema
   ),
-  serviceProviderController.updateServiceProviderLocation
+  serviceProviderController.updateLocation
 );
-serviceProviderRouter.delete(
-  '/delete',
-  serviceProviderController.deleteServiceProvider
-);
+serviceProviderRouter.delete('/delete', serviceProviderController.remove);
 serviceProviderRouter.post(
   '/change-password',
   validateRequestBody(serviceProviderValidations.changeProviderPasswordSchema),
@@ -135,13 +126,13 @@ serviceProviderRouter.get(
   serviceProviderController.getDocumentStatus
 );
 
-serviceProviderRouter.get('/:id', serviceProviderController.getServiceProvider);
+serviceProviderRouter.get('/:id', serviceProviderController.getById);
 serviceProviderRouter.patch(
   '/status',
   validateRequestBody(
     serviceProviderValidations.updateServiceProviderStatusSchema
   ),
-  serviceProviderController.updateServiceProviderStatus
+  serviceProviderController.updateStatus
 );
 
 export default serviceProviderRouter;

@@ -186,11 +186,11 @@ const getUsersFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const feedbackController = {
-  createFeedback,
-  updateFeedback,
-  deleteFeedback,
-  getFeedback,
-  getUsersFeedback,
+  create: createFeedback,
+  update: updateFeedback,
+  remove: deleteFeedback,
+  getById: getFeedback,
+  getForUser: getUsersFeedback,
 } as const;
 
 export default feedbackController;

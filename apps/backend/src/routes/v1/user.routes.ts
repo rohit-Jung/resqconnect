@@ -27,27 +27,27 @@ userRouter
   .post(
     authLimiter,
     validateRequestBody(newUserSchema),
-    userController.registerUser
+    userController.register
   );
 userRouter
   .route('/login')
   .post(
     authLimiter,
     validateRequestBody(loginUserSchema),
-    userController.loginUser
+    userController.login
   );
 userRouter
   .route('/logout')
   .get(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    userController.logoutUser
+    userController.logout
   );
 
 userRouter
   .route('/update')
   .put(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    userController.updateUser
+    userController.update
   );
 
 userRouter
@@ -55,7 +55,7 @@ userRouter
   .post(
     otpLimiter,
     validateRequestBody(verifyUserSchema),
-    userController.verifyUser
+    userController.verify
   );
 
 userRouter
@@ -63,7 +63,7 @@ userRouter
   .post(
     otpLimiter,
     validateRequestBody(resendUserVerificationOTPSchema),
-    userController.resendUserVerificationOTP
+    userController.resendVerificationOTP
   );
 
 userRouter
@@ -92,11 +92,11 @@ userRouter
   .route('/profile')
   .get(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    userController.getProfile
+    userController.profile
   );
 userRouter
   .route('/:userId')
-  .get(validateRoleAuth([UserRoles.ADMIN]), userController.getUser);
+  .get(validateRoleAuth([UserRoles.ADMIN]), userController.getById);
 
 userRouter.post(
   '/update-push-token',

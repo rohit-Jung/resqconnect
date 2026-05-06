@@ -793,14 +793,14 @@ export const getEmergencySettings = asyncHandler(
 );
 
 const userController = {
-  registerUser,
-  loginUser,
-  resendUserVerificationOTP,
-  logoutUser,
-  updateUser,
-  getUser,
-  verifyUser,
-  getProfile,
+  register: registerUser,
+  login: loginUser,
+  resendVerificationOTP: resendUserVerificationOTP,
+  logout: logoutUser,
+  update: updateUser,
+  getById: getUser,
+  verify: verifyUser,
+  profile: getProfile,
   forgotPassword,
   resetPassword,
   changePassword,

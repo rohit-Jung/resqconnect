@@ -1000,20 +1000,20 @@ const getProviderEmergencyHistory = asyncHandler(
 );
 
 const controllers = {
-  acceptEmergencyRequest,
-  cancelEmergencyRequest,
-  completeEmergencyRequest,
+  accept: acceptEmergencyRequest,
+  cancel: cancelEmergencyRequest,
+  complete: completeEmergencyRequest,
   confirmProviderArrival,
-  createEmergencyRequest: handleEmergencyRequest,
-  deleteEmergencyRequest,
-  getEmergencyRequest,
-  getProviderEmergencyHistory,
-  getRecentEmergencyRequests,
-  getUserEmergencyHistory,
-  getUsersEmergencyRequests,
+  create: handleEmergencyRequest,
+  remove: deleteEmergencyRequest,
+  getById: getEmergencyRequest,
+  getProviderHistory: getProviderEmergencyHistory,
+  getRecent: getRecentEmergencyRequests,
+  getUserHistory: getUserEmergencyHistory,
+  getForUser: getUsersEmergencyRequests,
   providerConfirmedArrival,
-  rejectEmergencyRequest,
-  updateEmergencyRequest,
+  reject: rejectEmergencyRequest,
+  update: updateEmergencyRequest,
 };
 
 export default controllers;

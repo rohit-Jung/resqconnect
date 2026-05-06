@@ -8,22 +8,22 @@ const feedbackRouter = Router();
 
 feedbackRouter
   .route('/')
-  .post(validateRoleAuth([UserRoles.USER]), feedbackController.createFeedback)
-  .get(validateRoleAuth([UserRoles.USER]), feedbackController.getUsersFeedback);
+  .post(validateRoleAuth([UserRoles.USER]), feedbackController.create)
+  .get(validateRoleAuth([UserRoles.USER]), feedbackController.getForUser);
 
 feedbackRouter
   .route('/:id')
   .get(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    feedbackController.getFeedback
+    feedbackController.getById
   )
   .put(
     validateRoleAuth([UserRoles.USER, UserRoles.ADMIN]),
-    feedbackController.updateFeedback
+    feedbackController.update
   )
   .delete(
     validateRoleAuth([UserRoles.ADMIN, UserRoles.USER]),
-    feedbackController.deleteFeedback
+    feedbackController.remove
   );
 
 export default feedbackRouter;

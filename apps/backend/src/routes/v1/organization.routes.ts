@@ -20,18 +20,16 @@ import { requireActiveOrganization } from '@/middlewares/org-status.guard';
 const organizationRouter = Router();
 const validateAdmin = validateRoleAuth([UserRoles.ADMIN]);
 
-organizationRouter
-  .route('/')
-  .get(validateAdmin, organizationController.getAllOrganizations);
+organizationRouter.route('/').get(validateAdmin, organizationController.getAll);
 organizationRouter
   .route('/profile')
-  .get(validateOrg, organizationController.getOrgProfile);
+  .get(validateOrg, organizationController.profile);
 organizationRouter
   .route('/profile')
   .patch(
     validateOrg,
     validateRequestBody(organizationValidations.updateOrgProfileSchema),
-    organizationController.updateOrgProfile
+    organizationController.updateProfile
   );
 
 // dashboard analytics for organization
@@ -40,13 +38,11 @@ organizationRouter
   .get(
     validateOrg,
     requireActiveOrganization,
-    organizationController.getOrgDashboardAnalytics
+    organizationController.dashboardAnalytics
   );
 
 // public endpoint to list organizations for service provider registration
-organizationRouter
-  .route('/list')
-  .get(organizationController.listOrganizationsPublic);
+organizationRouter.route('/list').get(organizationController.listPublic);
 
 organizationRouter
   .route('/register')
@@ -54,7 +50,7 @@ organizationRouter
     validateAdmin,
     authLimiter,
     validateRequestBody(organizationValidations.registerOrganizationSchema),
-    organizationController.registerOrganization
+    organizationController.register
   );
 
 organizationRouter
@@ -62,7 +58,7 @@ organizationRouter
   .post(
     authLimiter,
     validateRequestBody(organizationValidations.loginOrganizationSchema),
-    organizationController.loginOrganization
+    organizationController.login
   );
 
 organizationRouter
@@ -70,7 +66,7 @@ organizationRouter
   .post(
     otpLimiter,
     validateRequestBody(organizationValidations.verifyOrgOTPSchema),
-    organizationController.verifyOrgOTP
+    organizationController.verifyOTP
   );
 
 organizationRouter
@@ -80,7 +76,7 @@ organizationRouter
     validateRequestBody(
       organizationValidations.resendOrganizationVerificationOTPSchema
     ),
-    organizationController.resendOrganizationVerificationOTP
+    organizationController.resendVerificationOTP
   );
 
 //service provider management routes
@@ -89,7 +85,7 @@ organizationRouter
   .get(
     validateOrg,
     requireActiveOrganization,
-    organizationController.getOrgServiceProviders
+    organizationController.getProviders
   )
   .post(
     validateOrg,
@@ -98,7 +94,7 @@ organizationRouter
     validateRequestBody(
       organizationValidations.registerOrgServiceProviderSchema
     ),
-    organizationController.registerOrgServiceProvider
+    organizationController.registerProvider
   );
 
 organizationRouter
@@ -106,18 +102,18 @@ organizationRouter
   .get(
     validateOrg,
     requireActiveOrganization,
-    organizationController.getOrgServiceProviderById
+    organizationController.getProviderById
   )
   .patch(
     validateOrg,
     requireActiveOrganization,
     validateRequestBody(organizationValidations.updateOrgServiceProviderSchema),
-    organizationController.updateOrgServiceProvider
+    organizationController.updateProvider
   )
   .delete(
     validateOrg,
     requireActiveOrganization,
-    organizationController.deleteOrgServiceProvider
+    organizationController.deleteProvider
   );
 
 organizationRouter
@@ -125,7 +121,7 @@ organizationRouter
   .post(
     validateOrg,
     requireActiveOrganization,
-    organizationController.verifyOrgServiceProvider
+    organizationController.verifyProvider
   );
 
 // document verification routes (organization admin verifies provider docs)
@@ -155,8 +151,8 @@ organizationRouter
 
 organizationRouter
   .route('/:id')
-  .get(validateAdmin, organizationController.getOrganizationById)
-  .delete(validateAdmin, organizationController.deleteOrganization)
-  .put(validateAdmin, organizationController.updateOrganization);
+  .get(validateAdmin, organizationController.getById)
+  .delete(validateAdmin, organizationController.remove)
+  .put(validateAdmin, organizationController.update);
 
 export default organizationRouter;

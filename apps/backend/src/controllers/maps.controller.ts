@@ -164,9 +164,9 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const mapsController = {
-  getAutoComplete,
-  getOptimalRouteForUser,
-  getRoute,
+  autocomplete: getAutoComplete,
+  optimalRoute: getOptimalRouteForUser,
+  route: getRoute,
 } as const;
 
 export default mapsController;
