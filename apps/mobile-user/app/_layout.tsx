@@ -1,4 +1,4 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
@@ -27,8 +27,10 @@ export default function RootLayout() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const hasCheckedAuth = useRef(false);
   const router = useRouter();
+  const pathname = usePathname();
   const lastOnlineRef = useRef<boolean | null>(null);
   const isActiveEmergencyCheckInFlight = useRef(false);
+  const lastRedirectedEmergencyIdRef = useRef<string | null>(null);
 
   // monitor connectivity so we can re-check when coming back online.
   const { isConnected } = useNetworkStatus({
@@ -138,6 +140,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!user) return;
     if (isCheckingAuth || isLoading) return;
+    if (pathname === '/emergency-tracking') return;
 
     const maybeRedirectToActiveEmergency = async () => {
       if (isActiveEmergencyCheckInFlight.current) return;
@@ -169,6 +172,11 @@ export default function RootLayout() {
             status !== EmergencyStatus.COMPLETED &&
             status !== EmergencyStatus.CANCELLED
           ) {
+            if (lastRedirectedEmergencyIdRef.current === storedRequestId) {
+              isActiveEmergencyCheckInFlight.current = false;
+              return;
+            }
+            lastRedirectedEmergencyIdRef.current = storedRequestId;
             router.replace({
               pathname: '/emergency-tracking',
               params: {
@@ -205,6 +213,11 @@ export default function RootLayout() {
         });
 
         if (active?.id) {
+          if (lastRedirectedEmergencyIdRef.current === active.id) {
+            isActiveEmergencyCheckInFlight.current = false;
+            return;
+          }
+          lastRedirectedEmergencyIdRef.current = active.id;
           router.replace({
             pathname: '/emergency-tracking',
             params: {
@@ -237,7 +250,7 @@ export default function RootLayout() {
     if (wasOnline === false && isConnected === true) {
       maybeRedirectToActiveEmergency();
     }
-  }, [user, isCheckingAuth, isLoading, router, isConnected]);
+  }, [user, isCheckingAuth, isLoading, router, isConnected, pathname]);
 
   if (!loaded && !error) {
     return null;
