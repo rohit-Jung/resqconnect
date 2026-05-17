@@ -1,0 +1,5 @@
+[install]
+# expo (native autolinking) cannot tolerate multiple physical installs of the same
+# native module. prevent bun from auto-installing peer dependencies into nested
+# package folders, which can appear as “duplicate native modules” to expo doctor.
+peer = false
