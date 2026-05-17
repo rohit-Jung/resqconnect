@@ -8,18 +8,12 @@ import {
   Alert,
   Animated,
   Linking,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, {
-  LatLng,
-  Marker,
-  PROVIDER_GOOGLE,
-  Polyline,
-} from 'react-native-maps';
+import MapView, { LatLng, Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -29,7 +23,6 @@ import {
   MAP_CONFIG,
   MARKER_SIZES,
   STATUS_MESSAGES,
-  UI_CONFIG,
 } from '@/constants/emergency-tracking.constants';
 import { SocketEvents } from '@/constants/socket.constants';
 import { TEST_CORDS } from '@/constants/test.constants';
@@ -266,79 +259,80 @@ export default function EmergencyTrackingScreen() {
 
   // Simulated location movement along route (for testing only)
   // Enable with EXPO_PUBLIC_TEST_MODE=true in .env
-  useEffect(() => {
-    const isTestMode = process.env.EXPO_PUBLIC_TEST_MODE === 'true';
-
-    // Only enable in test mode when we have a route and emergency is active
-    if (
-      !isTestMode ||
-      !routeCoordinates.length ||
-      currentStatus !== EmergencyStatus.ACCEPTED ||
-      !isProvider
-    ) {
-      return;
-    }
-
-    console.log(
-      '[SIMULATION] Starting simulated location movement along route'
-    );
-
-    isSimulatingRef.current = true;
-
-    // Start simulation
-    simulationTimerRef.current = setInterval(() => {
-      simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
-
-      // Stop when reached destination
-      if (simulationProgressRef.current >= 1) {
-        simulationProgressRef.current = 1;
-        if (simulationTimerRef.current) {
-          clearInterval(simulationTimerRef.current);
-          isSimulatingRef.current = false;
-          simulationTimerRef.current = null;
-        }
-        console.log('[SIMULATION] Reached destination');
-        // Clear remaining route when destination reached
-        setRemainingRouteCoordinates([]);
-        return;
-      }
-
-      // Calculate new location along route
-      const newLocation = getPointAtProgress(
-        routeCoordinates,
-        simulationProgressRef.current
-      );
-
-      if (newLocation) {
-        console.log(
-          `[SIMULATION] Simulated location progress: ${(
-            simulationProgressRef.current * 100
-          ).toFixed(1)}%`,
-          newLocation
-        );
-
-        // Update provider's location for real-time display
-        setMyLocation(newLocation);
-        setProviderLocation(newLocation);
-
-        // Update remaining route (polyline trimming)
-        const remaining = getRemainingRouteAfterProgress(
-          routeCoordinates,
-          simulationProgressRef.current
-        );
-        console.log('Remaining', remaining);
-        setRemainingRouteCoordinates(remaining);
-      }
-    }, LOCATION_TRACKING.SIMULATION_INTERVAL);
-
-    return () => {
-      if (simulationTimerRef.current) {
-        clearInterval(simulationTimerRef.current);
-        isSimulatingRef.current = false;
-        simulationTimerRef.current = null;
-      }
-    };
-  }, [routeCoordinates, currentStatus, isProvider]);
+  // useEffect(() => {
+  //   const isTestMode = process.env.EXPO_PUBLIC_TEST_MODE === 'true';
+  //   console.log("Is test Mode", isTestMode)
+  //
+  //   // Only enable in test mode when we have a route and emergency is active
+  //   if (
+  //     !isTestMode ||
+  //     !routeCoordinates.length ||
+  //     currentStatus !== EmergencyStatus.ACCEPTED ||
+  //     !isProvider
+  //   ) {
+  //     return;
+  //   }
+  //
+  //   console.log(
+  //     '[SIMULATION] Starting simulated location movement along route'
+  //   );
+  //
+  //   isSimulatingRef.current = true;
+  //
+  //   // Start simulation
+  //   simulationTimerRef.current = setInterval(() => {
+  //     simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
+  //
+  //     // Stop when reached destination
+  //     if (simulationProgressRef.current >= 1) {
+  //       simulationProgressRef.current = 1;
+  //       if (simulationTimerRef.current) {
+  //         clearInterval(simulationTimerRef.current);
+  //         isSimulatingRef.current = false;
+  //         simulationTimerRef.current = null;
+  //       }
+  //       console.log('[SIMULATION] Reached destination');
+  //       // Clear remaining route when destination reached
+  //       setRemainingRouteCoordinates([]);
+  //       return;
+  //     }
+  //
+  //     // Calculate new location along route
+  //     const newLocation = getPointAtProgress(
+  //       routeCoordinates,
+  //       simulationProgressRef.current
+  //     );
+  //
+  //     if (newLocation) {
+  //       console.log(
+  //         `[SIMULATION] Simulated location progress: ${(
+  //           simulationProgressRef.current * 100
+  //         ).toFixed(1)}%`,
+  //         newLocation
+  //       );
+  //
+  //       // Update provider's location for real-time display
+  //       setMyLocation(newLocation);
+  //       setProviderLocation(newLocation);
+  //
+  //       // Update remaining route (polyline trimming)
+  //       const remaining = getRemainingRouteAfterProgress(
+  //         routeCoordinates,
+  //         simulationProgressRef.current
+  //       );
+  //       console.log('Remaining', remaining);
+  //       setRemainingRouteCoordinates(remaining);
+  //     }
+  //   }, LOCATION_TRACKING.SIMULATION_INTERVAL);
+  //
+  //   return () => {
+  //     if (simulationTimerRef.current) {
+  //       clearInterval(simulationTimerRef.current);
+  //       isSimulatingRef.current = false;
+  //       simulationTimerRef.current = null;
+  //     }
+  //   };
+  // }, [routeCoordinates, currentStatus, isProvider]);
 
   // Start location tracking
   useEffect(() => {
@@ -775,7 +769,6 @@ export default function EmergencyTrackingScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         initialRegion={{
           ...userLocation,
           latitudeDelta: MAP_CONFIG.INITIAL_DELTA.latitudeDelta,

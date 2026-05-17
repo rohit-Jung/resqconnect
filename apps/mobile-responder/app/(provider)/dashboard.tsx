@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,10 +21,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 
 import { SocketEvents } from '@/constants/socket.constants';
-import { TEST_CORDS } from '@/constants/test.constants';
 import { newEmergencyEventPayloadSchema } from '@/lib/validations/socket';
 import { serviceProviderApi } from '@/services/provider/provider.api';
 import { socketManager } from '@/socket/socket-manager';
@@ -388,7 +386,6 @@ export default function ProviderDashboardScreen() {
               <MapView
                 ref={mapRef}
                 style={styles.map}
-                provider={PROVIDER_GOOGLE}
                 initialRegion={{
                   latitude: currentLocation.latitude,
                   longitude: currentLocation.longitude,
