@@ -97,11 +97,11 @@ export function constructMatrixUrl(props: ConstructMatrixUrlProps): string {
 
   matrixURL.searchParams.append('access_token', token);
   matrixURL.searchParams.append('annotations', 'duration,distance');
-
-  if (sources) {
+  if (sources?.length) {
     matrixURL.searchParams.append('sources', sources.join(';'));
   }
-  if (destinations) {
+
+  if (destinations?.length) {
     matrixURL.searchParams.append('destinations', destinations.join(';'));
   }
 

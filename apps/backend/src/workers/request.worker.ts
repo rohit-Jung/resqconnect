@@ -14,6 +14,7 @@ import {
   EXPANDED_K_RING_RADIUS,
   INITIAL_K_RING_RADIUS,
   MAX_PROVIDERS_TO_BROADCAST,
+  REQUEST_TIMEOUT_MS,
 } from '@/constants';
 import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
@@ -70,6 +71,7 @@ async function startEmergencyRequestService() {
 
       const { requestId, emergencyLocation, emergencyType, userId } =
         parsedData.data;
+
       const source =
         typeof (data as { source?: unknown }).source === 'string'
           ? (data as { source?: string }).source
@@ -176,7 +178,7 @@ async function startEmergencyRequestService() {
       }
 
       // Broadcast to ALL providers simultaneously
-      const providerIds = top10Providers.map(p => p.id);
+      // const providerIds = top10Providers.map(p => p.id);
       const payload = {
         ...parsedData.data,
         username: userInfo?.name?.toString() ?? 'Unknown',
@@ -187,6 +189,7 @@ async function startEmergencyRequestService() {
       console.log('top 10 providers-found', top10Providers);
       for (const provider of top10Providers) {
         const roomName = SocketRoom.PROVIDER(provider.id);
+
         io.to(roomName).emit(SocketEvents.NEW_EMERGENCY, payload);
         logger.debug(`Emitted to ${roomName}`);
       }
@@ -195,93 +198,111 @@ async function startEmergencyRequestService() {
         `Broadcasted to ${top10Providers.length} providers in ${Date.now() - messageStartTime}ms`
       );
 
+      // Set request expiry and revert to pending
+      await db
+        .update(emergencyRequest)
+        .set({
+          requestStatus: 'pending',
+          expiresAt: new Date(Date.now() + REQUEST_TIMEOUT_MS).toISOString(),
+          searchRadius: INITIAL_K_RING_RADIUS,
+        })
+        .where(eq(emergencyRequest.id, requestId));
+
+      logger.info(
+        `Broadcasted request ${requestId} to ${top10Providers.length} providers`
+      );
+
+      logger.info(
+        `Total message processing time: ${Date.now() - messageStartTime}ms`
+      );
+
       // Wait for provider decision
-      const result = await waitForAnyProviderDecision({
-        io,
-        requestId,
-        providerIds,
-        timeoutMs: 120_000,
-      });
-
-      if (result.decision === 'ACCEPTED' && result.providerId) {
-        await Promise.all([
-          db
-            .update(serviceProvider)
-            .set({ serviceStatus: 'assigned' })
-            .where(eq(serviceProvider.id, result.providerId)),
-          db
-            .update(emergencyRequest)
-            .set({ requestStatus: 'assigned' })
-            .where(eq(emergencyRequest.id, requestId)),
-        ]);
-
-        // Join the already-connected sockets for both parties to the emergency room.
-        // Use the role-prefixed rooms for consistency with the rest of the codebase.
-        io.in(SocketRoom.PROVIDER(result.providerId)).socketsJoin(
-          SocketRoom.EMERGENCY(requestId)
-        );
-        io.in(SocketRoom.USER(userId)).socketsJoin(
-          SocketRoom.EMERGENCY(requestId)
-        );
-
-        // Get provider info to include in notification
-        const providerData = await db.query.serviceProvider.findFirst({
-          where: eq(serviceProvider.id, result.providerId),
-        });
-
-        // inform others that it's accepted
-        io.to(SocketRoom.EMERGENCY(requestId)).emit(
-          SocketEvents.REQUEST_ACCEPTED,
-          {
-            requestId,
-            emergencyLocation,
-            emergencyType,
-            providerId: result.providerId,
-            provider: {
-              id: providerData?.id,
-              name: providerData?.name,
-              phone: providerData?.phoneNumber?.toString(),
-              serviceType: providerData?.serviceType,
-              vehicleNumber: providerData?.vehicleInformation?.number,
-              location: providerData?.currentLocation,
-            },
-          }
-        );
-
-        logger.info(
-          `Request ${requestId} assigned to provider ${result.providerId}`
-        );
-
-        if (source === 'sms' && userInfo?.phoneNumber) {
-          const emergencyTypeLabel =
-            emergencyType === 'ambulance'
-              ? 'Medical/Ambulance'
-              : emergencyType === 'fire_truck'
-                ? 'Fire'
-                : emergencyType === 'rescue_team'
-                  ? 'Rescue'
-                  : 'Police';
-          await sendLocalSMS(
-            userInfo.phoneNumber.toString(),
-            SMS_TEMPLATES.PROVIDER_ASSIGNED(
-              emergencyTypeLabel,
-              providerData?.name || 'Responder'
-            )
-          );
-        }
-      } else if (result.decision === 'TIMEOUT') {
-        await db
-          .update(emergencyRequest)
-          .set({ requestStatus: 'no_providers_available' })
-          .where(eq(emergencyRequest.id, requestId));
-
-        io.to(SocketRoom.USER(userId)).emit(SocketEvents.EMERGENCY_FAILED, {
-          requestId,
-          message: 'No providers available at this time. Please try again.',
-        });
-
-        logger.warn(`Request ${requestId} timed out - no providers accepted`);
-      }
+      // const result = await waitForAnyProviderDecision({
+      //   io,
+      //   requestId,
+      //   providerIds,
+      //   timeoutMs: 120_000,
+      // });
+      //
+      // if (result.decision === 'ACCEPTED' && result.providerId) {
+      //   await Promise.all([
+      //     db
+      //       .update(serviceProvider)
+      //       .set({ serviceStatus: 'assigned' })
+      //       .where(eq(serviceProvider.id, result.providerId)),
+      //     db
+      //       .update(emergencyRequest)
+      //       .set({ requestStatus: 'assigned' })
+      //       .where(eq(emergencyRequest.id, requestId)),
+      //   ]);
+      //
+      //   // Join the already-connected sockets for both parties to the emergency room.
+      //   // Use the role-prefixed rooms for consistency with the rest of the codebase.
+      //   io.in(SocketRoom.PROVIDER(result.providerId)).socketsJoin(
+      //     SocketRoom.EMERGENCY(requestId)
+      //   );
+      //   io.in(SocketRoom.USER(userId)).socketsJoin(
+      //     SocketRoom.EMERGENCY(requestId)
+      //   );
+      //
+      //   // Get provider info to include in notification
+      //   const providerData = await db.query.serviceProvider.findFirst({
+      //     where: eq(serviceProvider.id, result.providerId),
+      //   });
+      //
+      //   // inform others that it's accepted
+      //   io.to(SocketRoom.EMERGENCY(requestId)).emit(
+      //     SocketEvents.REQUEST_ACCEPTED,
+      //     {
+      //       requestId,
+      //       emergencyLocation,
+      //       emergencyType,
+      //       providerId: result.providerId,
+      //       provider: {
+      //         id: providerData?.id,
+      //         name: providerData?.name,
+      //         phone: providerData?.phoneNumber?.toString(),
+      //         serviceType: providerData?.serviceType,
+      //         vehicleNumber: providerData?.vehicleInformation?.number,
+      //         location: providerData?.currentLocation,
+      //       },
+      //     }
+      //   );
+      //
+      //   logger.info(
+      //     `Request ${requestId} assigned to provider ${result.providerId}`
+      //   );
+      //
+      //   if (source === 'sms' && userInfo?.phoneNumber) {
+      //     const emergencyTypeLabel =
+      //       emergencyType === 'ambulance'
+      //         ? 'Medical/Ambulance'
+      //         : emergencyType === 'fire_truck'
+      //           ? 'Fire'
+      //           : emergencyType === 'rescue_team'
+      //             ? 'Rescue'
+      //             : 'Police';
+      //     await sendLocalSMS(
+      //       userInfo.phoneNumber.toString(),
+      //       SMS_TEMPLATES.PROVIDER_ASSIGNED(
+      //         emergencyTypeLabel,
+      //         providerData?.name || 'Responder'
+      //       )
+      //     );
+      //   }
+      // } else if (result.decision === 'TIMEOUT') {
+      //   await db
+      //     .update(emergencyRequest)
+      //     .set({ requestStatus: 'no_providers_available' })
+      //     .where(eq(emergencyRequest.id, requestId));
+      //
+      //   io.to(SocketRoom.USER(userId)).emit(SocketEvents.EMERGENCY_FAILED, {
+      //     requestId,
+      //     message: 'No providers available at this time. Please try again.',
+      //   });
+      //
+      //   logger.warn(`Request ${requestId} timed out - no providers accepted`);
+      // }
 
       logger.info(
         `Total message processing time: ${Date.now() - messageStartTime}ms`
