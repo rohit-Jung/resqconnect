@@ -17,7 +17,7 @@ const validateServiceProvider = asyncHandler(
     next: NextFunction
   ) {
     const token =
-      req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
+      req.headers.authorization?.replace('Bearer ', '') || req.cookies.token;
 
     if (!token) {
       throw ApiError.unauthorized('Authentication token required');
@@ -36,7 +36,7 @@ const validateServiceProvider = asyncHandler(
 const validateRoleAuth = (allowedRoles: TUserRole[]) => {
   return asyncHandler(async (req: Request, _, next: NextFunction) => {
     const token =
-      req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
+      req.headers.authorization?.replace('Bearer ', '') || req.cookies.token;
 
     if (!token) {
       throw ApiError.unauthorized('Authentication token required');
@@ -78,7 +78,7 @@ const validateOrg = asyncHandler(
 const validateUserOrProvider = asyncHandler(
   async (req: Request, _, next: NextFunction) => {
     const token =
-      req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
+      req.headers.authorization?.replace('Bearer ', '') || req.cookies.token;
 
     if (!token) {
       throw ApiError.unauthorized('Authentication token required');
