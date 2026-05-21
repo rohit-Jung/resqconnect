@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Header } from '@repo/mobile/ui';
 
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,6 @@ import {
   View,
 } from 'react-native';
 
-import Header from '@/components/Header';
 import { TOKEN_KEY } from '@/constants';
 import {
   documentUploadApi,
@@ -122,8 +122,9 @@ const UploadDocumentsScreen: React.FC = () => {
     }
 
     try {
-      // Step 1: Get signatures for both documents
+      // step 1: get signatures for both documents
       const signatures = await documentUploadApi.getDocumentUploadSignatures();
+      console.log('[UploadDocuments] Received upload signatures:', signatures);
 
       // Step 2: Upload files directly to Cloudinary
       const [panCardUpload, citizenshipUpload] = await Promise.all([

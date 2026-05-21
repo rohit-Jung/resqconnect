@@ -1,13 +1,16 @@
+import { InfoCard, InfoPage, Notice, SectionCard } from '@repo/mobile/ui';
+
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { InfoCard, InfoPage, Notice, SectionCard } from '@/components/InfoPage';
 import { APP_NAME } from '@/constants';
 
 const SIGNAL_RED = '#C44536';
 const MID_GRAY = '#888888';
 
 export default function PrivacyPolicyScreen() {
+  const router = useRouter();
   const sections = [
     {
       number: '01',
@@ -110,7 +113,11 @@ We respond to all inquiries within 30 days.`,
   ];
 
   return (
-    <InfoPage title="PRIVACY POLICY" tagline="PRIVACY POLICY">
+    <InfoPage
+      title="PRIVACY POLICY"
+      tagline="PRIVACY POLICY"
+      onBack={() => router.back()}
+    >
       <InfoCard
         icon="shield-checkmark"
         iconBgColor="#DBEAFE"

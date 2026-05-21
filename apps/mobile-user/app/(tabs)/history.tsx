@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '@repo/mobile/ui';
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -12,7 +13,6 @@ import {
   View,
 } from 'react-native';
 
-import { EmptyState } from '@/components/ui/EmptyState';
 import { useGetUserEmergencyHistory } from '@/services/emergency/emergency.api';
 import {
   EmergencyStatus,

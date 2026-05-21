@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { FAQItem, InfoPage, MenuItem } from '@repo/mobile/ui';
 
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -11,7 +12,6 @@ import {
   View,
 } from 'react-native';
 
-import { FAQItem, InfoPage, MenuItem } from '@/components/InfoPage';
 import { APP_NAME, EMERGENCY_PHONE_NUMBER } from '@/constants';
 
 const SIGNAL_RED = '#C44536';
@@ -101,7 +101,11 @@ export default function HelpSupportScreen() {
   };
 
   return (
-    <InfoPage title="HELP & SUPPORT" tagline="HELP & SUPPORT">
+    <InfoPage
+      title="HELP & SUPPORT"
+      tagline="HELP & SUPPORT"
+      onBack={() => router.back()}
+    >
       <TouchableOpacity
         style={styles.emergencyBanner}
         onPress={handleEmergencyCall}

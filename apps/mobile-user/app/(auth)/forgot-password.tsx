@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Header } from '@repo/mobile/ui';
 
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
@@ -16,7 +17,6 @@ import {
   View,
 } from 'react-native';
 
-import Header from '@/components/Header';
 import { useForgotPassword } from '@/services/user/auth.api';
 import {
   TForgotPassword,
@@ -77,7 +77,11 @@ const ForgotPasswordScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header title="PASSWORD RECOVERY" showBackButton />
+      <Header
+        title="PASSWORD RECOVERY"
+        showBackButton
+        onBack={() => router.back()}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

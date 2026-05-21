@@ -1,40 +1,34 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-
-import * as Location from 'expo-location';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Linking,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import MapView, {
-  LatLng,
-  Marker,
-  PROVIDER_GOOGLE,
-  Polyline,
-} from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
+  EmergencyTrackingHeader,
+  EmergencyTrackingMap,
+  EmergencyTrackingStatusCardUser,
+} from '@repo/mobile/emergency-tracking/components';
 import {
   COLORS,
   EMERGENCY_ICONS,
   LOCATION_TRACKING,
   MAP_CONFIG,
-  MARKER_SIZES,
   STATUS_MESSAGES,
-  UI_CONFIG,
-} from '@/constants/emergency-tracking.constants';
+} from '@repo/mobile/emergency-tracking/constants';
+import { usePulseAnimation } from '@repo/mobile/emergency-tracking/hooks';
+
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
+import MapView, { LatLng } from 'react-native-maps';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { SocketEvents } from '@/constants/socket.constants';
 import { TEST_CORDS } from '@/constants/test.constants';
-import { usePulseAnimation } from '@/hooks/usePulseAnimation';
 import { useSocketHandlers } from '@/hooks/useSocketHandlers';
+import { useEmergencyActions } from '@/services/emergency/emergency.actions';
 import {
   useGetEmergencyRequest,
   useGetNearbyProviders,
@@ -44,8 +38,6 @@ import { socketManager } from '@/socket/socket-manager';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
 import {
-  formatDistance,
-  formatDuration,
   getPointAtProgress,
   getRemainingRouteAfterProgress,
   haversineDistance,
@@ -59,14 +51,9 @@ interface LocationCoords {
 
 export default function EmergencyTrackingScreen() {
   const router = useRouter();
-  const {
-    requestId,
-    emergencyType,
-    role = 'user',
-  } = useLocalSearchParams<{
+  const { requestId, emergencyType } = useLocalSearchParams<{
     requestId: string;
     emergencyType: string;
-    role?: 'user' | 'provider';
   }>();
 
   const mapRef = useRef<MapView>(null);
@@ -82,7 +69,7 @@ export default function EmergencyTrackingScreen() {
 
   const isSimulatingRef = useRef<boolean>(false);
 
-  const isProvider = role === 'provider';
+  const isProvider = false;
   const initialUserLocation = TEST_CORDS;
 
   const [userLocation, setUserLocation] =
@@ -104,7 +91,7 @@ export default function EmergencyTrackingScreen() {
   const [mapReady, setMapReady] = useState(false);
 
   const [localStatus, setLocalStatus] = useState<EmergencyStatus>(
-    isProvider ? EmergencyStatus.ACCEPTED : EmergencyStatus.PENDING
+    EmergencyStatus.PENDING
   );
 
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
@@ -128,8 +115,8 @@ export default function EmergencyTrackingScreen() {
       serviceType: emergencyType || 'ambulance',
     },
     !isProvider &&
-      !!userLocation.latitude &&
-      !!userLocation.longitude &&
+      Number.isFinite(userLocation.latitude) &&
+      Number.isFinite(userLocation.longitude) &&
       !!emergencyType
   );
 
@@ -142,7 +129,7 @@ export default function EmergencyTrackingScreen() {
   // Use local status that can be updated from socket events
   const currentStatus = localStatus;
 
-  // Get status message based on current status and role
+  // Get status message based on current status
   const getStatusMessage = useCallback(() => {
     switch (currentStatus) {
       case EmergencyStatus.PENDING:
@@ -155,10 +142,6 @@ export default function EmergencyTrackingScreen() {
         return STATUS_MESSAGES.in_progress;
       case EmergencyStatus.COMPLETED:
         return STATUS_MESSAGES.completed;
-      case 'cancelled' as any:
-        return STATUS_MESSAGES.cancelled;
-      case 'no_providers_available' as any:
-        return STATUS_MESSAGES.no_providers_available;
       default:
         return STATUS_MESSAGES.pending;
     }
@@ -295,8 +278,7 @@ export default function EmergencyTrackingScreen() {
           newLocation
         );
 
-        // Update provider's location for real-time display
-        setMyLocation(newLocation);
+        // Simulate provider movement only; keep user GPS fixed to TEST_CORDS.
         setProviderLocation(newLocation);
 
         // Update remaining route (polyline trimming)
@@ -318,62 +300,9 @@ export default function EmergencyTrackingScreen() {
     };
   }, [routeCoordinates, currentStatus, isProvider]);
 
-  // Start location tracking
+  // USER app: keep user location fixed to TEST_CORDS for now.
   useEffect(() => {
-    let locationSubscription: Location.LocationSubscription | null = null;
-
-    const startLocationTracking = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Location permission is required for tracking.'
-        );
-        return;
-      }
-
-      if (isProvider) {
-        // PROVIDER: Use real GPS location with continuous updates
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-        const initialLocation = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        };
-        setMyLocation(initialLocation);
-        setProviderLocation(initialLocation);
-
-        // Subscribe to continuous location updates for provider
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: LOCATION_TRACKING.LOCATION_UPDATE_INTERVAL,
-            distanceInterval: LOCATION_TRACKING.LOCATION_DISTANCE_INTERVAL,
-          },
-          location => {
-            const newLocation = {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            };
-            setMyLocation(newLocation);
-            setProviderLocation(newLocation);
-          }
-        );
-      } else {
-        // USER: Use test coordinates only (for testing)
-        setMyLocation(TEST_CORDS);
-        // Note: userLocation is already initialized with TEST_CORDS
-      }
-    };
-
-    startLocationTracking();
-
-    return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-    };
+    setMyLocation(TEST_CORDS);
   }, [isProvider]);
 
   // Broadcast location updates via socket
@@ -477,91 +406,38 @@ export default function EmergencyTrackingScreen() {
     routeCoordinates.length,
   ]);
 
-  // Fit map to show all markers
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-
-    const coordinates: LocationCoords[] = [];
-
-    if (userLocation.latitude && userLocation.longitude) {
-      coordinates.push(userLocation);
-    }
-
-    if (providerLocation) {
-      coordinates.push(providerLocation);
-    }
-
-    if (coordinates.length > 1) {
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: MAP_CONFIG.FIT_TO_COORDINATES_PADDING,
-        animated: true,
-      });
-    } else if (coordinates.length === 1) {
-      mapRef.current.animateToRegion({
-        ...coordinates[0],
-        latitudeDelta: MAP_CONFIG.INITIAL_DELTA.latitudeDelta,
-        longitudeDelta: MAP_CONFIG.INITIAL_DELTA.longitudeDelta,
-      });
-    }
-  }, [mapReady, userLocation, providerLocation]);
+  const { cancelRequest, confirmArrival } = useEmergencyActions();
 
   const handleCancelRequest = () => {
     Alert.alert(
       'Cancel Emergency',
       'Are you sure you want to cancel this emergency request?',
       [
-        { text: 'No', style: 'cancel' },
+        {
+          text: 'No',
+          style: 'cancel',
+        },
         {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
             try {
-              // Get raw socket for emit with callback support
-              const socketInstance = socketManager.getSocket();
-              if (!socketInstance) {
+              await cancelRequest(requestId).then(() => {
                 Alert.alert(
-                  'Error',
-                  'Socket connection lost. Please check your connection.'
-                );
-                return;
-              }
-
-              setIsCancelling(true);
-              // TODO: Re-enable retry logic after testing
-              // For now, single attempt with simple timeout
-              await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                  console.log(`CANCEL_REQUEST_SOCKET timeout`);
-                  reject(new Error('Timeout'));
-                }, LOCATION_TRACKING.SOCKET_TIMEOUT);
-
-                socketInstance.emit(
-                  SocketEvents.CANCEL_REQUEST_SOCKET,
-                  {
-                    requestId,
-                    role: role as 'user' | 'provider',
-                  },
-                  (ack?: any) => {
-                    clearTimeout(timeout);
-                    if (ack?.error) {
-                      reject(new Error(ack.error));
-                    } else {
-                      resolve();
-                    }
-                  }
+                  'Request Cancelled',
+                  'Your emergency request has been cancelled successfully.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        router.replace('/(tabs)');
+                      },
+                    },
+                  ]
                 );
               });
-
-              console.log(`CANCEL_REQUEST_SOCKET succeeded`);
-              // If success, the socket listener will handle the redirect
-            } catch (error) {
-              console.error('Error cancelling request:', error);
-              Alert.alert(
-                'Error',
-                'Failed to cancel request. Please check your connection and try again.'
-              );
-            } finally {
-              setIsCancelling(false);
+            } catch {
+              Alert.alert('Error', 'Failed to cancel request');
             }
           },
         },
@@ -572,7 +448,7 @@ export default function EmergencyTrackingScreen() {
   const handleConfirmArrival = () => {
     Alert.alert(
       'Confirm Arrival',
-      `${role === 'user' ? 'Has the service provider arrived at your location?' : 'Have you arrived to the location ?'}`,
+      'Has the service provider arrived at your location?',
       [
         { text: 'No', style: 'cancel' },
         {
@@ -586,56 +462,14 @@ export default function EmergencyTrackingScreen() {
               return;
             }
 
-            // Mark confirmation as in progress to prevent accidental navigation
+            // mark confirmation as in progress to prevent accidental navigation
             setIsProcessingConfirmation(true);
             setIsConfirmingArrival(true);
 
             try {
-              // Get raw socket for emit with callback support
-              const socketInstance = socketManager.getSocket();
-              if (!socketInstance) {
-                Alert.alert(
-                  'Error',
-                  'Socket connection lost. Please check your connection.'
-                );
-                setIsProcessingConfirmation(false);
-                return;
-              }
-
-              // TODO: Re-enable retry logic after testing
-              // For now, single attempt with simple timeout
-              await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                  console.log(`CONFIRM_ARRIVAL timeout`);
-                  reject(new Error('Timeout'));
-                }, LOCATION_TRACKING.SOCKET_TIMEOUT);
-
-                socketInstance.emit(
-                  SocketEvents.CONFIRM_ARRIVAL,
-                  {
-                    requestId,
-                    role: role as 'user' | 'provider',
-                  },
-                  (ack?: any) => {
-                    clearTimeout(timeout);
-                    if (ack?.error) {
-                      reject(new Error(ack.error));
-                    } else {
-                      resolve();
-                    }
-                  }
-                );
-              });
-
-              console.log(`CONFIRM_ARRIVAL succeeded`);
-              // If success, the socket listener will handle the redirect
-              // and will clear isProcessingConfirmation
-            } catch (error) {
-              console.error('Error confirming arrival:', error);
-              Alert.alert(
-                'Error',
-                'Failed to confirm arrival. Please check your connection and try again.'
-              );
+              await confirmArrival(requestId);
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to confirm  arrival');
             } finally {
               setIsProcessingConfirmation(false);
               setIsConfirmingArrival(false);
@@ -646,20 +480,21 @@ export default function EmergencyTrackingScreen() {
     );
   };
 
-  const handleCallProvider = () => {
-    if (assignedProvider?.phoneNumber) {
-      Linking.openURL(`tel:${assignedProvider.phoneNumber}`);
-    }
-  };
-
   const handleRecenterMap = () => {
     if (!mapRef.current) return;
 
     const coordinates: LocationCoords[] = [];
-    if (userLocation.latitude && userLocation.longitude) {
+    if (
+      Number.isFinite(userLocation.latitude) &&
+      Number.isFinite(userLocation.longitude)
+    ) {
       coordinates.push(userLocation);
     }
-    if (providerLocation) {
+    if (
+      providerLocation &&
+      Number.isFinite(providerLocation.latitude) &&
+      Number.isFinite(providerLocation.longitude)
+    ) {
       coordinates.push(providerLocation);
     }
 
@@ -695,111 +530,25 @@ export default function EmergencyTrackingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.BLACK} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <View style={styles.brandRow}>
-            <Text style={styles.brandMark}>RESQ</Text>
-            <Text style={styles.brandDot}>.</Text>
-          </View>
-          <View style={styles.headerLine} />
-          <Text style={styles.tagline}>EMERGENCY TRACKING</Text>
-        </View>
-      </View>
+      <EmergencyTrackingHeader onBack={() => router.replace('/(tabs)')} />
 
-      {/* Map */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
+      <EmergencyTrackingMap
+        mapRef={mapRef}
+        mapReady={mapReady}
+        onMapReady={() => setMapReady(true)}
         initialRegion={{
           ...userLocation,
           latitudeDelta: MAP_CONFIG.INITIAL_DELTA.latitudeDelta,
           longitudeDelta: MAP_CONFIG.INITIAL_DELTA.longitudeDelta,
         }}
-        onMapReady={() => setMapReady(true)}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-      >
-        {/* User Location Marker */}
-        <Marker
-          coordinate={userLocation}
-          anchor={{ x: 0.5, y: 0.5 }}
-          identifier="user"
-        >
-          <View
-            style={[styles.userMarker, { borderColor: emergencyInfo.color }]}
-          >
-            <MaterialCommunityIcons
-              name="account-alert"
-              size={20}
-              color={emergencyInfo.color}
-            />
-          </View>
-        </Marker>
-
-        {/* Nearby Providers (when searching) */}
-        {!isProvider &&
-          currentStatus === EmergencyStatus.PENDING &&
-          nearbyProviders.map(provider => (
-            <Marker
-              key={provider.id}
-              coordinate={{
-                latitude: parseFloat(provider.currentLocation.latitude),
-                longitude: parseFloat(provider.currentLocation.longitude),
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View style={styles.providerMarker}>
-                <MaterialCommunityIcons
-                  name="car-emergency"
-                  size={16}
-                  color="#fff"
-                />
-              </View>
-            </Marker>
-          ))}
-
-        {/* Assigned Provider / My Location (if provider) Marker */}
-        {providerLocation && (
-          <Marker
-            coordinate={providerLocation}
-            anchor={{ x: 0.5, y: 0.5 }}
-            identifier="provider"
-          >
-            <View
-              style={[
-                styles.assignedProviderMarker,
-                { backgroundColor: emergencyInfo.color },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={emergencyInfo.icon as any}
-                size={20}
-                color="#fff"
-              />
-            </View>
-          </Marker>
-        )}
-
-        {/* Route Polyline */}
-        {remainingRouteCoordinates.length > 0 && (
-          <Polyline
-            coordinates={remainingRouteCoordinates}
-            strokeColor={emergencyInfo.color}
-            strokeWidth={4}
-            lineCap="round"
-            lineJoin="round"
-          />
-        )}
-      </MapView>
+        userLocation={userLocation}
+        providerLocation={providerLocation}
+        nearbyProviders={
+          currentStatus === EmergencyStatus.PENDING ? nearbyProviders : []
+        }
+        remainingRouteCoordinates={remainingRouteCoordinates}
+        emergencyInfo={emergencyInfo}
+      />
 
       {/* Recenter Button */}
       <TouchableOpacity
@@ -809,214 +558,38 @@ export default function EmergencyTrackingScreen() {
         <Ionicons name="locate" size={24} color="#374151" />
       </TouchableOpacity>
 
-      {/* Status Card */}
-      <View style={styles.statusCard}>
-        {/* Emergency Type Badge */}
-        <View
-          style={[styles.typeBadge, { backgroundColor: emergencyInfo.color }]}
-        >
-          <MaterialCommunityIcons
-            name={emergencyInfo.icon as any}
-            size={24}
-            color="#fff"
-          />
-          <Text style={styles.typeBadgeText}>
-            {emergencyInfo.label} Emergency
-          </Text>
-          {isProvider && (
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>Provider</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Status Message */}
-        <View style={styles.statusSection}>
-          {currentStatus === EmergencyStatus.PENDING && (
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <ActivityIndicator size="small" color={statusInfo.color} />
-            </Animated.View>
-          )}
-          {currentStatus === EmergencyStatus.ACCEPTED && (
-            <Ionicons
-              name="checkmark-circle"
-              size={24}
-              color={statusInfo.color}
-            />
-          )}
-          <Text style={[styles.statusText, { color: statusInfo.color }]}>
-            {statusInfo.message}
-          </Text>
-        </View>
-
-        {/* Nearby Providers Count (when searching) */}
-        {!isProvider &&
-          currentStatus === EmergencyStatus.PENDING &&
-          nearbyProviders.length > 0 && (
-            <Text style={styles.providersCount}>
-              {nearbyProviders.length} provider
-              {nearbyProviders.length > 1 ? 's' : ''} nearby
-            </Text>
-          )}
-
-        {/* Swiss-style Route Info */}
-        {routeInfo &&
-          (currentStatus === EmergencyStatus.ACCEPTED ||
-            currentStatus === EmergencyStatus.IN_PROGRESS) && (
-            <View style={styles.routeInfoSwiss}>
-              <View style={styles.routeInfoSwissItem}>
-                <Ionicons
-                  name="time-outline"
-                  size={16}
-                  color={COLORS.MID_GRAY}
-                />
-                <Text style={styles.routeInfoSwissText}>
-                  {formatDuration(routeInfo.duration)}
-                </Text>
-              </View>
-              <View style={styles.routeInfoSwissDivider} />
-              <View style={styles.routeInfoSwissItem}>
-                <Ionicons
-                  name="navigate-outline"
-                  size={16}
-                  color={COLORS.MID_GRAY}
-                />
-                <Text style={styles.routeInfoSwissText}>
-                  {formatDistance(routeInfo.distance)}
-                </Text>
-              </View>
-              {isLoadingRoute && (
-                <ActivityIndicator
-                  size="small"
-                  color={COLORS.MID_GRAY}
-                  style={{ marginLeft: 8 }}
-                />
-              )}
-            </View>
-          )}
-
-        {/* Hairline below route info */}
-        {routeInfo &&
-          (currentStatus === EmergencyStatus.ACCEPTED ||
-            currentStatus === EmergencyStatus.IN_PROGRESS) && (
-            <View style={styles.hairline} />
-          )}
-
-        {/* Assigned Provider Info (for user) */}
-        {!isProvider && assignedProvider && (
-          <View style={styles.providerInfo}>
-            <View style={styles.providerHeader}>
-              <View style={styles.providerAvatar}>
-                <MaterialCommunityIcons name="account" size={20} color="#fff" />
-              </View>
-              <View style={styles.providerDetails}>
-                <Text style={styles.providerName}>{assignedProvider.name}</Text>
-                {assignedProvider.vehicleNumber && (
-                  <Text style={styles.providerVehicle}>
-                    {assignedProvider.vehicleNumber}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Call Button */}
-            {assignedProvider.phoneNumber && (
-              <TouchableOpacity
-                style={styles.callButton}
-                onPress={handleCallProvider}
-              >
-                <Ionicons name="call" size={20} color="#fff" />
-                <Text style={styles.callButtonText}>Call Provider</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Cancel Button (only for user) */}
-        {!isProvider &&
-          (currentStatus === EmergencyStatus.PENDING ||
-            currentStatus === EmergencyStatus.ACCEPTED) && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancelRequest}
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <ActivityIndicator size="small" color="#EF4444" />
-              ) : (
-                <>
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={20}
-                    color="#EF4444"
-                  />
-                  <Text style={styles.cancelButtonText}>Cancel Request</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
-        {/* Confirm Arrival Button (only for user when provider is accepted) */}
-        {!isProvider && currentStatus === EmergencyStatus.ACCEPTED && (
-          <TouchableOpacity
-            style={styles.confirmArrivalButton}
-            onPress={handleConfirmArrival}
-            disabled={isConfirmingArrival}
-          >
-            {isConfirmingArrival ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#fff"
-                />
-                <Text style={styles.confirmArrivalButtonText}>
-                  Confirm Provider Arrived
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* Complete button */}
-        {isProvider && currentStatus === EmergencyStatus.ACCEPTED && (
-          <TouchableOpacity
-            style={styles.confirmArrivalButton}
-            onPress={handleConfirmArrival}
-            disabled={isConfirmingArrival}
-          >
-            {isConfirmingArrival ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#fff"
-                />
-                <Text style={styles.confirmArrivalButtonText}>
-                  Confirm Arrival
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* Connection Status */}
-        <View style={styles.connectionStatus}>
-          <View
-            style={[
-              styles.connectionDot,
-              { backgroundColor: isConnected ? '#10B981' : '#EF4444' },
-            ]}
-          />
-          <Text style={styles.connectionText}>
-            {isConnected ? 'Live Tracking Active' : 'Reconnecting...'}
-          </Text>
-        </View>
-      </View>
+      <EmergencyTrackingStatusCardUser
+        emergencyInfo={emergencyInfo}
+        statusMessage={statusInfo}
+        status={currentStatus}
+        pulseAnim={pulseAnim}
+        routeInfo={
+          routeInfo
+            ? {
+                distance: routeInfo.distance,
+                duration: routeInfo.duration,
+              }
+            : null
+        }
+        isLoadingRoute={isLoadingRoute}
+        nearbyProvidersCount={
+          currentStatus === EmergencyStatus.PENDING ? nearbyProviders.length : 0
+        }
+        assignedProvider={
+          assignedProvider
+            ? {
+                name: assignedProvider.name,
+                vehicleNumber: assignedProvider.vehicleNumber,
+                phoneNumber: assignedProvider.phoneNumber,
+              }
+            : null
+        }
+        isCancelling={isCancelling}
+        isConfirmingArrival={isConfirmingArrival}
+        isConnected={isConnected}
+        onCancel={handleCancelRequest}
+        onConfirmArrival={handleConfirmArrival}
+      />
     </SafeAreaView>
   );
 }
@@ -1038,82 +611,6 @@ const styles = StyleSheet.create({
     color: COLORS.MID_GRAY,
     letterSpacing: 2,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.LIGHT_GRAY,
-    backgroundColor: COLORS.OFF_WHITE,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 16,
-    backgroundColor: COLORS.LIGHT_GRAY,
-  },
-  headerContent: {},
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  brandMark: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: COLORS.BLACK,
-    letterSpacing: 4,
-  },
-  brandDot: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: COLORS.SIGNAL_RED,
-    lineHeight: 26,
-  },
-  headerLine: {
-    width: 30,
-    height: 2,
-    backgroundColor: COLORS.SIGNAL_RED,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  tagline: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: COLORS.MID_GRAY,
-    letterSpacing: 2,
-  },
-  map: {
-    flex: 1,
-  },
-  userMarker: {
-    ...MARKER_SIZES.USER_MARKER,
-    backgroundColor: COLORS.OFF_WHITE,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
-    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
-    elevation: UI_CONFIG.ELEVATION,
-  },
-  providerMarker: {
-    ...MARKER_SIZES.PROVIDER_MARKER,
-    backgroundColor: COLORS.MID_GRAY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  assignedProviderMarker: {
-    ...MARKER_SIZES.ASSIGNED_PROVIDER_MARKER,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: UI_CONFIG.SHADOW_OFFSET,
-    shadowOpacity: UI_CONFIG.SHADOW_OPACITY,
-    shadowRadius: UI_CONFIG.SHADOW_RADIUS,
-    elevation: UI_CONFIG.ELEVATION,
-  },
   recenterButton: {
     position: 'absolute',
     top: 60,
@@ -1126,195 +623,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.LIGHT_GRAY,
   },
-  statusCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.OFF_WHITE,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.LIGHT_GRAY,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    maxHeight: '40%',
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: COLORS.BLACK,
-    marginBottom: 8,
-  },
-  typeBadgeText: {
-    color: COLORS.OFF_WHITE,
-    fontSize: 10,
-    fontWeight: '700',
-    marginLeft: 6,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  roleBadgeText: {
-    color: COLORS.OFF_WHITE,
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  statusSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginLeft: 8,
-    letterSpacing: 1,
-    color: COLORS.BLACK,
-    textTransform: 'uppercase',
-  },
-  providersCount: {
-    fontSize: 11,
-    color: COLORS.MID_GRAY,
-    marginBottom: 8,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  routeInfoSwiss: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    gap: 16,
-  },
-  routeInfoSwissItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeInfoSwissText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.BLACK,
-    marginLeft: 4,
-    letterSpacing: 1,
-  },
-  routeInfoSwissDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: COLORS.LIGHT_GRAY,
-  },
-  hairline: {
-    height: 1,
-    backgroundColor: COLORS.LIGHT_GRAY,
-    marginBottom: 10,
-  },
-  providerInfo: {
-    backgroundColor: COLORS.OFF_WHITE,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.LIGHT_GRAY,
-    paddingTop: 8,
-    marginBottom: 8,
-  },
-  providerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  providerAvatar: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.BLACK,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  providerDetails: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  providerName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.BLACK,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  providerVehicle: {
-    fontSize: 10,
-    color: COLORS.MID_GRAY,
-    letterSpacing: 0.5,
-  },
-  callButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: COLORS.BLACK,
-    marginTop: 12,
-  },
-  callButtonText: {
-    color: COLORS.BLACK,
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 8,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: COLORS.SIGNAL_RED,
-    marginBottom: 8,
-  },
-  cancelButtonText: {
-    color: COLORS.SIGNAL_RED,
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 8,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  confirmArrivalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    backgroundColor: COLORS.SIGNAL_RED,
-    marginBottom: 8,
-  },
-  confirmArrivalButtonText: {
-    color: COLORS.OFF_WHITE,
-    fontSize: 11,
-    fontWeight: '700',
-    marginLeft: 6,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  connectionText: {
-    fontSize: 10,
-    color: COLORS.MID_GRAY,
-    letterSpacing: 1,
-  },
+  // Header, map markers, and status card styles live in the shared package.
 });

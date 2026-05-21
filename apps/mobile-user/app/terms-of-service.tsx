@@ -1,13 +1,16 @@
+import { InfoCard, InfoPage, SectionCard } from '@repo/mobile/ui';
+
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { InfoCard, InfoPage, SectionCard } from '@/components/InfoPage';
 import { APP_NAME, APP_VERSION } from '@/constants';
 
 const SIGNAL_RED = '#C44536';
 const MID_GRAY = '#888888';
 
 export default function TermsOfServiceScreen() {
+  const router = useRouter();
   const sections = [
     {
       number: '01',
@@ -62,7 +65,11 @@ export default function TermsOfServiceScreen() {
   ];
 
   return (
-    <InfoPage title="TERMS OF SERVICE" tagline="TERMS OF SERVICE">
+    <InfoPage
+      title="TERMS OF SERVICE"
+      tagline="TERMS OF SERVICE"
+      onBack={() => router.back()}
+    >
       <InfoCard
         icon="document-text"
         iconBgColor="#FEE2E2"

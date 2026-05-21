@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Header, OTPInput } from '@repo/mobile/ui';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
@@ -15,8 +16,6 @@ import {
   View,
 } from 'react-native';
 
-import Header from '@/components/Header';
-import OTPInput from '@/components/ui/OTPInput';
 import { useResetProviderPassword } from '@/services/user/auth.api';
 import {
   TResetPasswordForm,
@@ -91,7 +90,11 @@ const ResetPasswordScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header title="RESET PASSWORD" showBackButton />
+      <Header
+        title="RESET PASSWORD"
+        showBackButton
+        onBack={() => router.back()}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -38,7 +38,6 @@ export const useSocketHandlers = ({
 }: UseSocketHandlersProps) => {
   const router = useRouter();
 
-  // Parse location from socket data
   const parseLocation = useCallback((location: any): LocationCoords | null => {
     const lat =
       typeof location.latitude === 'string'
@@ -55,7 +54,6 @@ export const useSocketHandlers = ({
     return null;
   }, []);
 
-  // Handle provider location updates
   const handleProviderLocation = useCallback(
     (data: any) => {
       console.log('Provider location update:', data);
@@ -69,7 +67,6 @@ export const useSocketHandlers = ({
     [isProvider, parseLocation, onProviderLocationUpdate]
   );
 
-  // Handle user location updates
   const handleUserLocation = useCallback(
     (data: any) => {
       console.log('User location update:', data);
@@ -83,7 +80,6 @@ export const useSocketHandlers = ({
     [isProvider, parseLocation, onUserLocationUpdate]
   );
 
-  // Handle provider acceptance
   const handleProviderAccepted = useCallback(
     (data: any) => {
       console.log(
@@ -103,7 +99,6 @@ export const useSocketHandlers = ({
           estimatedArrival: data.route?.duration,
         };
 
-        // Set provider location if available
         if (
           data.provider.location?.latitude &&
           data.provider.location?.longitude
@@ -112,36 +107,20 @@ export const useSocketHandlers = ({
           if (location) {
             console.log('Setting provider location:', location);
             onProviderLocationUpdate(location);
-          } else {
-            console.warn(
-              'Invalid provider location coordinates:',
-              data.provider.location
-            );
           }
-        } else {
-          console.warn('Provider location not available in acceptance data');
         }
 
-        // Set initial route from acceptance response
         if (
           data.route?.coordinates &&
           Array.isArray(data.route.coordinates) &&
           data.route.coordinates.length > 0
         ) {
-          console.log(
-            'Setting route from acceptance - coordinates count:',
-            data.route.coordinates.length
-          );
           const coords = mapboxToLatLng(data.route.coordinates);
           onRouteCoordinatesUpdate(coords);
           onRouteInfoUpdate({
             distance: data.route.distance,
             duration: data.route.duration,
           });
-        } else {
-          console.warn(
-            'Route coordinates not available in acceptance data - will fetch when provider location updates'
-          );
         }
 
         onProviderAccepted(assignedProvider, data.route);
@@ -156,7 +135,6 @@ export const useSocketHandlers = ({
     ]
   );
 
-  // Handle emergency completion
   const handleEmergencyCompleted = useCallback(() => {
     if (isProvider && requestId) {
       useProviderStore.getState().removeIncomingRequest(requestId);
@@ -170,7 +148,6 @@ export const useSocketHandlers = ({
           text: 'OK',
           onPress: async () => {
             await new Promise(resolve => setTimeout(resolve, 50));
-            // mobile-user app has no provider dashboard.
             router.replace('/(tabs)');
           },
         },
@@ -180,54 +157,31 @@ export const useSocketHandlers = ({
     onEmergencyCompleted();
   }, [isProvider, requestId, router, onEmergencyCompleted]);
 
-  // Handle request cancellation
   const handleRequestCancelled = useCallback(
     (data: any) => {
-      console.log('Request cancelled:', data);
-
-      if (isProvider && data.requestId) {
-        useProviderStore.getState().removeIncomingRequest(data.requestId);
-      }
-
       if (data.requestId === requestId) {
         Alert.alert(
           'Request Cancelled',
           data.message || 'The user has cancelled this emergency request.',
-          [
-            {
-              text: 'OK',
-              onPress: () =>
-                // mobile-user app has no provider dashboard.
-                router.replace('/(tabs)'),
-            },
-          ]
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
         );
       }
     },
     [isProvider, requestId, router]
   );
 
-  // Handle provider confirmation
   const handleProviderConfirmed = useCallback(
     (data: any) => {
       if (isProvider) return;
       Alert.alert(
         'Confirm Arrival',
         data.message || 'The provider has confirmed his arrival',
-        [
-          {
-            text: 'YES',
-            onPress: () =>
-              // mobile-user app has no provider dashboard.
-              router.replace('/(tabs)'),
-          },
-        ]
+        [{ text: 'YES', onPress: () => router.replace('/(tabs)') }]
       );
     },
     [isProvider, router]
   );
 
-  // setup socket listeners
   const setupSocketListeners = useCallback(() => {
     socketManager.emit(SocketEvents.USER_JOIN_ROOM, {
       requestId,
@@ -242,6 +196,10 @@ export const useSocketHandlers = ({
     socketManager.on(SocketEvents.REQUEST_ACCEPTED, handleProviderAccepted);
     socketManager.on(SocketEvents.REQUEST_COMPLETED, handleEmergencyCompleted);
     socketManager.on(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+    socketManager.on(
+      SocketEvents.CANCEL_REQUEST_SOCKET,
+      handleRequestCancelled
+    );
     socketManager.on(
       SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
       handleRequestCancelled
@@ -263,6 +221,10 @@ export const useSocketHandlers = ({
         handleEmergencyCompleted
       );
       socketManager.off(SocketEvents.REQUEST_CANCELLED, handleRequestCancelled);
+      socketManager.off(
+        SocketEvents.CANCEL_REQUEST_SOCKET,
+        handleRequestCancelled
+      );
       socketManager.off(
         SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
         handleRequestCancelled

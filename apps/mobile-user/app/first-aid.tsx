@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Accordion, AccordionItem } from '@repo/mobile/ui';
 
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -14,7 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Accordion, AccordionItem } from '@/components/ui/Accordion';
 import { EMERGENCY_PHONE_NUMBER } from '@/constants';
 
 const SIGNAL_RED = '#C44536';

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Header } from '@repo/mobile/ui';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -13,7 +14,6 @@ import {
   View,
 } from 'react-native';
 
-import Header from '@/components/Header';
 import { TOKEN_KEY } from '@/constants';
 import { useGetDocumentStatus } from '@/services/document/document.api';
 import { serviceProviderApi } from '@/services/provider/provider.api';
