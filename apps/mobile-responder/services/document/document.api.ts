@@ -2,7 +2,6 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
 
 import { TOKEN_KEY } from '@/constants';
 
@@ -55,36 +54,31 @@ export interface IDocumentSignaturesResponse {
 
 // Get document verification status - uses apiWithoutAuthLogout to prevent auto-logout
 export const useGetDocumentStatus = (enabled: boolean = true) => {
-  const [shouldPoll, setShouldPoll] = useState(false);
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  // Avoid querying the status endpoint when no token exists (common during
+  // auth routing like "verification pending" flows).
+  const tokenQuery = useQuery<string | null, Error>({
+    queryKey: ['authToken'],
+    queryFn: () => SecureStore.getItemAsync(TOKEN_KEY),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  });
 
-  useEffect(() => {
-    SecureStore.getItemAsync(TOKEN_KEY).then(token => {
-      setHasToken(!!token);
-    });
-  }, []);
+  const hasToken = !!tokenQuery.data;
 
-  const query = useQuery<AxiosResponse<IDocumentStatusResponse>, AxiosError>({
+  return useQuery<AxiosResponse<IDocumentStatusResponse>, AxiosError>({
     queryKey: ['documentStatus'],
     queryFn: () =>
       apiWithoutAuthLogout.get(serviceProviderEndpoints.documentStatus),
-    enabled: enabled && hasToken === true,
-    refetchInterval: shouldPoll ? 60000 : false,
+    enabled: enabled && hasToken,
+    // Poll while the provider is not yet approved.
+    // Keeping this derived from the query state avoids extra component state.
+    refetchInterval: query => {
+      const status = query.state.data?.data?.data?.documentStatus;
+      return hasToken && status && status !== 'approved' ? 60000 : false;
+    },
     retry: 1,
   });
-
-  useEffect(() => {
-    const checkAndPoll = async () => {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const isNotApproved =
-        query.data?.data?.data?.documentStatus !== 'approved';
-      setShouldPoll(!!token && isNotApproved);
-    };
-
-    checkAndPoll();
-  }, [query.data]);
-
-  return query;
 };
 
 // upload documents (pan card + citizenship) - uses main api with logout capability
@@ -105,6 +99,10 @@ export const documentUploadApi = {
     citizenship: CloudinarySignature;
   }> => {
     const response = await api.get(serviceProviderEndpoints.documentSignatures);
+    console.log(
+      '[Document Upload] Received upload signatures',
+      JSON.stringify(response.data, null, 2)
+    );
     return response.data.data;
   },
 
@@ -130,6 +128,7 @@ export const documentUploadApi = {
       formData.append('public_id', signature.publicId);
     }
 
+    console.log('upload url', signature.uploadUrl);
     const response = await fetch(signature.uploadUrl, {
       method: 'POST',
       body: formData,
@@ -137,6 +136,10 @@ export const documentUploadApi = {
 
     if (!response.ok) {
       const error = await response.json();
+      console.log(
+        '[Document Upload] Cloudinary upload failed',
+        JSON.stringify(error, null, 2)
+      );
       throw new Error(error.error?.message || 'Failed to upload document');
     }
 
