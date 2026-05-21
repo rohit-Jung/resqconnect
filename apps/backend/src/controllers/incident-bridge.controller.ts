@@ -21,9 +21,9 @@ type SiloIncomingAck = {
 // PLATFORM: receives updates from silos and forwards to user sockets.
 const platformIncidentUpdate = asyncHandler(
   async (req: Request, res: Response) => {
-    if (envConfig.mode !== 'platform') {
-      throw ApiError.notFound('Not found');
-    }
+    // if (envConfig.mode !== 'platform') {
+    //   throw ApiError.notFound('Not found');
+    // }
 
     const platformIncidentId = String(req.params.platformIncidentId || '');
     if (!platformIncidentId) {
@@ -32,6 +32,7 @@ const platformIncidentUpdate = asyncHandler(
 
     const {
       userId,
+      role,
       eventType,
       requestStatus,
       provider,
@@ -43,6 +44,7 @@ const platformIncidentUpdate = asyncHandler(
     if (typeof userId !== 'string' || userId.length === 0) {
       throw ApiError.badRequest('userId is required');
     }
+
     if (typeof eventType !== 'string' || eventType.length === 0) {
       throw ApiError.badRequest('eventType is required');
     }
@@ -56,9 +58,24 @@ const platformIncidentUpdate = asyncHandler(
         .where(eq(emergencyRequest.id, platformIncidentId));
     }
 
+    console.log(
+      'Received incident update for',
+      platformIncidentId,
+      'eventType',
+      eventType,
+      'userRole',
+      role,
+      envConfig.mode
+    );
+
     const io = getIo();
     if (io) {
-      const room = SocketRoom.USER(userId);
+      const room =
+        role === 'service_provider'
+          ? SocketRoom.PROVIDER(userId)
+          : SocketRoom.USER(userId);
+
+      console.log('Emitting to room', room, 'eventType', eventType);
 
       switch (eventType) {
         case SocketEvents.REQUEST_ACCEPTED:
@@ -83,6 +100,7 @@ const platformIncidentUpdate = asyncHandler(
         case SocketEvents.REQUEST_COMPLETED:
         case SocketEvents.REQUEST_CANCELLED:
         case SocketEvents.REQUEST_CANCELLED_NOTIFICATION:
+        case SocketEvents.CANCEL_REQUEST_SOCKET:
         case SocketEvents.PROVIDER_CONFIRM_ARRIVAL:
         case SocketEvents.PROVIDER_ARRIVAL_CONFIRMED:
           io.to(room).emit(eventType as any, {
