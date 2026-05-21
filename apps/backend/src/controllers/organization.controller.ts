@@ -285,10 +285,45 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (typeof email === 'string') await clearLoginFailures(email);
-
   if (!existingOrg.isVerified) {
-    throw ApiError.forbidden(
-      'Super admin has not verified your organization yet. Please contact support.'
+    const otpToken = await sendOTP(existingOrg.email);
+
+    if (!otpToken) {
+      console.log('Error Sending OTP token. Please try again');
+      throw ApiError.serviceUnavailable(
+        'Error Sending OTP token. Please try again'
+      );
+    }
+
+    const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    console.log('Setting token expiry:', {
+      tokenExpiry: tokenExpiry.toISOString(),
+      currentTime: new Date().toISOString(),
+    });
+
+    const updatedOrg = await db
+      .update(organization)
+      .set({
+        verificationToken: otpToken,
+        tokenExpiry: tokenExpiry.toISOString(),
+      })
+      .where(eq(organization.id, existingOrg.id));
+
+    if (!updatedOrg) {
+      console.log('Error Updating org. Please try again');
+      throw ApiError.badRequest('Error Updating org. Please try again');
+    }
+
+    console.log('OTP sent to user for verification', {
+      organizationId: existingOrg.id,
+      otpToken,
+    });
+
+    return res.status(200).json(
+      new ApiResponse(200, 'OTP sent to user for verification', {
+        organizationId: existingOrg.id,
+      })
     );
   }
 
