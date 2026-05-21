@@ -12,6 +12,7 @@ import {
   validateRequestBody,
   validateRoleAuth,
   validateServiceProvider,
+  validateUserOrProvider,
 } from '@/middlewares/auth.middleware';
 
 const emergencyRequestRouter = Router();
@@ -39,7 +40,7 @@ emergencyRequestRouter.get(
 
 emergencyRequestRouter.patch(
   '/:id/cancel',
-  validateRoleAuth([UserRoles.USER]),
+  validateUserOrProvider,
   emergencyRequestController.cancel
 );
 

@@ -71,6 +71,7 @@ serviceProviderRouter.get(
 // protected routes
 serviceProviderRouter.use(validateServiceProvider);
 serviceProviderRouter.use(requireActiveProviderOrganization);
+
 serviceProviderRouter.post('/logout', serviceProviderController.logout);
 serviceProviderRouter.get('/profile', serviceProviderController.profile);
 
@@ -83,7 +84,7 @@ serviceProviderRouter.put(
   '/profile-picture',
   validateRequestBody(
     z.object({
-      profilePictureUrl: z.string().url('Must be url'),
+      profilePictureUrl: z.url('Must be url'),
     })
   ),
   serviceProviderController.updateProfilePicture
@@ -117,10 +118,12 @@ serviceProviderRouter.post(
   validateRequestBody(uploadDocumentsSchema),
   serviceProviderController.uploadVerificationDocuments
 );
+
 serviceProviderRouter.get(
   '/documents/signatures',
   serviceProviderController.getDocumentUploadSignatures
 );
+
 serviceProviderRouter.get(
   '/documents/status',
   serviceProviderController.getDocumentStatus
