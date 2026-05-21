@@ -6,11 +6,12 @@ import {
   user,
 } from '@repo/db/schemas';
 
-import { HttpStatusCode } from 'axios';
+import axios from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
+import { warn } from 'winston';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import emergencyRequestService from '@/services/emergency/emergency-request.service';
@@ -26,6 +27,22 @@ import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
+interface IValidatedQuery {
+  page: number;
+  limit: number;
+  sortBy: 'asc' | 'desc';
+  status?:
+    | 'pending'
+    | 'accepted'
+    | 'assigned'
+    | 'rejected'
+    | 'in_progress'
+    | 'completed'
+    | 'cancelled'
+    | 'no_providers_available';
+}
+
+// user stuff
 const handleEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const { emergencyType, emergencyDescription, userLocation } = req.body;
@@ -36,7 +53,7 @@ const handleEmergencyRequest = asyncHandler(
       throw ApiError.unauthorized('Unauthorized');
     }
 
-    const { success, requestId, error, requestInfo } =
+    const { success, error, requestInfo } =
       await emergencyRequestService.create(
         loggedInUser?.id,
         {
@@ -59,6 +76,7 @@ const handleEmergencyRequest = asyncHandler(
   }
 );
 
+// shared
 const getEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id as string;
@@ -79,30 +97,9 @@ const getEmergencyRequest = asyncHandler(
   }
 );
 
-const getUsersEmergencyRequests = asyncHandler(
-  async (req: Request, res: Response) => {
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw ApiError.badRequest('User ID is required');
-    }
-
-    const emergencyRequests = await db.query.emergencyRequest.findMany({
-      where: eq(emergencyRequest.userId, loggedInUser.id),
-    });
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Emergency requests found', emergencyRequests)
-      );
-  }
-);
-
 const updateEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    // const { status } = req.body;
 
     if (!id) {
       throw ApiError.badRequest('Emergency request ID is required');
@@ -164,15 +161,6 @@ const updateEmergencyRequest = asyncHandler(
 const deleteEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw ApiError.badRequest('User ID is required');
-    }
-
-    if (!loggedInUser.role) {
-      throw ApiError.badRequest('User role is required');
-    }
 
     if (!id) {
       throw ApiError.badRequest('Emergency request ID is required');
@@ -237,95 +225,6 @@ const getRecentEmergencyRequests = asyncHandler(
   }
 );
 
-const cancelEmergencyRequest = asyncHandler(
-  async (req: Request, res: Response) => {
-    const id = req.params.id as string;
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw ApiError.badRequest('User ID is required');
-    }
-
-    if (!id) {
-      throw ApiError.badRequest('Emergency request ID is required');
-    }
-
-    const existingEmergencyRequest = await db.query.emergencyRequest.findFirst({
-      where: and(
-        eq(emergencyRequest.id, id),
-        eq(emergencyRequest.userId, loggedInUser.id)
-      ),
-    });
-
-    if (!existingEmergencyRequest) {
-      throw ApiError.notFound('Emergency request not found or not authorized');
-    }
-
-    if (existingEmergencyRequest.requestStatus === 'cancelled') {
-      return res
-        .status(200)
-        .json(
-          new ApiResponse(
-            200,
-            'Request already cancelled',
-            existingEmergencyRequest
-          )
-        );
-    }
-
-    const [updatedRequest] = await db
-      .update(emergencyRequest)
-      .set({ requestStatus: 'cancelled' })
-      .where(eq(emergencyRequest.id, id))
-      .returning();
-
-    try {
-      const io = getIo();
-
-      if (io) {
-        io.to(SocketRoom.EMERGENCY(id)).emit(SocketEvents.REQUEST_CANCELLED, {
-          requestId: id,
-          message: 'The user has cancelled this emergency request.',
-        });
-
-        let providerIds = await getEmergencyProviders(id);
-
-        if (providerIds.length === 0) {
-          const assignedResponse = await db.query.emergencyResponse.findFirst({
-            where: eq(emergencyResponse.emergencyRequestId, id),
-          });
-
-          if (assignedResponse?.serviceProviderId) {
-            providerIds = [assignedResponse.serviceProviderId];
-          }
-        }
-
-        if (providerIds.length > 0) {
-          for (const providerId of providerIds) {
-            io.to(SocketRoom.PROVIDER(providerId)).emit(
-              SocketEvents.REQUEST_CANCELLED,
-              {
-                requestId: id,
-                message: 'The user has cancelled this emergency request.',
-              }
-            );
-          }
-        }
-      }
-
-      await clearEmergencyProviders(id);
-    } catch (error) {
-      console.error('Error notifying providers about cancellation:', error);
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Emergency request cancelled', updatedRequest)
-      );
-  }
-);
-
 const acceptEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const requestId = req.params.id as string;
@@ -340,7 +239,6 @@ const acceptEmergencyRequest = asyncHandler(
     }
 
     const lockAcquired = await acquireLock(requestId, providerId, 30);
-
     if (!lockAcquired) {
       throw ApiError.conflict('Request already taken by another provider');
     }
@@ -355,14 +253,14 @@ const acceptEmergencyRequest = asyncHandler(
         throw ApiError.notFound('Emergency request not found');
       }
 
-      if (existingRequest.requestStatus === 'assigned') {
+      if (
+        existingRequest.requestStatus === 'assigned' ||
+        existingRequest.requestStatus === 'cancelled'
+      ) {
         await releaseLock(requestId, providerId);
-        throw ApiError.conflict('Request already assigned');
-      }
-
-      if (existingRequest.requestStatus === 'cancelled') {
-        await releaseLock(requestId, providerId);
-        throw ApiError.gone('Request was cancelled');
+        throw ApiError.conflict(
+          `Request already ${existingRequest.requestStatus}`
+        );
       }
 
       await Promise.all([
@@ -402,8 +300,6 @@ const acceptEmergencyRequest = asyncHandler(
       ]);
 
       const providerIds = await getEmergencyProviders(requestId);
-      console.log('Got providers', providerIds);
-
       const io = getIo();
 
       if (io) {
@@ -465,7 +361,7 @@ const acceptEmergencyRequest = asyncHandler(
         // notify platform (silently, don't fail the request)
         const platformUrl = envConfig.platform_base_url;
         if (platformUrl && existingRequest.userId) {
-          // Fire async - don't await
+          // fire async - don't await
           postJsonWithRetry<{ ok: true }>(
             `${platformUrl}/api/v1/internal/incidents/${requestId}/update`,
             {
@@ -609,10 +505,129 @@ const completeEmergencyRequest = asyncHandler(
   }
 );
 
-const confirmProviderArrival = asyncHandler(
+const confirmArrival = asyncHandler(async (req: Request, res: Response) => {
+  const requestId = req.params.id as string;
+
+  const userId = req.user?.id;
+  const role = (req.user?.role as 'user' | 'service_provider') || 'user';
+
+  if (!userId) {
+    throw ApiError.unauthorized('Unauthorized');
+  }
+  if (!requestId) {
+    throw ApiError.badRequest('Request ID is required');
+  }
+  if (!role || !['user', 'service_provider'].includes(role)) {
+    throw ApiError.badRequest(
+      'Valid role (user or service_provider) is required'
+    );
+  }
+
+  const existingRequest = await db.query.emergencyRequest.findFirst({
+    where: eq(emergencyRequest.id, requestId),
+  });
+
+  if (!existingRequest) {
+    throw ApiError.notFound('Emergency request not found');
+  }
+
+  const existingResponse = await db.query.emergencyResponse.findFirst({
+    where: eq(emergencyResponse.emergencyRequestId, requestId),
+  });
+
+  if (!existingResponse) {
+    throw ApiError.notFound('No provider assigned to this request');
+  }
+
+  const completedAt = new Date().toISOString();
+
+  await db.transaction(async tx => {
+    await tx
+      .update(emergencyRequest)
+      .set({ requestStatus: 'completed', updatedAt: completedAt })
+      .where(eq(emergencyRequest.id, requestId));
+
+    await tx
+      .update(emergencyResponse)
+      .set({ statusUpdate: 'accepted', updatedAt: completedAt })
+      .where(eq(emergencyResponse.id, existingResponse.id));
+
+    if (existingResponse.serviceProviderId) {
+      await tx
+        .update(serviceProvider)
+        .set({ serviceStatus: 'available' })
+        .where(eq(serviceProvider.id, existingResponse.serviceProviderId));
+    }
+
+    await tx.insert(requestEvents).values({
+      requestId,
+      eventType: 'completed',
+      providerId: existingResponse.serviceProviderId,
+      metadata: { completedAt, completedBy: role },
+    });
+  });
+
+  const io = getIo();
+  if (io) {
+    const completionPayload = {
+      requestId,
+      completedBy: role,
+      completedAt,
+      message: 'Emergency has been marked as complete.',
+    };
+
+    io.to(SocketRoom.EMERGENCY(requestId)).emit(
+      SocketEvents.REQUEST_COMPLETED,
+      completionPayload
+    );
+
+    if (existingRequest.userId) {
+      io.to(SocketRoom.USER(existingRequest.userId)).emit(
+        SocketEvents.REQUEST_COMPLETED,
+        completionPayload
+      );
+    }
+
+    if (existingResponse.serviceProviderId) {
+      io.to(SocketRoom.PROVIDER(existingResponse.serviceProviderId)).emit(
+        SocketEvents.REQUEST_COMPLETED,
+        completionPayload
+      );
+    }
+  }
+
+  if (envConfig.platform_base_url && existingRequest.userId) {
+    const { postJsonWithRetry } =
+      await import('@/services/internal-http.service');
+
+    postJsonWithRetry(
+      `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
+      {
+        headers: { 'x-internal-api-key': envConfig.internal_api_key as string },
+        body: {
+          userId: existingRequest.userId,
+          eventType: SocketEvents.REQUEST_COMPLETED,
+          requestStatus: 'completed',
+          payload: { completedBy: role, completedAt },
+        },
+        timeoutMs: 1000,
+        backoffMs: 500,
+        retries: 1,
+      }
+    ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Request marked as completed', { completedAt }));
+});
+
+const cancelEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const requestId = req.params.id as string;
     const userId = req.user?.id;
+
+    const role = (req.user?.role as 'user' | 'service_provider') || 'user';
 
     if (!userId) {
       throw ApiError.unauthorized('Unauthorized');
@@ -622,149 +637,159 @@ const confirmProviderArrival = asyncHandler(
       throw ApiError.badRequest('Request ID is required');
     }
 
+    if (!role || !['user', 'service_provider'].includes(role)) {
+      throw ApiError.badRequest('Valid role (user or provider) is required');
+    }
+
     const existingRequest = await db.query.emergencyRequest.findFirst({
-      where: and(
-        eq(emergencyRequest.id, requestId),
-        eq(emergencyRequest.userId, userId)
-      ),
+      where: eq(emergencyRequest.id, requestId),
     });
 
     if (!existingRequest) {
-      throw ApiError.notFound('Emergency request not found or not authorized');
+      throw ApiError.notFound('Emergency request not found');
     }
 
-    if (
-      existingRequest.requestStatus !== 'accepted' &&
-      existingRequest.requestStatus !== 'assigned'
-    ) {
-      throw ApiError.badRequest(
-        'Request is not in accepted or assigned status'
-      );
+    if (existingRequest.requestStatus === 'cancelled') {
+      throw ApiError.badRequest('Request is already cancelled');
     }
 
-    const response = await db.query.emergencyResponse.findFirst({
+    const cancelledAt = new Date().toISOString();
+    const existingResponse = await db.query.emergencyResponse.findFirst({
       where: eq(emergencyResponse.emergencyRequestId, requestId),
     });
 
-    const arrivedAt = new Date().toISOString();
-
-    await Promise.all([
-      db
+    await db.transaction(async tx => {
+      await tx
         .update(emergencyRequest)
-        .set({ requestStatus: 'in_progress' })
-        .where(eq(emergencyRequest.id, requestId)),
-      db.insert(requestEvents).values({
+        .set({ requestStatus: 'cancelled', updatedAt: cancelledAt })
+        .where(eq(emergencyRequest.id, requestId));
+
+      await tx.insert(requestEvents).values({
         requestId,
-        eventType: 'in_progress',
-        metadata: { arrivedAt, confirmedByUser: true },
-      }),
-    ]);
+        eventType: 'request_cancelled',
+        providerId: undefined,
+        metadata: { cancelledAt, cancelledBy: role },
+      });
+
+      if (existingResponse && existingResponse.serviceProviderId) {
+        await tx
+          .update(serviceProvider)
+          .set({ serviceStatus: 'available' })
+          .where(eq(serviceProvider.id, existingResponse.serviceProviderId));
+
+        await tx.insert(requestEvents).values({
+          requestId,
+          eventType: 'cancelled',
+          providerId: existingResponse.serviceProviderId,
+          metadata: { cancelledBy: role, cancelledAt },
+        });
+      }
+    });
+
+    const messageText =
+      role === 'user'
+        ? 'The user has cancelled this emergency request.'
+        : 'The service provider has cancelled this emergency request.';
+
+    const payload = {
+      cancelledBy: role,
+      cancelledAt,
+      messageText,
+    };
+
+    if (
+      envConfig.platform_base_url &&
+      existingRequest.userId &&
+      envConfig.mode === 'silo'
+    ) {
+      emergencyRequestService
+        .notifyIncidentUpdate({
+          baseUrl: envConfig.platform_base_url,
+          requestId,
+          body: {
+            userId: existingRequest.userId,
+            eventType: SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+            requestStatus: 'cancelled',
+            payload,
+          },
+        })
+        .catch(e => logger.warn(`[CANCEL] Failed to notify platform: ${e}`));
+    }
+
+    if (
+      envConfig.mode === 'platform' &&
+      envConfig.control_pane_url &&
+      existingRequest.requestStatus !== 'pending'
+    ) {
+      const siloData =
+        await emergencyRequestService.getSiloUrlFromProvider(requestId);
+
+      if (!siloData?.siloUrl) {
+        return;
+      }
+
+      emergencyRequestService
+        .notifyIncidentUpdate({
+          baseUrl: siloData.siloUrl,
+          requestId,
+          body: {
+            userId: siloData.serviceProviderId,
+            role: 'service_provider',
+            eventType: SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+            requestStatus: 'cancelled',
+            payload,
+          },
+        })
+        .catch(e =>
+          logger.warn(
+            `[CANCEL] Failed to notify silo: ${JSON.stringify(
+              e.message,
+              null,
+              2
+            )} ${JSON.stringify(e.response?.data, null, 2)}`
+          )
+        );
+    }
 
     const io = getIo();
-    if (io && response?.serviceProviderId) {
-      io.to(SocketRoom.PROVIDER(response.serviceProviderId)).emit(
-        SocketEvents.PROVIDER_ARRIVAL_CONFIRMED,
-        {
-          requestId,
-          arrivedAt,
-          message: 'User has confirmed your arrival',
-        }
+    if (io) {
+      io.to(SocketRoom.EMERGENCY(requestId)).emit(
+        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+        payload
       );
+
+      if (existingRequest.userId) {
+        io.to(SocketRoom.USER(existingRequest.userId)).emit(
+          SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+          payload
+        );
+      }
+
+      const existingResponse = await db.query.emergencyResponse.findFirst({
+        where: eq(emergencyResponse.emergencyRequestId, requestId),
+      });
+
+      if (existingResponse?.serviceProviderId) {
+        io.to(SocketRoom.PROVIDER(existingResponse.serviceProviderId)).emit(
+          SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+          payload
+        );
+      }
     }
 
     return res
       .status(200)
-      .json(new ApiResponse(200, 'Provider arrival confirmed', { arrivedAt }));
-  }
-);
-
-const providerConfirmedArrival = asyncHandler(
-  async (req: Request, res: Response) => {
-    const requestId = req.params.id as string;
-    const providerId = req.user?.id;
-
-    if (!providerId) {
-      throw ApiError.unauthorized('Unauthorized');
-    }
-
-    if (!requestId) {
-      throw ApiError.badRequest('Request ID is required');
-    }
-
-    const existingRequest = await db.query.emergencyRequest.findFirst({
-      where: and(eq(emergencyRequest.id, requestId)),
-    });
-
-    if (!existingRequest) {
-      throw ApiError.notFound('Emergency request not found or not authorized');
-    }
-
-    if (
-      existingRequest.requestStatus !== 'accepted' &&
-      existingRequest.requestStatus !== 'assigned'
-    ) {
-      throw ApiError.badRequest(
-        'Request is not in accepted or assigned status'
+      .json(
+        new ApiResponse(200, 'Request cancelled successfully', { cancelledAt })
       );
-    }
-
-    const response = await db.query.emergencyResponse.findFirst({
-      where: eq(emergencyResponse.emergencyRequestId, requestId),
-    });
-
-    const arrivedAt = new Date().toISOString();
-
-    await Promise.all([
-      db
-        .update(emergencyRequest)
-        .set({ requestStatus: 'in_progress' })
-        .where(eq(emergencyRequest.id, requestId)),
-      db.insert(requestEvents).values({
-        requestId,
-        eventType: 'in_progress',
-        metadata: {
-          arrivedAt,
-          confirmedByUser: false,
-          confirmedByProvider: true,
-        },
-      }),
-    ]);
-
-    const io = getIo();
-    if (io && response?.serviceProviderId) {
-      io.to(SocketRoom.PROVIDER(response.serviceProviderId)).emit(
-        SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
-        {
-          requestId,
-          arrivedAt,
-          message: 'Provider has confirmed their arrival',
-        }
-      );
-    }
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, 'Provider arrival confirmed', { arrivedAt }));
   }
 );
 
 const getUserEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInUser = req.user;
-    const { page, limit, sortBy, status } = req.validatedQuery as {
-      page: number;
-      limit: number;
-      sortBy: 'asc' | 'desc';
-      status?:
-        | 'pending'
-        | 'accepted'
-        | 'assigned'
-        | 'rejected'
-        | 'in_progress'
-        | 'completed'
-        | 'cancelled'
-        | 'no_providers_available';
-    };
+    const { page, limit, sortBy, status } =
+      req.validatedQuery as IValidatedQuery;
 
     const offset = (page - 1) * limit;
 
@@ -999,11 +1024,30 @@ const getProviderEmergencyHistory = asyncHandler(
   }
 );
 
+const getUsersEmergencyRequests = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInUser = req.user;
+
+    if (!loggedInUser || !loggedInUser.id) {
+      throw ApiError.badRequest('User ID is required');
+    }
+
+    const emergencyRequests = await db.query.emergencyRequest.findMany({
+      where: eq(emergencyRequest.userId, loggedInUser.id),
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, 'Emergency requests found', emergencyRequests)
+      );
+  }
+);
+
 const controllers = {
   accept: acceptEmergencyRequest,
   cancel: cancelEmergencyRequest,
   complete: completeEmergencyRequest,
-  confirmProviderArrival,
   create: handleEmergencyRequest,
   remove: deleteEmergencyRequest,
   getById: getEmergencyRequest,
@@ -1011,7 +1055,10 @@ const controllers = {
   getRecent: getRecentEmergencyRequests,
   getUserHistory: getUserEmergencyHistory,
   getForUser: getUsersEmergencyRequests,
-  providerConfirmedArrival,
+
+  confirmProviderArrival: confirmArrival,
+  providerConfirmedArrival: confirmArrival,
+
   reject: rejectEmergencyRequest,
   update: updateEmergencyRequest,
 };

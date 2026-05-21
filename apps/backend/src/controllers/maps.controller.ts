@@ -144,7 +144,7 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const { origin, dest, profile } = parsedData.data;
-  const routeResult = await getRouteFromMapbox(origin, dest, profile);
+  const routeResult = await getRouteFromMapbox(origin, dest, profile as any);
 
   if (!routeResult.success) {
     return res.status(HttpStatusCode.InternalServerError).json({
