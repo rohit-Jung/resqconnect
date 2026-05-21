@@ -1,0 +1,41 @@
+{
+  "name": "@repo/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./emergency-tracking": "./src/emergency-tracking/index.ts",
+    "./emergency-tracking/components": "./src/emergency-tracking/components/index.ts",
+    "./emergency-tracking/constants": "./src/emergency-tracking/constants.ts",
+    "./emergency-tracking/hooks": "./src/emergency-tracking/hooks/index.ts",
+    "./emergency-tracking/stylesheet": "./src/emergency-tracking/stylesheet/index.ts",
+    "./emergency-tracking/types": "./src/emergency-tracking/types.ts",
+    "./ui": "./src/ui/index.ts",
+    "./ui/components": "./src/ui/components/index.ts",
+    "./ui/constants": "./src/ui/constants.ts",
+    "./ui/stylesheet": "./src/ui/stylesheet/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/react": "19.2.2",
+    "@expo/vector-icons": "^15.0.3",
+    "eslint": "^9.39.1",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "typescript": "5.9.2"
+  },
+  "peerDependencies": {
+    "@expo/vector-icons": "*",
+    "react": "^19",
+    "react-native": "*",
+    "react-native-maps": "*",
+    "react-native-safe-area-context": "*"
+  }
+}
