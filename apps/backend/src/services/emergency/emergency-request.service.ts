@@ -1,9 +1,16 @@
-import { emergencyRequest, outbox, user } from '@repo/db/schemas';
+import {
+  emergencyRequest,
+  emergencyResponse,
+  outbox,
+  serviceProvider,
+  user,
+} from '@repo/db/schemas';
 
+import axios from 'axios';
 import { eq, sql } from 'drizzle-orm';
 import { latLngToCell } from 'h3-js';
 
-import { logger } from '@/config';
+import { envConfig, logger } from '@/config';
 import {
   H3_RESOLUTION,
   INITIAL_SEARCH_RADIUS,
@@ -136,8 +143,63 @@ async function create(
   }
 }
 
+async function notifyIncidentUpdate({
+  baseUrl,
+  requestId,
+  body,
+}: {
+  baseUrl: string;
+  requestId: string;
+  body: Record<string, unknown>;
+}) {
+  const { postJsonWithRetry } =
+    await import('@/services/internal-http.service');
+
+  return postJsonWithRetry(
+    `${baseUrl}/api/v1/internal/incidents/${requestId}/update`,
+    {
+      headers: {
+        'x-internal-api-key': envConfig.internal_api_key as string,
+      },
+      body,
+      timeoutMs: 1000,
+      backoffMs: 500,
+      retries: 1,
+    }
+  );
+}
+
+async function getSiloUrlFromProvider(requestId: string) {
+  const existingResponse = await db.query.emergencyResponse.findFirst({
+    where: eq(emergencyResponse.emergencyRequestId, requestId),
+  });
+
+  if (!existingResponse?.serviceProviderId) {
+    return null;
+  }
+
+  const provider = await db.query.serviceProvider.findFirst({
+    where: eq(serviceProvider.id, existingResponse.serviceProviderId),
+  });
+
+  if (!provider?.organizationId) {
+    return null;
+  }
+
+  const response = await axios.get(
+    `${envConfig.control_pane_url}/lookup/org?id=${provider.organizationId}`
+  );
+
+  return {
+    siloUrl: response.data.org?.siloBaseUrl,
+    serviceProviderId: existingResponse.serviceProviderId,
+  };
+}
+
 const emergencyRequestService = {
   create,
+  notifyIncidentUpdate,
+  getSiloUrlFromProvider,
 };
 
 export default emergencyRequestService;
