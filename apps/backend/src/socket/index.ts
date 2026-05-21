@@ -151,8 +151,6 @@ function initializeSocketServer(
       socket.user.role
     );
 
-    socket.join(socket.user.id);
-
     // Join role-specific rooms based on MODE.
     if (envConfig.mode === 'platform') {
       socket.join(SocketRoom.USER(socket.user.id));
