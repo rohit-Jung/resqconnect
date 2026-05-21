@@ -27,7 +27,7 @@ import type { ParsedEmergency } from '@/utils/sms/sms.parser';
 async function create(
   userId: string,
   data: ParsedEmergency,
-  source: 'sms' | 'inapp' = 'sms'
+  source: 'sms' | 'app' = 'sms'
 ): Promise<{
   success: boolean;
   requestId?: string;
@@ -62,6 +62,7 @@ async function create(
           userId,
           serviceType: emergencyType,
           description: description || 'Emergency request via SMS (offline)',
+          source: source,
           location: {
             latitude: location.latitude,
             longitude: location.longitude,
@@ -81,6 +82,7 @@ async function create(
           status: emergencyRequest.requestStatus,
           searchRadius: emergencyRequest.searchRadius,
           expiresAt: emergencyRequest.expiresAt,
+          source: emergencyRequest.source,
         });
 
       if (!newRequest?.id) {

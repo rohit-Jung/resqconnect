@@ -14,6 +14,7 @@ import { logger } from '@/config/logger/winston.config';
 import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
+import { sendLocalSMS } from '@/services/local-sms.service';
 import { getRouteFromMapbox } from '@/services/mapbox.service';
 import {
   acquireLock,
@@ -22,6 +23,7 @@ import {
   releaseLock,
 } from '@/services/redis.service';
 import type { TEntityRole } from '@/utils/tokens/jwtTokens';
+import { SMS_TEMPLATES } from '@/workers/messaging.worker';
 
 // Register all emergency-related socket handlers
 export function registerEmergencyHandlers(
@@ -160,6 +162,7 @@ async function handleAcceptRequest(
         serviceType: emergencyRequest.serviceType,
         description: emergencyRequest.description,
         location: emergencyRequest.location,
+        source: emergencyRequest.source,
       });
 
     if (result.length === 0) {
@@ -296,18 +299,43 @@ async function handleAcceptRequest(
     });
 
     // Confirm to this provider
-    socket.emit(SocketEvents.ACCEPT_CONFIRMED, {
-      requestId,
-      request: {
-        id: request.id,
-        emergencyType: request.serviceType,
-        location: request.location,
-        description: request.description,
-        requestorId: request.userId,
-      },
-      route: routeData,
-      message: 'Request accepted! Please connect to start navigation.',
+    // socket.emit(SocketEvents.ACCEPT_CONFIRMED, {
+    //   requestId,
+    //   request: {
+    //     id: request.id,
+    //     emergencyType: request.serviceType,
+    //     location: request.location,
+    //     description: request.description,
+    //     requestorId: request.userId,
+    //   },
+    //   route: routeData,
+    //   message: 'Request accepted! Please connect to start navigation.',
+    // });
+
+    const emergencyType = request.serviceType;
+    const source = request.source || 'app';
+
+    const userInfo = await db.query.user.findFirst({
+      where: eq(user.id, request.userId),
     });
+
+    if (source === 'sms' && userInfo?.phoneNumber) {
+      const emergencyTypeLabel =
+        emergencyType === 'ambulance'
+          ? 'Medical/Ambulance'
+          : emergencyType === 'fire_truck'
+            ? 'Fire'
+            : emergencyType === 'rescue_team'
+              ? 'Rescue'
+              : 'Police';
+      await sendLocalSMS(
+        userInfo.phoneNumber.toString(),
+        SMS_TEMPLATES.PROVIDER_ASSIGNED(
+          emergencyTypeLabel,
+          providerData?.name || 'Responder'
+        )
+      );
+    }
 
     // Release Redis lock after 2 seconds (safety buffer)
     setTimeout(async () => {
