@@ -122,7 +122,7 @@ export async function getBatchETAs(
     const destinationIndex = origins.length; // Last coordinate is destination
     const sources = origins.map((_, i) => i).join(';'); // All origins
 
-    const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving-traffic/${coordinates}?sources=${sources}&destinations=${destinationIndex}&annotations=duration&access_token=${envConfig.mapbox_token}`;
+    const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving-traffic/${coordinates}?sources=${sources}&destinations=${destinationIndex}&annotations=duration&access_token=${envConfig.mapbox_access_token}`;
 
     const response = await fetch(url);
 
