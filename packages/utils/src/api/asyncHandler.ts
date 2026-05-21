@@ -17,9 +17,7 @@ export function asyncHandler(
       const errors = Array.isArray(error.errors) ? error.errors : [];
       console.log(
         'ERROR in async asyncHandler',
-        error.errors,
-        error.message,
-        error
+        JSON.stringify({ message: error.message, stack, errors })
       );
 
       res
