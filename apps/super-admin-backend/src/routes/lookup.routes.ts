@@ -4,11 +4,11 @@ import { Router } from 'express';
 
 import {
   listOrgsForLookup,
-  lookupOrgByName,
+  lookupOrgByNameOrId,
 } from '@/controllers/lookup.controller';
 
 export const lookupRouter = Router();
 
-lookupRouter.get('/org', asyncHandler(lookupOrgByName));
+lookupRouter.get('/org', asyncHandler(lookupOrgByNameOrId));
 
 lookupRouter.get('/orgs', asyncHandler(listOrgsForLookup));
