@@ -119,11 +119,13 @@ export async function getBatchETAs(
 
     const url = constructMatrixUrl({
       profile: RoutingProfiles.DrivingTraffic,
-      token: envConfig.mapbox_token,
+      token: envConfig.mapbox_access_token,
       sources,
       destinations,
       coordinates: allCoords,
     });
+
+    console.log('Matrix API URL:', url);
 
     // Add timeout to prevent hanging on slow API responses
     const controller = new AbortController();
@@ -132,8 +134,14 @@ export async function getBatchETAs(
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
 
+    const message = response
+      .json()
+      .then((data: any) => data.message)
+      .catch(() => null);
     if (!response.ok) {
-      logger.error('Failed to get matrix url', { status: response.status });
+      logger.error('Failed to get matrix url', message, {
+        status: response.status,
+      });
       return providers.map(() => null);
     }
 
@@ -185,16 +193,19 @@ export async function calculateDistancesAndSort(
   const BATCH_SIZE = 25;
   const allETAs: (number | null)[] = [];
 
-  for (let i = 0; i < validProviders.length; i += BATCH_SIZE) {
-    const batch = validProviders.slice(i, i + BATCH_SIZE);
-    const providerCoords = batch.map(p => p.coords);
+  // eta doesn't work for less than 2 providers, so skip API call and calculate distance manually
+  if (validProviders.length > 2) {
+    for (let i = 0; i < validProviders.length; i += BATCH_SIZE) {
+      const batch = validProviders.slice(i, i + BATCH_SIZE);
+      const providerCoords = batch.map(p => p.coords);
 
-    const etas = await getBatchETAs(providerCoords, {
-      lng: emergencyLocation.longitude,
-      lat: emergencyLocation.latitude,
-    });
+      const etas = await getBatchETAs(providerCoords, {
+        lng: emergencyLocation.longitude,
+        lat: emergencyLocation.latitude,
+      });
 
-    allETAs.push(...etas);
+      allETAs.push(...etas);
+    }
   }
 
   // Map and sort results
