@@ -15,6 +15,20 @@
       "when": 1779343427050,
       "tag": "0001_closed_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748131200000,
+      "tag": "0002_contact_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779648312798,
+      "tag": "0003_glorious_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }
