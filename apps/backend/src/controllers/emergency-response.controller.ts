@@ -10,10 +10,10 @@ import type { Request, Response } from 'express';
 
 import { logger } from '@/config/logger/winston.config';
 import db from '@/db';
+import { getRouteFromMapbox } from '@/services/mapbox.service';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { getOptimalRoute } from '@/utils/maps/galli-maps';
 
 // Helper function to generate a nearby location
 const generateNearbyLocation = (baseLocation: {
@@ -108,14 +108,18 @@ const createEmergencyResponse = asyncHandler(
       throw ApiError.badRequest('Service provider location not found');
     }
 
-    const optimalPath = await getOptimalRoute({
-      srcLat: assignedServiceProvider.currentLocation?.latitude,
-      srcLng: assignedServiceProvider.currentLocation?.longitude,
-      dstLat: destLocation?.latitude.toString(),
-      dstLng: destLocation?.longitude.toString(),
-    });
+    const optimalPath = await getRouteFromMapbox(
+      {
+        lat: parseFloat(assignedServiceProvider.currentLocation.latitude),
+        lng: parseFloat(assignedServiceProvider.currentLocation.longitude),
+      },
+      {
+        lat: parseFloat(destLocation.latitude.toString()),
+        lng: parseFloat(destLocation.longitude.toString()),
+      }
+    );
 
-    if (!optimalPath) {
+    if (!optimalPath.success) {
       throw ApiError.badRequest('Error getting optimal path');
     }
 
