@@ -16,6 +16,7 @@ import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import emergencyRequestService from '@/services/emergency/emergency-request.service';
 import { safeSend } from '@/services/kafka/kafka.service';
+import { notifyEmergencyContacts } from '@/services/notification.service';
 import {
   acquireLock,
   clearEmergencyProviders,
@@ -73,6 +74,15 @@ const handleEmergencyRequest = asyncHandler(
     if (!success) {
       throw ApiError.badRequest(`${error}`);
     }
+
+    notifyEmergencyContacts({
+      requestId: requestInfo!.id,
+      userId: loggedInUser.id,
+      userName: loggedInUser.name || 'User',
+      emergencyType,
+      location: userLocation,
+      message: emergencyDescription,
+    }).catch(err => logger.error('Failed to notify emergency contacts:', err));
 
     res.status(201).json(
       new ApiResponse(201, 'Emergency request created', {
