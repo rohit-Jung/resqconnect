@@ -56,7 +56,8 @@ const updateEmergencyContact = asyncHandler(
     const updateData = req.body;
 
     if (!userId) throw ApiError.unauthorized('Unauthorized');
-    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!id || typeof id != 'string')
+      throw ApiError.badRequest('Contact ID is required and as string');
 
     const existing = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
@@ -111,7 +112,8 @@ const deleteEmergencyContact = asyncHandler(
     const userId = req.user?.id;
     const role = req.user?.role;
 
-    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!id || typeof id != 'string')
+      throw ApiError.badRequest('Contact ID is required and as string');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
@@ -137,7 +139,8 @@ const getEmergencyContact = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!id || typeof id != 'string')
+      throw ApiError.badRequest('Contact ID is required and as string');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
@@ -168,7 +171,7 @@ const getUserEmergencyContacts = asyncHandler(
 );
 
 const getCommonEmergencyContacts = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_: Request, res: Response) => {
     const contacts = await db
       .select()
       .from(emergencyContact)
@@ -181,16 +184,14 @@ const getCommonEmergencyContacts = asyncHandler(
   }
 );
 
-/**
- * Toggle notification setting for a specific contact
- */
 const toggleContactNotification = asyncHandler(
   async (req: Request, res: Response) => {
     const id = req.params.id;
     const userId = req.user?.id;
 
     if (!userId) throw ApiError.unauthorized('Unauthorized');
-    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!id || typeof id != 'string')
+      throw ApiError.badRequest('Contact ID is required and as string');
 
     const contact = await db.query.emergencyContact.findFirst({
       where: eq(emergencyContact.id, id),
@@ -224,7 +225,8 @@ const updateContactPushToken = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) throw ApiError.unauthorized('Unauthorized');
-    if (!id) throw ApiError.badRequest('Contact ID is required');
+    if (!id || typeof id != 'string')
+      throw ApiError.badRequest('Contact ID is required and as string');
     if (!pushToken) throw ApiError.badRequest('Push token is required');
 
     const contact = await db.query.emergencyContact.findFirst({
