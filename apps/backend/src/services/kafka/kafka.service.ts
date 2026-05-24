@@ -16,8 +16,7 @@ const kafka = new Kafka({
     .map(b => b.trim())
     .filter(Boolean),
   logLevel: logLevel.WARN,
-  requestTimeout: 10000,
-  enforceRequestTimeout: false,
+  requestTimeout: 30000,
   retry: {
     initialRetryTime: 500,
     retries: 10,
@@ -36,6 +35,10 @@ export const assignResponderConsumer: Consumer = kafka.consumer({
   groupId: KAFKA_CONSUMER_ID.ASSIGN_RESPONDER,
 });
 
+export const incidentUpdateConsumer: Consumer = kafka.consumer({
+  groupId: KAFKA_CONSUMER_ID.INCIDENT_STATUS_UPDATE,
+});
+
 let connectPromise: Promise<void> | null = null;
 let isShuttingDown = false;
 
@@ -46,6 +49,7 @@ async function connectKafkaOnce() {
       await producer.connect();
       await notificationConsumer.connect();
       await assignResponderConsumer.connect();
+      await incidentUpdateConsumer.connect();
       console.log('Kafka connected');
     })();
   }
@@ -110,6 +114,7 @@ export async function shutdownInfra() {
     await producer.disconnect();
     await notificationConsumer.disconnect();
     await assignResponderConsumer.disconnect();
+    await incidentUpdateConsumer.disconnect();
     await redis.quit();
     console.log('Shutdown complete');
   } catch (err) {

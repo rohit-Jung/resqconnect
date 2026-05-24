@@ -5,17 +5,17 @@ import {
   serviceProvider,
   user,
 } from '@repo/db/schemas';
+import { CreateNewRequestSchema } from '@repo/types/validations';
 
-import axios from 'axios';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
-import { warn } from 'winston';
 
 import { envConfig, logger } from '@/config';
+import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import emergencyRequestService from '@/services/emergency/emergency-request.service';
-import { postJsonWithRetry } from '@/services/internal-http.service';
+import { safeSend } from '@/services/kafka/kafka.service';
 import {
   acquireLock,
   clearEmergencyProviders,
@@ -26,6 +26,7 @@ import { getIo } from '@/socket';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
+import type { IncidentStatusUpdatePayload } from '@/workers/incident-update.worker';
 
 interface IValidatedQuery {
   page: number;
@@ -45,17 +46,22 @@ interface IValidatedQuery {
 // user stuff
 const handleEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
-    const { emergencyType, emergencyDescription, userLocation } = req.body;
-
     const loggedInUser = req.user;
 
     if (!loggedInUser?.id) {
       throw ApiError.unauthorized('Unauthorized');
     }
 
+    const parsed = CreateNewRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw ApiError.badRequest('Invalid request data');
+    }
+
+    const { emergencyType, emergencyDescription, userLocation } = parsed.data;
+
     const { success, error, requestInfo } =
       await emergencyRequestService.create(
-        loggedInUser?.id,
+        loggedInUser.id,
         {
           emergencyType,
           description: emergencyDescription,
@@ -160,6 +166,10 @@ const updateEmergencyRequest = asyncHandler(
 
 const deleteEmergencyRequest = asyncHandler(
   async (req: Request, res: Response) => {
+    if (!req.user?.id || !req.user?.role) {
+      throw ApiError.unauthorized('Unauthorized');
+    }
+
     const id = req.params.id as string;
 
     if (!id) {
@@ -304,7 +314,7 @@ const acceptEmergencyRequest = asyncHandler(
 
       if (io) {
         for (const pid of providerIds) {
-          console.log('pid', pid);
+          logger.debug('pid', pid);
           if (pid !== providerId) {
             io.to(SocketRoom.PROVIDER(pid)).emit(
               SocketEvents.REQUEST_ALREADY_TAKEN,
@@ -358,35 +368,27 @@ const acceptEmergencyRequest = asyncHandler(
           }
         );
 
-        // notify platform (silently, don't fail the request)
-        const platformUrl = envConfig.platform_base_url;
-        if (platformUrl && existingRequest.userId) {
-          // fire async - don't await
-          postJsonWithRetry<{ ok: true }>(
-            `${platformUrl}/api/v1/internal/incidents/${requestId}/update`,
-            {
-              headers: {
-                'x-internal-api-key': envConfig.internal_api_key as string,
-              },
-              body: {
-                userId: existingRequest.userId,
-                eventType: SocketEvents.REQUEST_ACCEPTED,
-                requestStatus: 'assigned',
-                provider: {
-                  id: providerId,
-                  name: providerData?.name,
-                  phone: providerData?.phoneNumber?.toString(),
-                  serviceType: providerData?.serviceType,
-                  vehicleNumber: providerData?.vehicleInformation?.number,
-                  location: providerData?.currentLocation,
-                },
-                message: 'Provider accepted your request',
-              },
-              timeoutMs: 2000,
-              retries: 1,
-              backoffMs: 500,
-            }
-          ).catch(e => console.log('[ACCEPT] Platform notify failed:', e));
+        // notify platform via kafka (durable, no url coupling)
+        if (existingRequest.userId) {
+          const updateMsg: IncidentStatusUpdatePayload = {
+            platformIncidentId: requestId,
+            userId: existingRequest.userId,
+            eventType: SocketEvents.REQUEST_ACCEPTED,
+            requestStatus: 'assigned',
+            provider: {
+              id: providerId,
+              name: providerData?.name,
+              phone: providerData?.phoneNumber?.toString(),
+              serviceType: providerData?.serviceType,
+              vehicleNumber: providerData?.vehicleInformation?.number,
+              location: providerData?.currentLocation,
+            },
+            message: 'Provider accepted your request',
+          };
+          safeSend({
+            topic: KAFKA_TOPICS.INCIDENT_STATUS_UPDATE,
+            messages: [{ key: requestId, value: JSON.stringify(updateMsg) }],
+          }).catch(e => logger.warn(`[ACCEPT] Kafka notify failed: ${e}`));
         }
       }
 
@@ -596,25 +598,18 @@ const confirmArrival = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  if (envConfig.platform_base_url && existingRequest.userId) {
-    const { postJsonWithRetry } =
-      await import('@/services/internal-http.service');
-
-    postJsonWithRetry(
-      `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
-      {
-        headers: { 'x-internal-api-key': envConfig.internal_api_key as string },
-        body: {
-          userId: existingRequest.userId,
-          eventType: SocketEvents.REQUEST_COMPLETED,
-          requestStatus: 'completed',
-          payload: { completedBy: role, completedAt },
-        },
-        timeoutMs: 1000,
-        backoffMs: 500,
-        retries: 1,
-      }
-    ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
+  if (existingRequest.userId && envConfig.mode === 'silo') {
+    const updateMsg: IncidentStatusUpdatePayload = {
+      platformIncidentId: requestId,
+      userId: existingRequest.userId,
+      eventType: SocketEvents.REQUEST_COMPLETED,
+      requestStatus: 'completed',
+      payload: { completedBy: role, completedAt },
+    };
+    safeSend({
+      topic: KAFKA_TOPICS.INCIDENT_STATUS_UPDATE,
+      messages: [{ key: requestId, value: JSON.stringify(updateMsg) }],
+    }).catch(e => logger.warn(`[COMPLETE] Kafka notify failed: ${e}`));
   }
 
   return res
@@ -697,23 +692,18 @@ const cancelEmergencyRequest = asyncHandler(
       messageText,
     };
 
-    if (
-      envConfig.platform_base_url &&
-      existingRequest.userId &&
-      envConfig.mode === 'silo'
-    ) {
-      emergencyRequestService
-        .notifyIncidentUpdate({
-          baseUrl: envConfig.platform_base_url,
-          requestId,
-          body: {
-            userId: existingRequest.userId,
-            eventType: SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-            requestStatus: 'cancelled',
-            payload,
-          },
-        })
-        .catch(e => logger.warn(`[CANCEL] Failed to notify platform: ${e}`));
+    if (existingRequest.userId && envConfig.mode === 'silo') {
+      const updateMsg: IncidentStatusUpdatePayload = {
+        platformIncidentId: requestId,
+        userId: existingRequest.userId,
+        eventType: SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+        requestStatus: 'cancelled',
+        payload,
+      };
+      safeSend({
+        topic: KAFKA_TOPICS.INCIDENT_STATUS_UPDATE,
+        messages: [{ key: requestId, value: JSON.stringify(updateMsg) }],
+      }).catch(e => logger.warn(`[CANCEL] Kafka notify failed: ${e}`));
     }
 
     if (
@@ -793,7 +783,7 @@ const getUserEmergencyHistory = asyncHandler(
 
     const offset = (page - 1) * limit;
 
-    console.log('[RECEIVED]', req.user, req.validatedQuery, status);
+    logger.debug('[RECEIVED]', req.user, req.validatedQuery, status);
 
     const whereConditions = status
       ? and(
