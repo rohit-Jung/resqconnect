@@ -4,7 +4,6 @@ import { EmptyState } from '@repo/mobile/ui';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useGetUserEmergencyHistory } from '@/services/emergency/emergency.api';
 import {
@@ -172,6 +172,7 @@ const FilterChip: React.FC<{
 );
 
 export default function HistoryScreen() {
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -199,7 +200,7 @@ export default function HistoryScreen() {
   return (
     <View style={styles.container}>
       {/* Header - Swiss style */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerContent}>
           <View style={styles.brandRow}>
             <Text style={styles.brandMark}>RESQ</Text>
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: LIGHT_GRAY,

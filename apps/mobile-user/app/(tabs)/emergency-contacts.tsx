@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   CreateEmergencyContactData,
@@ -54,6 +55,7 @@ const NOTIFICATION_METHODS = [
 ];
 
 export default function EmergencyContactsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -147,6 +149,23 @@ export default function EmergencyContactsScreen() {
     },
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: (order: { id: string; priority: number }[]) =>
+      emergencyContactsApi.reorder(order),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emergencyContacts'] });
+    },
+  });
+
+  const handleReorder = (index: number, direction: 'up' | 'down') => {
+    if (!contacts) return;
+    const list = [...contacts];
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= list.length) return;
+    [list[index], list[swapIdx]] = [list[swapIdx], list[index]];
+    reorderMutation.mutate(list.map((c, i) => ({ id: c.id, priority: i + 1 })));
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -209,9 +228,28 @@ export default function EmergencyContactsScreen() {
     toggleNotificationMutation.mutate(contact.id);
   };
 
-  const renderContactCard = (contact: EmergencyContact) => (
+  const renderContactCard = (
+    contact: EmergencyContact,
+    index: number,
+    total: number
+  ) => (
     <View key={contact.id} style={styles.contactCard}>
       <View style={styles.cardHeader}>
+        <View
+          style={[
+            styles.priorityBadge,
+            index < 3 && styles.priorityBadgeActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.priorityBadgeText,
+              index < 3 && styles.priorityBadgeTextActive,
+            ]}
+          >
+            #{index + 1}
+          </Text>
+        </View>
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>
             {contact.name.charAt(0).toUpperCase()}
@@ -220,6 +258,32 @@ export default function EmergencyContactsScreen() {
         <View style={styles.contactInfo}>
           <Text style={styles.contactName}>{contact.name.toUpperCase()}</Text>
           <Text style={styles.contactRelation}>{contact.relationship}</Text>
+        </View>
+        <View style={styles.reorderButtons}>
+          <TouchableOpacity
+            onPress={() => handleReorder(index, 'up')}
+            disabled={index === 0 || reorderMutation.isPending}
+            style={styles.reorderBtn}
+            activeOpacity={0.6}
+          >
+            <Ionicons
+              name="chevron-up"
+              size={18}
+              color={index === 0 ? LIGHT_GRAY : MID_GRAY}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleReorder(index, 'down')}
+            disabled={index === total - 1 || reorderMutation.isPending}
+            style={styles.reorderBtn}
+            activeOpacity={0.6}
+          >
+            <Ionicons
+              name="chevron-down"
+              size={18}
+              color={index === total - 1 ? LIGHT_GRAY : MID_GRAY}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -470,10 +534,10 @@ export default function EmergencyContactsScreen() {
   return (
     <View style={styles.container}>
       {/* Header - Swiss style */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           onPress={openAddModal}
-          style={styles.addButton}
+          style={[styles.addButton, { top: insets.top + 12 }]}
           activeOpacity={0.7}
         >
           <Ionicons name="add" size={24} color={OFF_WHITE} />
@@ -520,7 +584,19 @@ export default function EmergencyContactsScreen() {
             <ActivityIndicator size="large" color={PRIMARY} />
           </View>
         ) : contacts && contacts.length > 0 ? (
-          contacts.map(renderContactCard)
+          <>
+            <View style={styles.priorityHint}>
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color={MID_GRAY}
+              />
+              <Text style={styles.priorityHintText}>
+                TOP 3 CONTACTS NOTIFIED IN EMERGENCIES. USE ↑↓ TO REORDER.
+              </Text>
+            </View>
+            {contacts.map((c, i) => renderContactCard(c, i, contacts.length))}
+          </>
         ) : (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
@@ -555,7 +631,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 20,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -596,7 +672,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
+    top: 0,
     right: 24,
     padding: 8,
     backgroundColor: SIGNAL_RED,
@@ -638,6 +714,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  priorityHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 12,
+    gap: 6,
+  },
+  priorityHintText: {
+    fontSize: 9,
+    color: MID_GRAY,
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  priorityBadge: {
+    width: 28,
+    height: 28,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  priorityBadgeActive: {
+    borderColor: SIGNAL_RED,
+    backgroundColor: '#FEE2E2',
+  },
+  priorityBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MID_GRAY,
+  },
+  priorityBadgeTextActive: {
+    color: SIGNAL_RED,
+  },
+  reorderButtons: {
+    flexDirection: 'column',
+    marginLeft: 8,
+  },
+  reorderBtn: {
+    padding: 2,
   },
   avatarContainer: {
     width: 48,

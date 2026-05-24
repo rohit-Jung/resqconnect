@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useResendVerificationOTP, useVerify } from '@/services/user/auth.api';
 
@@ -22,6 +23,7 @@ const LIGHT_GRAY = '#E8E6E1';
 const BLACK = '#000000';
 
 const VerifyOTPScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId, email, role } = useLocalSearchParams<{
     userId: string;
@@ -90,7 +92,7 @@ const VerifyOTPScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.brandRow}>
           <Text style={styles.brandMark}>RESQ</Text>
           <Text style={styles.brandDot}>.</Text>
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 40,
   },
   header: {

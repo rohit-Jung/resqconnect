@@ -18,12 +18,18 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import OfflineFallbackModal from '@/components/OfflineFallbackModal';
 import OfflineIndicator from '@/components/OfflineIndicator';
 import { useEmergencyRoom } from '@/hooks/useEmergencyRoom';
 import { useEmergencyNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useCreateEmergencyRequest } from '@/services/emergency/emergency.api';
+import {
+  extractResultCoords,
+  useAutocomplete,
+  useReverseGeocode,
+} from '@/services/maps/maps.api';
 import { SyncSummary } from '@/services/syncService';
 import { TEmergencyType } from '@/validations/emergency.schema';
 
@@ -51,19 +57,17 @@ const EMERGENCY_TYPES: {
 ];
 
 export default function EmergencyRequestScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
 
-  // Initialize emergency room socket listeners (user role)
   useEmergencyRoom('user');
 
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [offlineModalLocation, setOfflineModalLocation] =
     useState<Location.LocationObject | null>(null);
 
-  const handleOfflineDetected = useCallback(() => {
-    console.log('[EmergencyRequest] Offline detected');
-  }, []);
+  const handleOfflineDetected = useCallback(() => {}, []);
 
   const handleBackOnline = useCallback((summary: SyncSummary) => {
     if (summary.synced > 0) {
@@ -75,7 +79,7 @@ export default function EmergencyRequestScreen() {
     }
   }, []);
 
-  const { isConnected, isInternetReachable, isOffline, refresh, triggerSync } =
+  const { isConnected, isInternetReachable, isOffline, refresh } =
     useEmergencyNetworkStatus(handleOfflineDetected, handleBackOnline);
 
   const [location, setLocation] = useState<LocationCoords | null>(null);
@@ -87,6 +91,38 @@ export default function EmergencyRequestScreen() {
   const [markerLocation, setMarkerLocation] = useState<LocationCoords | null>(
     null
   );
+
+  // Debounced marker for reverse geocoding
+  const [debouncedMarker, setDebouncedMarker] = useState<LocationCoords | null>(
+    null
+  );
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMarker(markerLocation), 800);
+    return () => clearTimeout(t);
+  }, [markerLocation]);
+
+  const { data: resolvedAddress, isFetching: isResolvingAddress } =
+    useReverseGeocode(
+      debouncedMarker?.latitude ?? null,
+      debouncedMarker?.longitude ?? null
+    );
+
+  // Location search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 600);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchResults = [], isFetching: isSearching } = useAutocomplete(
+    debouncedSearch,
+    location?.latitude ?? null,
+    location?.longitude ?? null
+  );
+
+  const showDropdown = debouncedSearch.length >= 3 && searchResults.length > 0;
 
   const { mutate: createEmergency, isPending } = useCreateEmergencyRequest();
 
@@ -117,6 +153,20 @@ export default function EmergencyRequestScreen() {
       setIsLoadingLocation(false);
     })();
   }, []);
+
+  const handleSelectSearchResult = (result: any) => {
+    const coords = extractResultCoords(result);
+    if (!coords) return;
+    setMarkerLocation(coords);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    Keyboard.dismiss();
+    mapRef.current?.animateToRegion({
+      ...coords,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    });
+  };
 
   const handleMapPress = (event: any) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
@@ -166,9 +216,7 @@ export default function EmergencyRequestScreen() {
               });
               resolve(true);
             },
-            onError: () => {
-              resolve(false);
-            },
+            onError: () => resolve(false),
           }
         );
       });
@@ -203,10 +251,8 @@ export default function EmergencyRequestScreen() {
     }
 
     if (isOffline) {
-      if (fullLocationObject) {
-        setOfflineModalLocation(fullLocationObject);
-      } else {
-        setOfflineModalLocation({
+      setOfflineModalLocation(
+        fullLocationObject ?? {
           coords: {
             latitude: markerLocation.latitude,
             longitude: markerLocation.longitude,
@@ -217,8 +263,8 @@ export default function EmergencyRequestScreen() {
             speed: null,
           },
           timestamp: Date.now(),
-        });
-      }
+        }
+      );
       setShowOfflineModal(true);
       return;
     }
@@ -245,10 +291,8 @@ export default function EmergencyRequestScreen() {
         },
         onError: (error: any) => {
           if (!error.response) {
-            if (fullLocationObject) {
-              setOfflineModalLocation(fullLocationObject);
-            } else {
-              setOfflineModalLocation({
+            setOfflineModalLocation(
+              fullLocationObject ?? {
                 coords: {
                   latitude: markerLocation.latitude,
                   longitude: markerLocation.longitude,
@@ -259,8 +303,8 @@ export default function EmergencyRequestScreen() {
                   speed: null,
                 },
                 timestamp: Date.now(),
-              });
-            }
+              }
+            );
             setShowOfflineModal(true);
           } else {
             Alert.alert(
@@ -284,9 +328,16 @@ export default function EmergencyRequestScreen() {
   }
 
   return (
-    <Pressable style={styles.container} onPress={Keyboard.dismiss}>
+    <Pressable
+      style={styles.container}
+      onPress={() => {
+        Keyboard.dismiss();
+        setDebouncedSearch('');
+        setSearchQuery('');
+      }}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
@@ -304,7 +355,6 @@ export default function EmergencyRequestScreen() {
         </View>
       </View>
 
-      {/* Offline Indicator */}
       <OfflineIndicator
         isOffline={isOffline}
         onSMSFallback={() =>
@@ -315,7 +365,6 @@ export default function EmergencyRequestScreen() {
         }
       />
 
-      {/* Offline Fallback Modal */}
       <OfflineFallbackModal
         visible={showOfflineModal}
         onClose={() => setShowOfflineModal(false)}
@@ -334,7 +383,77 @@ export default function EmergencyRequestScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* Location Search */}
+          <View style={styles.searchSection}>
+            <View style={styles.searchBar}>
+              <Ionicons
+                name="search"
+                size={18}
+                color={MID_GRAY}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search location..."
+                placeholderTextColor={MID_GRAY}
+                value={searchQuery}
+                onChangeText={text => {
+                  setSearchQuery(text);
+                  if (text.length < 3) setDebouncedSearch('');
+                }}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              {isSearching && searchQuery.length >= 3 && (
+                <ActivityIndicator
+                  size="small"
+                  color={SIGNAL_RED}
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchQuery('');
+                    setDebouncedSearch('');
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={MID_GRAY} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {showDropdown && (
+              <View style={styles.dropdown}>
+                {searchResults.slice(0, 5).map((result, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.dropdownItem,
+                      idx < Math.min(searchResults.length, 5) - 1 &&
+                        styles.dropdownItemBorder,
+                    ]}
+                    onPress={() => handleSelectSearchResult(result)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="location-outline"
+                      size={16}
+                      color={SIGNAL_RED}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.dropdownItemText} numberOfLines={2}>
+                      {result.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
           {/* Map */}
           <View style={styles.mapContainer}>
             {location ? (
@@ -390,13 +509,39 @@ export default function EmergencyRequestScreen() {
             <View style={styles.locationIcon}>
               <Ionicons name="location" size={18} color={SIGNAL_RED} />
             </View>
-            <View style={styles.locationText}>
+            <View style={styles.locationTextContainer}>
               <Text style={styles.locationLabel}>EMERGENCY LOCATION</Text>
-              <Text style={styles.locationCoords}>
-                {markerLocation
-                  ? `${markerLocation.latitude.toFixed(6)}, ${markerLocation.longitude.toFixed(6)}`
-                  : 'Tap on map to set location'}
-              </Text>
+              {!markerLocation ? (
+                <Text style={styles.locationCoords}>
+                  Tap on map to set location
+                </Text>
+              ) : isResolvingAddress ? (
+                <View style={styles.locationResolvingRow}>
+                  <ActivityIndicator
+                    size="small"
+                    color={SIGNAL_RED}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.locationResolving}>LOCATING...</Text>
+                </View>
+              ) : (
+                <>
+                  {resolvedAddress ? (
+                    <Text style={styles.locationCoords} numberOfLines={2}>
+                      {resolvedAddress}
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.locationCoordsSmall,
+                      resolvedAddress ? { marginTop: 2 } : {},
+                    ]}
+                  >
+                    {markerLocation.latitude.toFixed(5)},{' '}
+                    {markerLocation.longitude.toFixed(5)}
+                  </Text>
+                </>
+              )}
             </View>
           </View>
 
@@ -420,8 +565,23 @@ export default function EmergencyRequestScreen() {
                     },
                   ]}
                   onPress={() => {
-                    setSelectedType(item.type);
-                    setDescription(item.type);
+                    if (selectedType === item.type) {
+                      Alert.alert(
+                        'Confirm Emergency',
+                        `Send ${item.label} emergency request now?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Send',
+                            style: 'destructive',
+                            onPress: handleSubmit,
+                          },
+                        ]
+                      );
+                    } else {
+                      setSelectedType(item.type);
+                      setDescription(item.type);
+                    }
                   }}
                   disabled={isPending}
                   activeOpacity={0.7}
@@ -443,6 +603,8 @@ export default function EmergencyRequestScreen() {
                       styles.typeLabel,
                       selectedType === item.type && { color: item.color },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
                   >
                     {item.label.toUpperCase()}
                   </Text>
@@ -509,45 +671,51 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 16,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: LIGHT_GRAY,
+    backgroundColor: OFF_WHITE,
   },
   backButton: {
-    padding: 8,
-    marginRight: 16,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
     backgroundColor: LIGHT_GRAY,
   },
-  headerContent: {},
+  headerContent: {
+    flex: 1,
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   brandMark: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#000000',
     letterSpacing: 4,
   },
   brandDot: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: SIGNAL_RED,
-    lineHeight: 26,
+    lineHeight: 24,
   },
   headerLine: {
-    width: 30,
+    width: 28,
     height: 2,
     backgroundColor: SIGNAL_RED,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 3,
+    marginBottom: 3,
   },
   tagline: {
     fontSize: 9,
-    fontWeight: '500',
+    fontWeight: '600',
     color: MID_GRAY,
     letterSpacing: 2,
   },
@@ -558,7 +726,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   loadingContainer: {
     flex: 1,
@@ -572,9 +740,63 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: 16,
   },
+  // Search — high z-index so dropdown floats above map
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 2,
+    zIndex: 999,
+    elevation: 999,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: LIGHT_GRAY,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#000',
+  },
+  dropdown: {
+    backgroundColor: OFF_WHITE,
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
+    borderTopWidth: 0,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: LIGHT_GRAY,
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1a1a1a',
+    lineHeight: 18,
+  },
+  // Map
   mapContainer: {
-    height: 240,
-    position: 'relative',
+    height: 220,
+    marginTop: 14,
+    marginHorizontal: 20,
   },
   map: {
     flex: 1,
@@ -593,17 +815,18 @@ const styles = StyleSheet.create({
   },
   locateButton: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    bottom: 12,
+    right: 12,
+    width: 40,
+    height: 40,
     backgroundColor: OFF_WHITE,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: LIGHT_GRAY,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -611,60 +834,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   markerInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
   markerArrow: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     backgroundColor: PRIMARY,
     transform: [{ rotate: '45deg' }],
-    marginTop: -6,
+    marginTop: -5,
   },
+  // Location info
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: LIGHT_GRAY,
-    marginHorizontal: 24,
-    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#FEF2F2',
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: SIGNAL_RED,
   },
   locationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FEE2E2',
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
-  locationText: {
+  locationTextContainer: {
     flex: 1,
   },
   locationLabel: {
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '700',
     color: MID_GRAY,
-    letterSpacing: 1,
-    marginBottom: 2,
+    letterSpacing: 1.5,
+    marginBottom: 3,
   },
   locationCoords: {
     fontSize: 12,
-    color: PRIMARY,
+    color: '#1a1a1a',
     fontWeight: '500',
+    lineHeight: 17,
   },
+  locationCoordsSmall: {
+    fontSize: 10,
+    color: MID_GRAY,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+    lineHeight: 15,
+  },
+  locationResolvingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationResolving: {
+    fontSize: 10,
+    color: MID_GRAY,
+    letterSpacing: 1,
+  },
+  // Sections
   section: {
-    paddingHorizontal: 24,
-    marginTop: 24,
+    paddingHorizontal: 20,
+    marginTop: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 10,
@@ -676,73 +919,74 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
     backgroundColor: LIGHT_GRAY,
-    marginLeft: 16,
+    marginLeft: 12,
   },
   typeGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
+    gap: 8,
   },
   typeCard: {
-    width: '48%',
+    flex: 1,
+    minWidth: 0,
     alignItems: 'center',
-    paddingVertical: 20,
-    marginHorizontal: '1%',
-    marginBottom: 8,
-    borderWidth: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
     borderColor: LIGHT_GRAY,
     backgroundColor: OFF_WHITE,
   },
   typeCardActive: {
-    backgroundColor: LIGHT_GRAY,
+    backgroundColor: '#FEF2F2',
   },
   typeIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 7,
   },
   typeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 9,
+    fontWeight: '700',
     color: MID_GRAY,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   descriptionInput: {
     backgroundColor: LIGHT_GRAY,
-    padding: 16,
+    padding: 14,
     fontSize: 14,
-    color: PRIMARY,
-    minHeight: 100,
+    color: '#1a1a1a',
+    minHeight: 96,
     textAlignVertical: 'top',
+    lineHeight: 20,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: SIGNAL_RED,
-    marginHorizontal: 24,
-    marginTop: 24,
-    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginTop: 20,
+    paddingVertical: 17,
+    gap: 8,
   },
   submitButtonDisabled: {
     backgroundColor: MID_GRAY,
   },
   submitButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: OFF_WHITE,
     letterSpacing: 2,
-    marginLeft: 8,
   },
   disclaimer: {
     fontSize: 10,
     color: MID_GRAY,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 14,
     paddingHorizontal: 24,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });

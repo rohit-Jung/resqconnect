@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_NAME, APP_VERSION } from '@/constants';
 import { useProviderStore } from '@/store/providerStore';
@@ -59,6 +60,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
 );
 
 export default function ProviderSettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { provider, logout } = useProviderStore();
 
@@ -79,7 +81,7 @@ export default function ProviderSettingsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.brandRow}>
           <Text style={styles.brandMark}>RESQ</Text>
           <Text style={styles.brandDot}>.</Text>
@@ -202,7 +204,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: LIGHT_GRAY,

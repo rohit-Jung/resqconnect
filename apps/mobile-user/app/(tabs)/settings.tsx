@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_NAME, APP_VERSION, SMS_FALLBACK_NUMBER } from '@/constants';
 import { EmergencySettings, userApi } from '@/services/user/user.api';
@@ -37,6 +38,7 @@ const NOTIFICATION_METHODS = [
 ];
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { logout } = useAuthStore();
@@ -102,7 +104,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       {/* Header - Swiss style */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerContent}>
           <View style={styles.brandRow}>
             <Text style={styles.brandMark}>RESQ</Text>
@@ -118,6 +120,51 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Offline SMS Fallback */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={18}
+                color="#D97706"
+              />
+            </View>
+            <Text style={styles.sectionTitle}>OFFLINE SMS FALLBACK</Text>
+          </View>
+
+          <View style={styles.sectionContent}>
+            <Text style={styles.descriptionText}>
+              {
+                "When you're offline, you can still request emergency help via SMS."
+              }
+              The message will be sent to our emergency SMS gateway.
+            </Text>
+
+            <View style={styles.smsInfo}>
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color="#D97706"
+              />
+              <Text style={styles.smsInfoText}>
+                SMS GATEWAY: {SMS_FALLBACK_NUMBER}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => router.push('/sms-emergency')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.linkLeft}>
+                <Ionicons name="send-outline" size={18} color={MID_GRAY} />
+                <Text style={styles.linkText}>TEST SMS EMERGENCY</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={MID_GRAY} />
+            </TouchableOpacity>
+          </View>
+        </View>
         {/* Emergency Notifications */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -200,52 +247,6 @@ export default function SettingsScreen() {
               )}
             </View>
           )}
-        </View>
-
-        {/* Offline SMS Fallback */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons
-                name="cloud-offline-outline"
-                size={18}
-                color="#D97706"
-              />
-            </View>
-            <Text style={styles.sectionTitle}>OFFLINE SMS FALLBACK</Text>
-          </View>
-
-          <View style={styles.sectionContent}>
-            <Text style={styles.descriptionText}>
-              {
-                "When you're offline, you can still request emergency help via SMS."
-              }
-              The message will be sent to our emergency SMS gateway.
-            </Text>
-
-            <View style={styles.smsInfo}>
-              <Ionicons
-                name="information-circle-outline"
-                size={16}
-                color="#D97706"
-              />
-              <Text style={styles.smsInfoText}>
-                SMS GATEWAY: {SMS_FALLBACK_NUMBER}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => router.push('/sms-emergency')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.linkLeft}>
-                <Ionicons name="send-outline" size={18} color={MID_GRAY} />
-                <Text style={styles.linkText}>TEST SMS EMERGENCY</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={MID_GRAY} />
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Quick Links */}
@@ -375,7 +376,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: LIGHT_GRAY,
