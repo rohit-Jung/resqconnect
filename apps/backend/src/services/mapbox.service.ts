@@ -2,7 +2,12 @@ import type { Coordinates } from '@repo/types/validations';
 
 import { envConfig, logger } from '@/config';
 import { RoutingProfiles } from '@/constants/mapbox.constants';
-import { cacheRoute, getCachedRoute } from '@/services/redis.service';
+import {
+  cacheGeocode,
+  cacheRoute,
+  getCachedGeocode,
+  getCachedRoute,
+} from '@/services/redis.service';
 import type { RouteResponse, RouteResult } from '@/types/maps.types';
 import { constructDirectionUrl } from '@/utils/maps/mapbox';
 
@@ -144,4 +149,74 @@ export async function getBatchETAs(
   }
 }
 
-export default { getRouteFromMapbox, getETA };
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<string | null> {
+  try {
+    const cached = await getCachedGeocode(lat, lng);
+    if (cached) return cached;
+
+    const params = new URLSearchParams({
+      longitude: String(lng),
+      latitude: String(lat),
+      access_token: envConfig.mapbox_access_token as string,
+    });
+    const response = await fetch(
+      `https://api.mapbox.com/search/geocode/v6/reverse?${params}`
+    );
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as {
+      features?: Array<{
+        properties: { full_address?: string; name?: string };
+      }>;
+    };
+    const address =
+      data.features?.[0]?.properties?.full_address ??
+      data.features?.[0]?.properties?.name ??
+      null;
+    if (address) {
+      await cacheGeocode(lat, lng, address);
+    }
+    return address;
+  } catch {
+    return null;
+  }
+}
+
+export async function forwardGeocode(
+  query: string,
+  lat?: number,
+  lng?: number
+): Promise<Array<{ name: string; latitude: number; longitude: number }>> {
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      access_token: envConfig.mapbox_access_token as string,
+      limit: '5',
+      ...(lat != null && lng != null ? { proximity: `${lng},${lat}` } : {}),
+    });
+    const response = await fetch(
+      `https://api.mapbox.com/search/geocode/v6/forward?${params}`
+    );
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      features?: Array<{
+        geometry: { coordinates: [number, number] };
+        properties: { full_address?: string; name?: string };
+      }>;
+    };
+    return (data.features ?? [])
+      .map(f => ({
+        name: f.properties.full_address ?? f.properties.name ?? '',
+        longitude: f.geometry.coordinates[0],
+        latitude: f.geometry.coordinates[1],
+      }))
+      .filter(x => x.name !== '');
+  } catch {
+    return [];
+  }
+}
+
+export default { getRouteFromMapbox, getETA, reverseGeocode };

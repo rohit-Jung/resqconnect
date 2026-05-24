@@ -1,139 +1,49 @@
-import { user } from '@repo/db/schemas';
 import { getRouteDataSchema } from '@repo/types/validations';
 
 import { HttpStatusCode } from 'axios';
-import { eq } from 'drizzle-orm';
 import { type Request, type Response } from 'express';
 
-import db from '@/db';
-import { getRouteFromMapbox } from '@/services/mapbox.service';
+import {
+  forwardGeocode,
+  getRouteFromMapbox,
+  reverseGeocode,
+} from '@/services/mapbox.service';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { compeletAutoSearch, getOptimalRoute } from '@/utils/maps/galli-maps';
 
 const getAutoComplete = asyncHandler(async (req: Request, res: Response) => {
   const { q: searchQuery, lat: currentLat, lg: currentLong } = req.query;
 
-  if (!searchQuery || searchQuery === '') {
-    throw ApiError.badRequest('Search query is required');
-  }
-
-  if (typeof searchQuery !== 'string') {
-    throw ApiError.badRequest('Search query must be a string');
-  }
-
   if (
-    (currentLat && typeof currentLat !== 'string') ||
-    (currentLong && typeof currentLong !== 'string')
+    !searchQuery ||
+    typeof searchQuery !== 'string' ||
+    searchQuery.length < 3
   ) {
-    throw ApiError.badRequest('Current latitude and longitude must be strings');
-  }
-
-  if (searchQuery.length < 3) {
     throw ApiError.badRequest(
-      'Search query must be at least 3 characters long'
+      'Search query must be a string of at least 3 characters'
     );
   }
 
-  const loggedInUser = req.user;
+  const lat = currentLat ? parseFloat(currentLat as string) : undefined;
+  const lng = currentLong ? parseFloat(currentLong as string) : undefined;
 
-  if (!loggedInUser || !loggedInUser.id) {
-    throw ApiError.badRequest('Unauthorized to perform this action');
-  }
-
-  let userLat, userLong, searchAutoCompleteResult;
-  if (!currentLat || !currentLong) {
-    const userInDb = await db.query.user.findFirst({
-      where: eq(user.id, loggedInUser.id),
-    });
-
-    if (!userInDb) {
-      throw ApiError.notFound('User not found');
-    }
-
-    userLat = userInDb?.currentLocation?.latitude;
-    userLong = userInDb?.currentLocation?.longitude;
-
-    if (!userLat || !userLong) {
-      throw ApiError.notFound('User location not found');
-    }
-
-    searchAutoCompleteResult = await compeletAutoSearch({
-      searchQuery,
-      currentLat: userLat,
-      currentLong: userLong,
-    });
-  } else {
-    searchAutoCompleteResult = await compeletAutoSearch({
-      searchQuery,
-      currentLat,
-      currentLong,
-    });
-  }
-
-  if (!searchAutoCompleteResult) {
-    throw ApiError.notFound('No results found');
-  }
+  const results = await forwardGeocode(
+    searchQuery,
+    lat != null && !isNaN(lat) ? lat : undefined,
+    lng != null && !isNaN(lng) ? lng : undefined
+  );
 
   res
     .status(200)
     .json(
-      new ApiResponse(200, 'Search results found', searchAutoCompleteResult)
+      new ApiResponse(
+        200,
+        results.length ? 'Search results found' : 'No results found',
+        results
+      )
     );
 });
-
-const getOptimalRouteForUser = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { srcLat, srcLng, dstLat, dstLng, mode } = req.query;
-
-    if (!srcLat || !srcLng || !dstLat || !dstLng) {
-      throw ApiError.badRequest(
-        'Source and destination coordinates are required'
-      );
-    }
-
-    if (
-      typeof srcLat !== 'string' ||
-      typeof srcLng !== 'string' ||
-      typeof dstLat !== 'string' ||
-      typeof dstLng !== 'string' ||
-      typeof mode !== 'string'
-    ) {
-      throw ApiError.badRequest(
-        'Source and destination coordinates must be strings'
-      );
-    }
-
-    const loggedInUser = req.user;
-
-    if (!loggedInUser || !loggedInUser.id) {
-      throw ApiError.badRequest('Unauthorized to perform this action');
-    }
-
-    if (mode) {
-      if (mode !== 'DRIVING' && mode !== 'WALKING' && mode !== 'BICYCLING') {
-        throw ApiError.badRequest('Invalid mode parameter');
-      }
-    }
-
-    const optimalRoute = await getOptimalRoute({
-      srcLat,
-      srcLng,
-      dstLat,
-      dstLng,
-      mode: (mode || 'DRIVING') as 'DRIVING' | 'WALKING' | 'CYCLING',
-    });
-
-    if (!optimalRoute) {
-      throw ApiError.notFound('No route found');
-    }
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, 'Optimal route found', optimalRoute));
-  }
-);
 
 const getRoute = asyncHandler(async (req: Request, res: Response) => {
   const parsedData = getRouteDataSchema.safeParse(req.body);
@@ -163,12 +73,37 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
     );
 });
 
+const getReverseGeocode = asyncHandler(async (req: Request, res: Response) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    throw ApiError.badRequest('lat and lng are required');
+  }
+
+  const parsedLat = parseFloat(lat as string);
+  const parsedLng = parseFloat(lng as string);
+
+  if (isNaN(parsedLat) || isNaN(parsedLng)) {
+    throw ApiError.badRequest('lat and lng must be valid numbers');
+  }
+
+  const address = await reverseGeocode(parsedLat, parsedLng);
+
+  if (!address) {
+    throw ApiError.notFound('Address not found for given coordinates');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Address found', { address }));
+});
+
 const mapsController = {
   autocomplete: getAutoComplete,
-  optimalRoute: getOptimalRouteForUser,
   route: getRoute,
+  reverseGeocode: getReverseGeocode,
 } as const;
 
 export default mapsController;
 
-export { getAutoComplete, getOptimalRouteForUser, getRoute };
+export { getAutoComplete, getRoute };

@@ -18,6 +18,10 @@ mapsRouter
   );
 
 mapsRouter
+  .route('/reverse-geocode')
+  .get(validateUserOrProvider, mapsController.reverseGeocode);
+
+mapsRouter
   .route('/optimal-route')
   .post(mapsRouteLimiter, validateUserOrProvider, mapsController.route);
 
