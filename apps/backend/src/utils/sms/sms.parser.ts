@@ -1,10 +1,10 @@
 import z from 'zod';
 
 import { logger } from '@/config';
-import { ServiceTypeEnum } from '@/constants';
+import { ServiceTypeEnum, type ServiceTypeEnumVal } from '@/constants';
 
 export interface ParsedEmergency {
-  emergencyType: ServiceTypeEnum;
+  emergencyType: ServiceTypeEnumVal;
   location: {
     latitude: number;
     longitude: number;
