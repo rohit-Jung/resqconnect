@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    reporters: [['verbose', { onlyFailures: false }]],
+    silent: true, // ← suppresses all stdout/console during tests
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts'],
     coverage: {
