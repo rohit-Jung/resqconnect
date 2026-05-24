@@ -28,11 +28,11 @@ export interface ServiceProvider {
   };
 }
 
-// Extended type with UI-friendly computed properties
+// extended type with ui-friendly computed properties
 export interface IncomingRequest extends TNewEmergencyEventPayload {
-  // Computed alias for emergencyLocation - for easier UI usage
+  // computed alias for emergencylocation - for easier ui usage
   location: { latitude: number; longitude: number };
-  // Computed alias for emergencyDescription
+  // computed alias for emergencydescription
   description?: string;
 }
 

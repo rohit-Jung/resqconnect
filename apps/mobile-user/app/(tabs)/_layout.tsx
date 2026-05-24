@@ -1,6 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+
+import { useAuthStore } from '@/store/authStore';
 
 const SIGNAL_RED = '#C44536';
 const PRIMARY = '#E63946';
@@ -9,6 +12,21 @@ const MID_GRAY = '#888888';
 const LIGHT_GRAY = '#E8E6E1';
 
 export default function TabLayout() {
+  const { isAuthenticated, user, isLoading } = useAuthStore();
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" color="#E63946" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
   return (
     <Tabs
       screenOptions={{

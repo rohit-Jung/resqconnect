@@ -39,7 +39,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Wait for store to rehydrate before checking auth
+    // wait for store to rehydrate before checking auth
     if (isLoading) {
       console.log('Waiting for store rehydration...', {
         isLoading,
@@ -56,18 +56,9 @@ export default function RootLayout() {
     const checkAuthAndFetchProfile = async () => {
       try {
         const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        console.log(
-          'Auth Check - Token exists:',
-          !!token,
-          'User:',
-          !!user,
-          'UserType:',
-          userType
-        );
 
         // If no token, clear any cached auth state
         if (!token) {
-          console.log('No token found, clearing auth state');
           if (user) setUser(null);
           if (userType) setUserType(null);
           setIsCheckingAuth(false);
@@ -76,13 +67,11 @@ export default function RootLayout() {
 
         // If we already have user data from persistence, skip fetch
         if (user) {
-          console.log('User already exists from persistence, skipping fetch');
           setIsCheckingAuth(false);
           return;
         }
 
         try {
-          console.log('Attempting to fetch user profile...');
           const response = await api.get(userEndpoints.profile);
           const profileData = response.data?.data?.user;
 
@@ -100,7 +89,7 @@ export default function RootLayout() {
           );
         }
 
-        // If profile fetch fails (401), clear the token
+        // if profile fetch fails (401), clear the token
         console.log('Profile fetch failed, clearing auth state');
         await SecureStore.deleteItemAsync(TOKEN_KEY);
         setUser(null);
@@ -196,7 +185,7 @@ export default function RootLayout() {
       }
 
       // 2) Ask backend if user has any active request
-      // Use /recent (no query schema restrictions) and pick the latest active status.
+      // use /recent (no query schema restrictions) and pick the latest active status.
       try {
         const resp = await api.get(emergencyRequestEndpoints.recent);
         const recent = resp.data?.data;
@@ -237,7 +226,7 @@ export default function RootLayout() {
     };
 
     // On first run, check if online.
-    // If we were offline and just became online, re-check.
+    // if we were offline and just became online, re-check.
     const wasOnline = lastOnlineRef.current;
     lastOnlineRef.current = isConnected;
     console.log('was Online', wasOnline);

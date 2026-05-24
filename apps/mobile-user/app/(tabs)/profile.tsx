@@ -1,6 +1,3 @@
-import { Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
-
 import {
   ProfileInfoItem,
   ProfileScreenContent,
@@ -8,21 +5,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 
 export default function UserProfileScreen() {
-  const { isAuthenticated, user, logout, isLoading, updateProfilePicture } =
-    useAuthStore();
-
-  // Show loading while checking auth
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#E63946" />
-      </View>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
-    return <Redirect href="/(auth)/sign-in" />;
-  }
+  const { user, updateProfilePicture, logout } = useAuthStore();
 
   const profileInfoItems: ProfileInfoItem[] = [
     {
