@@ -144,6 +144,54 @@ export const sendOTPEmail = async (
   }
 };
 
+export const sendEmergencyAlertEmail = async (
+  email: string,
+  contactName: string,
+  userName: string,
+  emergencyType: string,
+  mapsUrl: string
+): Promise<boolean> => {
+  try {
+    const emailContent: Mailgen.Content = {
+      body: {
+        name: contactName,
+        intro: `🚨 ${userName} has requested emergency assistance!`,
+        action: {
+          instructions: `${userName} needs ${emergencyType.replace('_', ' ')} help. Tap below to view their location:`,
+          button: {
+            color: '#E13333',
+            text: 'View Location on Maps',
+            link: mapsUrl,
+          },
+        },
+        outro:
+          'Please check on them immediately or contact emergency services.',
+      },
+    };
+
+    const emailBody = mailGenerator.generate(emailContent);
+    const emailText = mailGenerator.generatePlaintext(emailContent);
+
+    const { error } = await resend.emails.send({
+      from: `"Resqconnect Emergency" <${envConfig.from_email}>`,
+      to: email,
+      subject: `🚨 EMERGENCY: ${userName} needs ${emergencyType.replace('_', ' ')} help`,
+      html: emailBody,
+      text: emailText,
+    });
+
+    if (error) {
+      console.error('Resend emergency alert error:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error sending emergency alert email:', error);
+    return false;
+  }
+};
+
 export const sendOTP = async (
   email: string,
   name: string,
