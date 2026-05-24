@@ -8,8 +8,8 @@ export const EMERGENCY_LOCK_KEY = (requestId: string) =>
 export const PROVIDER_LOCATION_KEY = (providerId: string) =>
   `provider:${providerId}:location`;
 
-// Route cache keys - cache routes by sector (emergency type) for same origin-destination pairs
-// Format: route:{emergencyType}:{origin_lat}:{origin_lng}:{dest_lat}:{dest_lng}:{profile}
+// route cache keys - cache routes by sector (emergency type) for same origin-destination pairs
+// format: route:{emergencytype}:{origin_lat}:{origin_lng}:{dest_lat}:{dest_lng}:{profile}
 export const ROUTE_CACHE_KEY = (
   originLat: number,
   originLng: number,
@@ -18,7 +18,7 @@ export const ROUTE_CACHE_KEY = (
   profile: string,
   emergencyType?: string
 ) => {
-  // Round to 4 decimal places to handle small location variations (~11 meters)
+  // round to 4 decimal places to handle small location variations (~11 meters)
   const oLat = Math.round(originLat * 10000) / 10000;
   const oLng = Math.round(originLng * 10000) / 10000;
   const dLat = Math.round(destLat * 10000) / 10000;
@@ -27,7 +27,15 @@ export const ROUTE_CACHE_KEY = (
   return `route:${sector}:${oLat}:${oLng}:${dLat}:${dLng}:${profile}`;
 };
 
-// SMS deduplication keys
+// reverse geocode cache keys
+// round to 3 decimal places (~111m buckets) — enough for street-level addresses
+export const GEOCODE_CACHE_KEY = (lat: number, lng: number) => {
+  const rLat = Math.round(lat * 1000) / 1000;
+  const rLng = Math.round(lng * 1000) / 1000;
+  return `geocode:${rLat}:${rLng}`;
+};
+
+// sms deduplication keys
 export const SMS_PROCESSED_KEY = (messageSid: string) =>
   `sms:processed:${messageSid}`;
 export const SMS_LAST_POLL_KEY = 'sms:last_poll_timestamp';
@@ -36,8 +44,9 @@ export const CACHE_EXPIRY = {
   PROVIDERS_LIST: 600,
   LOCK: 10,
   PROVIDER_LOCATION: 3600,
-  ROUTE: 3600, // Cache routes for 1 hour
-  SMS_PROCESSED: 86400, // 24 hours - to prevent reprocessing
+  ROUTE: 3600,
+  GEOCODE: 604800, // 7 days — addresses rarely change
+  SMS_PROCESSED: 86400,
   SMS_LAST_POLL: 3600,
 };
 
@@ -301,6 +310,23 @@ export async function batchCheckMessagesProcessed(
  * cache a computed route to avoid re-computing the same route
  * caches routes by emergency type (sector) for same origin-destination pairs
  */
+export async function cacheGeocode(
+  lat: number,
+  lng: number,
+  address: string
+): Promise<void> {
+  const key = GEOCODE_CACHE_KEY(lat, lng);
+  await redis.set(key, address, 'EX', CACHE_EXPIRY.GEOCODE);
+}
+
+export async function getCachedGeocode(
+  lat: number,
+  lng: number
+): Promise<string | null> {
+  const key = GEOCODE_CACHE_KEY(lat, lng);
+  return redis.get(key);
+}
+
 export async function cacheRoute(
   originLat: number,
   originLng: number,
