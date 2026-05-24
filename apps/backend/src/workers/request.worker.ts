@@ -1,13 +1,7 @@
-import {
-  emergencyRequest,
-  requestEvents,
-  serviceProvider,
-  user,
-} from '@repo/db/schemas';
+import { emergencyRequest, requestEvents, user } from '@repo/db/schemas';
 import { EmergencyRequestPayload } from '@repo/types/validations';
 
 import { and, eq } from 'drizzle-orm';
-import type { Server } from 'socket.io';
 
 import { logger } from '@/config';
 import {
@@ -20,16 +14,14 @@ import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { assignResponderConsumer } from '@/services/kafka/kafka.service';
-import { sendLocalSMS } from '@/services/local-sms.service';
 import {
   calculateDistancesAndSort,
   findNearbyProviders,
 } from '@/services/matching.service';
 import { cacheEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
-import { SMS_TEMPLATES } from '@/utils/sms/sms.parser';
 
-async function startEmergencyRequestService() {
+export async function startEmergencyRequestService() {
   logger.info('Starting Kafka consumer connection...');
   const startTime = Date.now();
 
@@ -48,7 +40,7 @@ async function startEmergencyRequestService() {
   });
 
   await assignResponderConsumer.run({
-    // Process multiple partitions concurrently
+    // process multiple partitions concurrently
     partitionsConsumedConcurrently: 3,
     eachMessage: async ({ topic, message, partition }) => {
       const messageStartTime = Date.now();
@@ -69,13 +61,32 @@ async function startEmergencyRequestService() {
         return;
       }
 
-      const { requestId, emergencyLocation, emergencyType, userId } =
-        parsedData.data;
+      const {
+        requestId,
+        emergencyLocation,
+        emergencyType,
+        userId,
+        emergencyDescription,
+        expiresAt,
+      } = parsedData.data;
 
-      const source =
-        typeof (data as { source?: unknown }).source === 'string'
-          ? (data as { source?: string }).source
-          : undefined;
+      // seed silo db if record not yet present (platform creates in platform db;
+      // silo db only gets the record via this kafka path).
+      await db
+        .insert(emergencyRequest)
+        .values({
+          id: requestId,
+          userId: userId,
+          serviceType: emergencyType,
+          description: emergencyDescription ?? null,
+          location: emergencyLocation,
+          requestStatus: 'pending',
+          searchRadius: 1,
+          expiresAt: expiresAt ?? null,
+          h3Index: null,
+          geoLocation: null,
+        })
+        .onConflictDoNothing();
 
       // claim request atomically so duplicate kafka deliveries cannot process
       // the same pending request concurrently.
@@ -104,7 +115,7 @@ async function startEmergencyRequestService() {
 
       const { latitude, longitude } = emergencyLocation;
 
-      // Find providers (this is the slow part - H3 index lookup)
+      // find providers (this is the slow part - h3 index lookup)
       const providerSearchStart = Date.now();
 
       let providers = await findNearbyProviders({
@@ -140,7 +151,7 @@ async function startEmergencyRequestService() {
         return;
       }
 
-      // Calculate distances (external API - can be slow)
+      // calculate distances (external api - can be slow)
       const distanceCalcStart = Date.now();
       const providersWithDistance = await calculateDistancesAndSort(
         providers,
@@ -155,7 +166,7 @@ async function startEmergencyRequestService() {
         MAX_PROVIDERS_TO_BROADCAST
       );
 
-      // Cache and log in parallel
+      // cache and log in parallel
       await Promise.all([
         cacheEmergencyProviders(
           requestId,
@@ -177,8 +188,8 @@ async function startEmergencyRequestService() {
         return;
       }
 
-      // Broadcast to ALL providers simultaneously
-      // const providerIds = top10Providers.map(p => p.id);
+      // broadcast to all providers simultaneously
+      // const providerids = top10providers.map(p => p.id);
       const payload = {
         ...parsedData.data,
         username: userInfo?.name?.toString() ?? 'Unknown',
@@ -186,10 +197,8 @@ async function startEmergencyRequestService() {
         userEmail: userInfo?.email?.toString() ?? '',
       };
 
-      console.log('top 10 providers-found', top10Providers);
       for (const provider of top10Providers) {
         const roomName = SocketRoom.PROVIDER(provider.id);
-
         io.to(roomName).emit(SocketEvents.NEW_EMERGENCY, payload);
         logger.debug(`Emitted to ${roomName}`);
       }
@@ -198,7 +207,7 @@ async function startEmergencyRequestService() {
         `Broadcasted to ${top10Providers.length} providers in ${Date.now() - messageStartTime}ms`
       );
 
-      // Set request expiry and revert to pending
+      // set request expiry and revert to pending
       await db
         .update(emergencyRequest)
         .set({
@@ -216,161 +225,9 @@ async function startEmergencyRequestService() {
         `Total message processing time: ${Date.now() - messageStartTime}ms`
       );
 
-      // Wait for provider decision
-      // const result = await waitForAnyProviderDecision({
-      //   io,
-      //   requestId,
-      //   providerIds,
-      //   timeoutMs: 120_000,
-      // });
-      //
-      // if (result.decision === 'ACCEPTED' && result.providerId) {
-      //   await Promise.all([
-      //     db
-      //       .update(serviceProvider)
-      //       .set({ serviceStatus: 'assigned' })
-      //       .where(eq(serviceProvider.id, result.providerId)),
-      //     db
-      //       .update(emergencyRequest)
-      //       .set({ requestStatus: 'assigned' })
-      //       .where(eq(emergencyRequest.id, requestId)),
-      //   ]);
-      //
-      //   // Join the already-connected sockets for both parties to the emergency room.
-      //   // Use the role-prefixed rooms for consistency with the rest of the codebase.
-      //   io.in(SocketRoom.PROVIDER(result.providerId)).socketsJoin(
-      //     SocketRoom.EMERGENCY(requestId)
-      //   );
-      //   io.in(SocketRoom.USER(userId)).socketsJoin(
-      //     SocketRoom.EMERGENCY(requestId)
-      //   );
-      //
-      //   // Get provider info to include in notification
-      //   const providerData = await db.query.serviceProvider.findFirst({
-      //     where: eq(serviceProvider.id, result.providerId),
-      //   });
-      //
-      //   // inform others that it's accepted
-      //   io.to(SocketRoom.EMERGENCY(requestId)).emit(
-      //     SocketEvents.REQUEST_ACCEPTED,
-      //     {
-      //       requestId,
-      //       emergencyLocation,
-      //       emergencyType,
-      //       providerId: result.providerId,
-      //       provider: {
-      //         id: providerData?.id,
-      //         name: providerData?.name,
-      //         phone: providerData?.phoneNumber?.toString(),
-      //         serviceType: providerData?.serviceType,
-      //         vehicleNumber: providerData?.vehicleInformation?.number,
-      //         location: providerData?.currentLocation,
-      //       },
-      //     }
-      //   );
-      //
-      //   logger.info(
-      //     `Request ${requestId} assigned to provider ${result.providerId}`
-      //   );
-      //
-      //   if (source === 'sms' && userInfo?.phoneNumber) {
-      //     const emergencyTypeLabel =
-      //       emergencyType === 'ambulance'
-      //         ? 'Medical/Ambulance'
-      //         : emergencyType === 'fire_truck'
-      //           ? 'Fire'
-      //           : emergencyType === 'rescue_team'
-      //             ? 'Rescue'
-      //             : 'Police';
-      //     await sendLocalSMS(
-      //       userInfo.phoneNumber.toString(),
-      //       SMS_TEMPLATES.PROVIDER_ASSIGNED(
-      //         emergencyTypeLabel,
-      //         providerData?.name || 'Responder'
-      //       )
-      //     );
-      //   }
-      // } else if (result.decision === 'TIMEOUT') {
-      //   await db
-      //     .update(emergencyRequest)
-      //     .set({ requestStatus: 'no_providers_available' })
-      //     .where(eq(emergencyRequest.id, requestId));
-      //
-      //   io.to(SocketRoom.USER(userId)).emit(SocketEvents.EMERGENCY_FAILED, {
-      //     requestId,
-      //     message: 'No providers available at this time. Please try again.',
-      //   });
-      //
-      //   logger.warn(`Request ${requestId} timed out - no providers accepted`);
-      // }
-
       logger.info(
         `Total message processing time: ${Date.now() - messageStartTime}ms`
       );
     },
   });
 }
-
-/**
- * Wait for ANY provider from the list to accept (first one wins).
- * The actual race condition is handled by Redis distributed lock in the socket handler.
- * This function just waits for a successful acceptance or timeout.
- */
-async function waitForAnyProviderDecision({
-  io,
-  requestId,
-  providerIds,
-  timeoutMs = 120_000,
-}: {
-  io: Server;
-  requestId: string;
-  providerIds: string[];
-  timeoutMs?: number;
-}): Promise<{ decision: 'ACCEPTED' | 'TIMEOUT'; providerId?: string }> {
-  return new Promise(res => {
-    const rejections = new Set<string>();
-
-    const timer = setTimeout(() => {
-      cleanup();
-      res({ decision: 'TIMEOUT' });
-    }, timeoutMs);
-
-    const handler = (payload: {
-      requestId: string;
-      providerId: string;
-      decision: 'ACCEPTED' | 'REJECTED';
-    }) => {
-      // Only handle events for this request and from providers in our list
-      if (
-        payload.requestId !== requestId ||
-        !providerIds.includes(payload.providerId)
-      ) {
-        return;
-      }
-
-      if (payload.decision === 'ACCEPTED') {
-        cleanup();
-        res({ decision: 'ACCEPTED', providerId: payload.providerId });
-        return;
-      }
-
-      if (payload.decision === 'REJECTED') {
-        rejections.add(payload.providerId);
-        // If all providers rejected, resolve as timeout
-        if (rejections.size >= providerIds.length) {
-          cleanup();
-          res({ decision: 'TIMEOUT' });
-        }
-      }
-    };
-
-    function cleanup() {
-      clearTimeout(timer);
-      io.off(SocketEvents.PROVIDER_DECISION, handler);
-    }
-
-    io.on(SocketEvents.PROVIDER_DECISION, handler);
-  });
-}
-
-export { startEmergencyRequestService };

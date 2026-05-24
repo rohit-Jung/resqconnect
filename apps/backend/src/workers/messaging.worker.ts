@@ -1,27 +1,12 @@
 // TODO: Clean this cause we have a webhook setup now
-import {
-  emergencyRequest,
-  outbox,
-  serviceProvider,
-  user,
-} from '@repo/db/schemas';
+import { serviceProvider } from '@repo/db/schemas';
 
-import { eq, sql } from 'drizzle-orm';
-import { latLngToCell } from 'h3-js';
+import { eq } from 'drizzle-orm';
 
 import { envConfig, logger } from '@/config';
-import {
-  EMERGENCY_PHONE_NUMBER,
-  FETCH_INTERVAL,
-  H3_RESOLUTION,
-  INITIAL_SEARCH_RADIUS,
-  REQUEST_TIMEOUT_MS,
-} from '@/constants';
-import {
-  AGGREGATE_TYPES,
-  OUTBOX_EVENT_TYPES,
-} from '@/constants/kafka.constants';
+import { EMERGENCY_PHONE_NUMBER, FETCH_INTERVAL } from '@/constants';
 import db from '@/db';
+import emergencyRequestService from '@/services/emergency/emergency-request.service';
 import {
   batchCheckMessagesProcessed,
   getLastSMSPollTimestamp,
@@ -37,12 +22,7 @@ import {
   findUserByPhoneNumber,
   verifyUserIdentity,
 } from '@/services/user.service';
-import { getKafkaTopic } from '@/utils';
-import {
-  type ParsedEmergency,
-  SMS_TEMPLATES,
-  parseSMSMessage,
-} from '@/utils/sms/sms.parser';
+import { SMS_TEMPLATES, parseSMSMessage } from '@/utils/sms/sms.parser';
 
 // Health check state
 let lastPollTime: Date | null = null;
@@ -142,7 +122,7 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
 
   // Create the emergency request
   try {
-    const result = await createEmergencyRequest(userId, parsedData);
+    const result = await emergencyRequestService.create(userId, parsedData);
 
     if (!result.success || !result.requestId) {
       await markMessageProcessed(sid, {
@@ -215,7 +195,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
     };
   }
 }
-
 
 function formatEmergencyType(type: string): string {
   const types: Record<string, string> = {
