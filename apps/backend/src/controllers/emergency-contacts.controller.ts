@@ -1,6 +1,6 @@
 import { emergencyContact, newEmergencyContactSchema } from '@repo/db/schemas';
 
-import { desc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import db from '@/db';
@@ -75,6 +75,7 @@ const updateEmergencyContact = asyncHandler(
       'notificationMethod',
       'pushToken',
       'isCommanContact',
+      'priority',
     ];
     const invalidKeys = Object.keys(updateData).filter(
       key => !allowedFields.includes(key)
@@ -164,7 +165,7 @@ const getUserEmergencyContacts = asyncHandler(
       .select()
       .from(emergencyContact)
       .where(eq(emergencyContact.userId, userId))
-      .orderBy(desc(emergencyContact.createdAt));
+      .orderBy(asc(emergencyContact.priority), asc(emergencyContact.createdAt));
 
     res.status(200).json(new ApiResponse(200, 'Contacts retrieved', contacts));
   }
@@ -251,6 +252,28 @@ const updateContactPushToken = asyncHandler(
   }
 );
 
+const reorderEmergencyContacts = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) throw ApiError.unauthorized('Unauthorized');
+
+    const { order } = req.body as { order: { id: string; priority: number }[] };
+    if (!Array.isArray(order) || order.length === 0)
+      throw ApiError.badRequest('order must be a non-empty array');
+
+    await Promise.all(
+      order.map(({ id, priority }) =>
+        db
+          .update(emergencyContact)
+          .set({ priority, updatedAt: new Date().toISOString() })
+          .where(eq(emergencyContact.id, id))
+      )
+    );
+
+    res.status(200).json(new ApiResponse(200, 'Contacts reordered'));
+  }
+);
+
 const emergencyContactsController = {
   create: createEmergencyContact,
   update: updateEmergencyContact,
@@ -260,6 +283,7 @@ const emergencyContactsController = {
   getCommon: getCommonEmergencyContacts,
   toggleNotification: toggleContactNotification,
   updatePushToken: updateContactPushToken,
+  reorder: reorderEmergencyContacts,
 } as const;
 
 export default emergencyContactsController;

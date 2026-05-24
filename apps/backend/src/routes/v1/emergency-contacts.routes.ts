@@ -19,6 +19,12 @@ emergencyContactsRouter.get(
   emergencyContactsController.getCommon
 );
 
+emergencyContactsRouter.post(
+  '/reorder',
+  validateRoleAuth([UserRoles.USER]),
+  emergencyContactsController.reorder
+);
+
 emergencyContactsRouter
   .route('/:id')
   .get(emergencyContactsController.getById)
