@@ -6,7 +6,7 @@ import {
   user,
 } from '@repo/db/schemas';
 
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import {
   Expo,
   type ExpoPushMessage,
@@ -18,6 +18,7 @@ import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { sendSMS as sendTwilioSMS } from '@/services/twilio.service';
 import { getIo } from '@/socket';
+import { sendEmergencyAlertEmail } from '@/utils/services/email';
 
 // Initialize Expo SDK for push notifications
 const expo = new Expo();
@@ -255,9 +256,15 @@ export async function notifyEmergencyContacts(
     }
 
     // Get user's emergency contacts
-    const contacts = await db.query.emergencyContact.findMany({
-      where: eq(emergencyContact.userId, data.userId),
-    });
+    const contacts = (
+      await db.query.emergencyContact.findMany({
+        where: eq(emergencyContact.userId, data.userId),
+        orderBy: [
+          asc(emergencyContact.priority),
+          asc(emergencyContact.createdAt),
+        ],
+      })
+    ).slice(0, 3);
 
     if (contacts.length === 0) {
       logger.debug('No emergency contacts found for user:', data.userId);
@@ -287,10 +294,15 @@ export async function notifyEmergencyContacts(
     for (const contact of contacts) {
       if (!contact.notifyOnEmergency) continue;
 
-      const contactMethod = contact.notificationMethod || notificationMethod;
-
-      // Send SMS if enabled
-      if (contactMethod === 'sms' || contactMethod === 'both') {
+      if (contact.email) {
+        await sendEmergencyAlertEmail(
+          contact.email,
+          contact.name,
+          data.userName,
+          data.emergencyType,
+          googleMapsUrl
+        );
+      } else {
         await sendSMS({
           to: contact.phoneNumber,
           message: smsMessage,
@@ -298,11 +310,7 @@ export async function notifyEmergencyContacts(
         });
       }
 
-      // Send push notification if contact has the app and push token
-      if (
-        (contactMethod === 'push' || contactMethod === 'both') &&
-        contact.pushToken
-      ) {
+      if (contact.pushToken) {
         await sendPushNotification([contact.pushToken], pushNotification);
       }
     }
