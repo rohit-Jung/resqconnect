@@ -1,5 +1,7 @@
 import winston from 'winston';
 
+import { envConfig } from '../env.config';
+
 const levels = {
   error: 0,
   warn: 1,
@@ -24,35 +26,50 @@ const colors = {
   verbose: 'cyan',
 };
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+const isDevelopment = envConfig.node_env === 'development';
+
+const plainFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.printf(
+    ({ timestamp, level, message }) =>
+      `${timestamp} [${level.toUpperCase()}] ${message}`
+  )
+);
+
+const colorFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.colorize({ all: true }),
+  winston.format.printf(({ level, message }) => `${level} ${message}`)
+);
 
 const transports = [
-  // Console transport - always for dev, only for errors in prod
   new winston.transports.Console({
     level: isDevelopment ? 'debug' : 'error',
-    format: isDevelopment
-      ? winston.format.combine(
-          winston.format.colorize({ all: true }),
-          winston.format.printf(
-            ({ timestamp, level, message }) =>
-              `${timestamp} [${level.toUpperCase()}] ${message}`
-          )
-        )
-      : winston.format.printf(
-          ({ timestamp, level, message }) =>
-            `${timestamp} [${level.toUpperCase()}] ${message}`
-        ),
+    format: isDevelopment ? colorFormat : plainFormat,
   }),
-  // File transports - always log to files
-  new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-  new winston.transports.File({ filename: 'logs/combined.log' }),
-  new winston.transports.File({ filename: 'logs/info.log', level: 'info' }),
-  new winston.transports.File({ filename: 'logs/debug.log', level: 'debug' }),
+  new winston.transports.File({
+    filename: 'logs/error.log',
+    level: 'error',
+    format: plainFormat,
+  }),
+  new winston.transports.File({
+    filename: 'logs/combined.log',
+    format: plainFormat,
+  }),
+  new winston.transports.File({
+    filename: 'logs/info.log',
+    level: 'info',
+    format: plainFormat,
+  }),
+  new winston.transports.File({
+    filename: 'logs/debug.log',
+    level: 'debug',
+    format: plainFormat,
+  }),
 ];
 
 const format = winston.format.combine(
   winston.format.timestamp(),
-  winston.format.colorize({ all: true }),
   winston.format.printf(
     ({ timestamp, level, message }) =>
       `${timestamp} [${level.toUpperCase()}] ${message}`
