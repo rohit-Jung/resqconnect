@@ -1,3 +1,7 @@
+import { EmergencyStatus } from '@repo/types/constants';
+
+export { EmergencyStatus, EmergencyType } from '@repo/types/constants';
+
 export interface ILocation {
   latitude: number;
   longitude: number;
@@ -15,23 +19,6 @@ export interface IEmergencyRequest {
   assignedProviderId?: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-export enum EmergencyStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  NO_PROVIDERS = 'no_providers_available',
-}
-
-// Match backend ServiceTypeEnum
-export enum EmergencyType {
-  AMBULANCE = 'ambulance',
-  POLICE = 'police',
-  FIRE_TRUCK = 'fire_truck',
-  RESCUE_TEAM = 'rescue_team',
 }
 
 export interface IProvider {

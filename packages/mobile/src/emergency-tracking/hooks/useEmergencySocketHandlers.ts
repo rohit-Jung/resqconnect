@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
 
-export type EmergencySocketManager = {
-  emit: (event: string, payload?: any, cb?: any) => void;
-  on: (event: string, handler: (...args: any[]) => void) => void;
-  off: (event: string, handler: (...args: any[]) => void) => void;
-};
+import type { ISocketManager } from '../../socket/socket-manager';
+
+export type { ISocketManager };
 
 export type SocketEventsMap = {
   USER_JOIN_ROOM: string;
@@ -16,6 +14,7 @@ export type SocketEventsMap = {
   REQUEST_CANCELLED: string;
   REQUEST_CANCELLED_NOTIFICATION: string;
   PROVIDER_CONFIRM_ARRIVAL: string;
+  CANCEL_REQUEST?: string;
 };
 
 export type MapboxToLatLngFn = (coords: any[]) => any[];
@@ -28,7 +27,7 @@ export type UseEmergencySocketHandlersParams<TAssignedProvider> = {
   requestId: string;
   isProvider: boolean;
   socketId?: string;
-  socketManager: EmergencySocketManager;
+  socketManager: ISocketManager;
   socketEvents: SocketEventsMap;
   mapboxToLatLng: MapboxToLatLngFn;
   onProviderLocationUpdate: (location: LocationCoords) => void;
@@ -124,6 +123,7 @@ export function useEmergencySocketHandlers<TAssignedProvider>({
     },
     [
       buildAssignedProvider,
+      mapboxToLatLng,
       parseLocation,
       onProviderLocationUpdate,
       onProviderAccepted,
@@ -207,6 +207,9 @@ export function useEmergencySocketHandlers<TAssignedProvider>({
       socketEvents.REQUEST_CANCELLED_NOTIFICATION,
       handleRequestCancelled
     );
+    if (socketEvents.CANCEL_REQUEST) {
+      socketManager.on(socketEvents.CANCEL_REQUEST, handleRequestCancelled);
+    }
     socketManager.on(
       socketEvents.PROVIDER_CONFIRM_ARRIVAL,
       handleProviderConfirmed
@@ -228,6 +231,9 @@ export function useEmergencySocketHandlers<TAssignedProvider>({
         socketEvents.REQUEST_CANCELLED_NOTIFICATION,
         handleRequestCancelled
       );
+      if (socketEvents.CANCEL_REQUEST) {
+        socketManager.off(socketEvents.CANCEL_REQUEST, handleRequestCancelled);
+      }
       socketManager.off(
         socketEvents.PROVIDER_CONFIRM_ARRIVAL,
         handleProviderConfirmed

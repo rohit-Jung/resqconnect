@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./socket": "./src/socket/index.ts",
+    "./utils": "./src/utils/index.ts",
     "./emergency-tracking": "./src/emergency-tracking/index.ts",
     "./emergency-tracking/components": "./src/emergency-tracking/components/index.ts",
     "./emergency-tracking/constants": "./src/emergency-tracking/constants.ts",
@@ -19,11 +21,15 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0"
   },
+  "dependencies": {
+    "@repo/types": "*"
+  },
   "devDependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/react": "19.2.2",
-    "@expo/vector-icons": "^15.0.3",
+    "@types/socket.io-client": "^3.0.0",
     "eslint": "^9.39.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -36,6 +42,7 @@
     "react": "^19",
     "react-native": "*",
     "react-native-maps": "*",
-    "react-native-safe-area-context": "*"
+    "react-native-safe-area-context": "*",
+    "socket.io-client": "^4.8.3"
   }
 }

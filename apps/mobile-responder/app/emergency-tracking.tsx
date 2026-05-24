@@ -11,7 +11,12 @@ import {
   MAP_CONFIG,
   STATUS_MESSAGES,
 } from '@repo/mobile/emergency-tracking/constants';
-import { usePulseAnimation } from '@repo/mobile/emergency-tracking/hooks';
+import {
+  useEmergencySocketHandlers,
+  usePulseAnimation,
+  useRemainingRoute,
+  useRouteFetcher,
+} from '@repo/mobile/emergency-tracking/hooks';
 
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,7 +33,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SocketEvents } from '@/constants/socket.constants';
 import { TEST_CORDS } from '@/constants/test.constants';
-import { useSocketHandlers } from '@/hooks/useSocketHandlers';
 import { useEmergencyActions } from '@/services/emergency/emergency.actions';
 import { useGetEmergencyRequest } from '@/services/emergency/emergency.api';
 import { fetchRoute } from '@/services/maps/maps.api';
@@ -36,18 +40,25 @@ import { socketManager } from '@/socket/socket-manager';
 import { useProviderStore } from '@/store/providerStore';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus } from '@/types/emergency.types';
-import {
-  getRemainingRouteAfterProgress,
-  haversineDistance,
-  mapboxToLatLng,
-} from '@/utils/location.utils';
+import { getPointAtProgress, mapboxToLatLng } from '@/utils/location.utils';
 
 interface LocationCoords {
   latitude: number;
   longitude: number;
 }
 
-export default function EmergencyTrackingScreen() {
+const socketEvents = {
+  USER_JOIN_ROOM: SocketEvents.USER_JOIN_ROOM,
+  PROVIDER_LOCATION_UPDATED: SocketEvents.PROVIDER_LOCATION_UPDATED,
+  USER_LOCATION_UPDATED: SocketEvents.USER_LOCATION_UPDATED,
+  REQUEST_ACCEPTED: SocketEvents.REQUEST_ACCEPTED,
+  REQUEST_COMPLETED: SocketEvents.REQUEST_COMPLETED,
+  REQUEST_CANCELLED: SocketEvents.REQUEST_CANCELLED,
+  REQUEST_CANCELLED_NOTIFICATION: SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+  PROVIDER_CONFIRM_ARRIVAL: SocketEvents.PROVIDER_CONFIRM_ARRIVAL,
+} as const;
+
+export default function ProviderEmergencyTrackingScreen() {
   const router = useRouter();
   const { requestId, emergencyType } = useLocalSearchParams<{
     requestId: string;
@@ -55,22 +66,20 @@ export default function EmergencyTrackingScreen() {
   }>();
 
   const mapRef = useRef<MapView>(null);
-  const lastRouteFetchLocation = useRef<LocationCoords | null>(null);
   const locationBroadcastTimer = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
-  const isRouteRefetchingRef = useRef(false);
   const simulationProgressRef = useRef(0);
-
+  const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
   const isSimulatingRef = useRef<boolean>(false);
 
   const isProvider = true;
   const provider = useProviderStore(s => s.provider);
   const didProviderConnectRef = useRef<string | null>(null);
-  const initialUserLocation = TEST_CORDS;
 
-  const [userLocation, setUserLocation] =
-    useState<LocationCoords>(initialUserLocation);
+  const [userLocation, setUserLocation] = useState<LocationCoords>(TEST_CORDS);
   const [myLocation, setMyLocation] = useState<LocationCoords | null>(null);
   const [providerLocation, setProviderLocation] =
     useState<LocationCoords | null>(null);
@@ -84,225 +93,88 @@ export default function EmergencyTrackingScreen() {
   } | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-
   const [localStatus, setLocalStatus] = useState<EmergencyStatus>(
     EmergencyStatus.ACCEPTED
   );
-
-  const [isConfirmingArrival, setIsConfirmingArrival] =
-    useState<boolean>(false);
-
+  const [isConfirmingArrival, setIsConfirmingArrival] = useState(false);
   const [, setIsProcessingConfirmation] = useState(false);
 
   const { socket, isConnected } = useSocketStore();
   const pulseAnim = usePulseAnimation(localStatus);
+  const currentStatus = localStatus;
 
-  // Provider must connect to the request so backend sets providerConnectedAt
-  // and the disconnection worker doesn't rebroadcast the same request.
+  //  Connect provider to request
   useEffect(() => {
-    if (!isProvider) return;
-    if (!requestId) return;
-    if (!provider?.id) return;
-    if (!isConnected) return;
-
+    if (!requestId || !provider?.id || !isConnected) return;
     if (didProviderConnectRef.current === requestId) return;
     didProviderConnectRef.current = requestId;
-
     socketManager.emit(SocketEvents.PROVIDER_CONNECT, {
       requestId,
       providerId: provider.id,
     });
-  }, [isProvider, requestId, provider?.id, isConnected]);
+  }, [requestId, provider?.id, isConnected]);
 
-  // Fetch emergency request status
+  //  Fetch request
   const { data: requestData, isLoading: isLoadingRequest } =
     useGetEmergencyRequest(requestId || '', !!requestId);
-
   const emergencyRequest = requestData?.data?.data;
 
-  // Use local status that can be updated from socket events
-  const currentStatus = localStatus;
-
-  // Get status message based on current status and role
-  const getStatusMessage = useCallback(() => {
-    switch (currentStatus) {
-      case EmergencyStatus.PENDING:
-        return STATUS_MESSAGES.pending;
-      case EmergencyStatus.ACCEPTED:
-        return isProvider
-          ? STATUS_MESSAGES.acceptedProvider
-          : STATUS_MESSAGES.acceptedUser;
-      case EmergencyStatus.IN_PROGRESS:
-        return STATUS_MESSAGES.in_progress;
-      case EmergencyStatus.COMPLETED:
-        return STATUS_MESSAGES.completed;
-      default:
-        return STATUS_MESSAGES.pending;
-    }
-  }, [currentStatus, isProvider]);
-
-  // Sync local status with server data on initial load
   useEffect(() => {
     if (emergencyRequest?.status) {
       setLocalStatus(emergencyRequest.status as EmergencyStatus);
     }
   }, [emergencyRequest?.status]);
 
-  // Calculate origin and destination for route
+  //  Route origin / destination
   const routeOrigin = useMemo(() => {
-    if (isProvider && myLocation) {
-      return { lat: myLocation.latitude, lng: myLocation.longitude };
-    }
-    if (!isProvider && providerLocation) {
-      return {
-        lat: providerLocation.latitude,
-        lng: providerLocation.longitude,
-      };
-    }
-    return null;
-  }, [isProvider, myLocation, providerLocation]);
+    if (!myLocation) return null;
+    return { lat: myLocation.latitude, lng: myLocation.longitude };
+  }, [myLocation]);
 
-  const routeDestination = useMemo(() => {
-    return { lat: userLocation.latitude, lng: userLocation.longitude };
-  }, [userLocation]);
+  const routeDestination = useMemo(
+    () => ({ lat: userLocation.latitude, lng: userLocation.longitude }),
+    [userLocation]
+  );
 
-  // Fetch route function
-  const fetchAndUpdateRoute = useCallback(async () => {
-    if (!routeOrigin || !routeDestination || isRouteRefetchingRef.current)
+  //  Route fetcher
+  const { fetchAndUpdateRoute } = useRouteFetcher({
+    routeOrigin,
+    routeDestination,
+    userLocation,
+    fetchRoute,
+    isSimulatingRef,
+    simulationProgressRef,
+    setRouteCoordinates,
+    setRemainingRouteCoordinates,
+    setRouteInfo,
+    setIsLoadingRoute,
+  });
+
+  //  polyline trimming
+  useRemainingRoute({
+    movingParty: myLocation,
+    userLocation,
+    routeCoordinates,
+    currentStatus,
+    setRemainingRouteCoordinates,
+  });
+
+  //  trigger route fetch whenever origin changes (provider moves)
+  useEffect(() => {
+    if (
+      currentStatus !== EmergencyStatus.ACCEPTED &&
+      currentStatus !== EmergencyStatus.IN_PROGRESS
+    )
       return;
-    if (isSimulatingRef.current) return;
+    if (!routeOrigin || !routeDestination) return;
+    fetchAndUpdateRoute();
+  }, [currentStatus, routeOrigin, routeDestination, fetchAndUpdateRoute]);
 
-    // Check if we need to refetch (significant movement)
-    if (lastRouteFetchLocation.current) {
-      const moved = haversineDistance(
-        lastRouteFetchLocation.current.latitude,
-        lastRouteFetchLocation.current.longitude,
-        routeOrigin.lat,
-        routeOrigin.lng
-      );
-      if (moved < LOCATION_TRACKING.ROUTE_REFETCH_THRESHOLD) {
-        return; // Don't refetch, movement too small
-      }
-    }
-
-    isRouteRefetchingRef.current = true;
-    setIsLoadingRoute(true);
-
-    try {
-      const route = await fetchRoute({
-        origin: routeOrigin,
-        dest: routeDestination,
-      });
-
-      if (route) {
-        const coords = mapboxToLatLng(route.coordinates);
-        setRouteCoordinates(coords);
-        // Initialize remaining route with full route
-        setRemainingRouteCoordinates(coords);
-        // Reset simulation progress when new route is loaded
-        simulationProgressRef.current = 0;
-        setRouteInfo({
-          distance: route.distance,
-          duration: route.duration,
-        });
-        lastRouteFetchLocation.current = {
-          latitude: routeOrigin.lat,
-          longitude: routeOrigin.lng,
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching route:', error);
-    } finally {
-      setIsLoadingRoute(false);
-      isRouteRefetchingRef.current = false;
-    }
-  }, [routeOrigin, routeDestination]);
-
-  // Pulse animation is now handled by usePulseAnimation hook
-  // No need for separate useEffect
-
-  // Simulated location movement along route (for testing only)
-  // Enable with EXPO_PUBLIC_TEST_MODE=true in .env
-  // useEffect(() => {
-  //   const isTestMode = process.env.EXPO_PUBLIC_TEST_MODE === 'true';
-  //   console.log("Is test Mode", isTestMode)
-  //
-  //   // Only enable in test mode when we have a route and emergency is active
-  //   if (
-  //     !isTestMode ||
-  //     !routeCoordinates.length ||
-  //     currentStatus !== EmergencyStatus.ACCEPTED ||
-  //     !isProvider
-  //   ) {
-  //     return;
-  //   }
-  //
-  //   console.log(
-  //     '[SIMULATION] Starting simulated location movement along route'
-  //   );
-  //
-  //   isSimulatingRef.current = true;
-  //
-  //   // Start simulation
-  //   simulationTimerRef.current = setInterval(() => {
-  //     simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
-  //
-  //     // Stop when reached destination
-  //     if (simulationProgressRef.current >= 1) {
-  //       simulationProgressRef.current = 1;
-  //       if (simulationTimerRef.current) {
-  //         clearInterval(simulationTimerRef.current);
-  //         isSimulatingRef.current = false;
-  //         simulationTimerRef.current = null;
-  //       }
-  //       console.log('[SIMULATION] Reached destination');
-  //       // Clear remaining route when destination reached
-  //       setRemainingRouteCoordinates([]);
-  //       return;
-  //     }
-  //
-  //     // Calculate new location along route
-  //     const newLocation = getPointAtProgress(
-  //       routeCoordinates,
-  //       simulationProgressRef.current
-  //     );
-  //
-  //     if (newLocation) {
-  //       console.log(
-  //         `[SIMULATION] Simulated location progress: ${(
-  //           simulationProgressRef.current * 100
-  //         ).toFixed(1)}%`,
-  //         newLocation
-  //       );
-  //
-  //       // Update provider's location for real-time display
-  //       setMyLocation(newLocation);
-  //       setProviderLocation(newLocation);
-  //
-  //       // Update remaining route (polyline trimming)
-  //       const remaining = getRemainingRouteAfterProgress(
-  //         routeCoordinates,
-  //         simulationProgressRef.current
-  //       );
-  //       console.log('Remaining', remaining);
-  //       setRemainingRouteCoordinates(remaining);
-  //     }
-  //   }, LOCATION_TRACKING.SIMULATION_INTERVAL);
-  //
-  //   return () => {
-  //     if (simulationTimerRef.current) {
-  //       clearInterval(simulationTimerRef.current);
-  //       isSimulatingRef.current = false;
-  //       simulationTimerRef.current = null;
-  //     }
-  //   };
-  // }, [routeCoordinates, currentStatus, isProvider]);
-
-  // Start location tracking
+  //  gps location tracking
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
 
-    const startLocationTracking = async () => {
+    const startTracking = async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
@@ -312,212 +184,179 @@ export default function EmergencyTrackingScreen() {
         return;
       }
 
-      if (isProvider) {
-        // PROVIDER: Use real GPS location with continuous updates
-        const currentLocation = await Location.getCurrentPositionAsync({
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const initial = {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      };
+      setMyLocation(initial);
+      setProviderLocation(initial);
+
+      locationSubscription = await Location.watchPositionAsync(
+        {
           accuracy: Location.Accuracy.High,
-        });
-        const initialLocation = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        };
-        setMyLocation(initialLocation);
-        setProviderLocation(initialLocation);
-
-        // Subscribe to continuous location updates for provider
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: LOCATION_TRACKING.LOCATION_UPDATE_INTERVAL,
-            distanceInterval: LOCATION_TRACKING.LOCATION_DISTANCE_INTERVAL,
-          },
-          location => {
-            const newLocation = {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            };
-            setMyLocation(newLocation);
-            setProviderLocation(newLocation);
-          }
-        );
-      } else {
-        // USER: Use test coordinates only (for testing)
-        setMyLocation(TEST_CORDS);
-        // Note: userLocation is already initialized with TEST_CORDS
-      }
+          timeInterval: LOCATION_TRACKING.LOCATION_UPDATE_INTERVAL,
+          distanceInterval: LOCATION_TRACKING.LOCATION_DISTANCE_INTERVAL,
+        },
+        loc => {
+          const updated = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          };
+          setMyLocation(updated);
+          setProviderLocation(updated);
+        }
+      );
     };
 
-    startLocationTracking();
-
+    startTracking();
     return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
+      locationSubscription?.remove();
     };
-  }, [isProvider]);
+  }, []);
 
-  // Broadcast location updates via socket
+  //  Broadcast location via socket
   useEffect(() => {
     if (!requestId || !myLocation) return;
 
-    const broadcastLocation = () => {
-      if (socket && isConnected && myLocation) {
-        socketManager.emit(SocketEvents.LOCATION_UPDATE, {
-          requestId,
-          providerId: isProvider ? socket.id : undefined,
-          userId: !isProvider ? socket.id : undefined,
-          location: {
-            lat: myLocation.latitude,
-            lng: myLocation.longitude,
-          },
-          timestamp: Date.now(),
-          isProvider,
-        });
-      }
+    const broadcast = () => {
+      if (!socket || !isConnected) return;
+      socketManager.emit(SocketEvents.LOCATION_UPDATE, {
+        requestId,
+        providerId: socket.id,
+        location: { lat: myLocation.latitude, lng: myLocation.longitude },
+        timestamp: Date.now(),
+        isProvider: true,
+      });
     };
 
-    // Broadcast immediately
-    broadcastLocation();
-
-    // Set up interval for periodic broadcasts
+    broadcast();
     locationBroadcastTimer.current = setInterval(
-      broadcastLocation,
+      broadcast,
       LOCATION_TRACKING.LOCATION_BROADCAST_INTERVAL
     );
-
     return () => {
-      if (locationBroadcastTimer.current) {
+      if (locationBroadcastTimer.current)
         clearInterval(locationBroadcastTimer.current);
-      }
     };
-  }, [requestId, myLocation, socket, isConnected, isProvider]);
+  }, [requestId, myLocation, socket, isConnected]);
 
-  // Socket listeners for real-time updates
-  const { setupSocketListeners } = useSocketHandlers({
+  //  Socket listeners
+  const handleRemoveIncomingRequest = useCallback((reqId: string) => {
+    const store = useProviderStore.getState();
+    store.removeIncomingRequest(reqId);
+    store.setCurrentRequest(null);
+    store.setServiceStatus('available');
+  }, []);
+
+  const { setupSocketListeners } = useEmergencySocketHandlers({
     requestId: requestId || '',
     isProvider,
-    socket,
+    socketId: socket?.id,
+    socketManager,
+    socketEvents,
+    mapboxToLatLng,
     onProviderLocationUpdate: setProviderLocation,
     onUserLocationUpdate: setUserLocation,
-    onProviderAccepted: () => {
-      setLocalStatus(EmergencyStatus.ACCEPTED);
-    },
-    onEmergencyCompleted: () => {
-      setIsProcessingConfirmation(false);
-    },
+    onProviderAccepted: () => setLocalStatus(EmergencyStatus.ACCEPTED),
+    onEmergencyCompleted: () => setIsProcessingConfirmation(false),
     onRouteCoordinatesUpdate: setRouteCoordinates,
     onRouteInfoUpdate: setRouteInfo,
+    onRemoveIncomingRequest: handleRemoveIncomingRequest,
+    navigateAfterExit: () => router.replace('/(provider)/dashboard'),
+    buildAssignedProvider: (data: any) => data.provider,
   });
 
   useEffect(() => {
     if (!requestId) return;
-    const cleanup = setupSocketListeners();
-    return cleanup;
+    return setupSocketListeners();
   }, [requestId, setupSocketListeners]);
 
-  // Update remaining route when my location changes (real-time polyline trimming for provider)
+  //  test-mode simulation
   useEffect(() => {
+    const isTestMode = process.env.EXPO_PUBLIC_TEST_MODE === 'true';
     if (
-      isProvider &&
-      myLocation &&
-      routeCoordinates.length > 0 &&
-      currentStatus === EmergencyStatus.ACCEPTED
-    ) {
-      // Find the closest point on the route to current location
-      let minDist = Infinity;
-      let closestIndex = 0;
+      !isTestMode ||
+      !routeCoordinates.length ||
+      currentStatus !== EmergencyStatus.ACCEPTED
+    )
+      return;
 
-      for (let i = 0; i < routeCoordinates.length; i++) {
-        const dist = haversineDistance(
-          myLocation.latitude,
-          myLocation.longitude,
-          routeCoordinates[i].latitude,
-          routeCoordinates[i].longitude
-        );
-        if (dist < minDist) {
-          minDist = dist;
-          closestIndex = i;
+    console.log('[SIMULATION] Provider: starting');
+    isSimulatingRef.current = true;
+
+    simulationTimerRef.current = setInterval(() => {
+      simulationProgressRef.current += LOCATION_TRACKING.SIMULATION_INCREMENT;
+
+      if (simulationProgressRef.current >= 1) {
+        simulationProgressRef.current = 1;
+        if (simulationTimerRef.current) {
+          clearInterval(simulationTimerRef.current);
+          simulationTimerRef.current = null;
+          isSimulatingRef.current = false;
         }
+        console.log('[SIMULATION] Provider: reached destination');
+        setRemainingRouteCoordinates([]);
+        return;
       }
 
-      // Calculate progress based on closest point
-      const progress = closestIndex / (routeCoordinates.length - 1);
-      const remaining = getRemainingRouteAfterProgress(
+      const newLocation = getPointAtProgress(
         routeCoordinates,
-        progress
+        simulationProgressRef.current
       );
-      setRemainingRouteCoordinates(remaining);
-    }
-  }, [myLocation, routeCoordinates, isProvider, currentStatus]);
-
-  // Fetch route when status changes or when locations become available
-  // For user: Only fetch if route wasn't already set from acceptance event
-  useEffect(() => {
-    if (
-      currentStatus === EmergencyStatus.ACCEPTED ||
-      currentStatus === EmergencyStatus.IN_PROGRESS
-    ) {
-      // Only fetch if we have the required locations AND route is not already set
-      if (routeOrigin && routeDestination) {
-        // For user: If we don't have route coordinates yet, fetch them
-        // For provider: Always try to fetch/update route based on current position
-        if (isProvider || routeCoordinates.length === 0) {
-          console.log('Fetching route:', {
-            routeOrigin,
-            routeDestination,
-            currentStatus,
-            hasExistingRoute: routeCoordinates.length > 0,
-          });
-          fetchAndUpdateRoute();
-        }
-      } else {
-        console.log('Cannot fetch route - missing locations:', {
-          hasOrigin: !!routeOrigin,
-          hasDest: !!routeDestination,
-          isProvider,
-          myLocation,
-          providerLocation,
-        });
+      if (newLocation) {
+        setMyLocation(newLocation);
+        setProviderLocation(newLocation);
       }
+    }, LOCATION_TRACKING.SIMULATION_INTERVAL);
+
+    return () => {
+      if (simulationTimerRef.current) {
+        clearInterval(simulationTimerRef.current);
+        simulationTimerRef.current = null;
+        isSimulatingRef.current = false;
+      }
+    };
+  }, [routeCoordinates, currentStatus]);
+
+  //  handlers
+  const getStatusMessage = useCallback(() => {
+    switch (currentStatus) {
+      case EmergencyStatus.PENDING:
+        return STATUS_MESSAGES.pending;
+      case EmergencyStatus.ACCEPTED:
+        return STATUS_MESSAGES.acceptedProvider;
+      case EmergencyStatus.IN_PROGRESS:
+        return STATUS_MESSAGES.in_progress;
+      case EmergencyStatus.COMPLETED:
+        return STATUS_MESSAGES.completed;
+      default:
+        return STATUS_MESSAGES.pending;
     }
-  }, [
-    currentStatus,
-    routeOrigin,
-    routeDestination,
-    fetchAndUpdateRoute,
-    isProvider,
-    myLocation,
-    providerLocation,
-    routeCoordinates.length,
-  ]);
+  }, [currentStatus]);
 
   const { confirmArrival } = useEmergencyActions();
   const handleConfirmArrival = () => {
-    Alert.alert('Confirm Arrival', 'Have you arrived to the location ?', [
+    Alert.alert('Confirm Arrival', 'Have you arrived at the location?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes, Arrived',
         onPress: async () => {
           if (!requestId) {
             Alert.alert(
-              'Sorry Request ID is not found!',
-              'Simply exit the screen. Thank you for your patience.'
+              'Error',
+              'Request ID not found. Please exit the screen.'
             );
             return;
           }
-
-          // Mark confirmation as in progress to prevent accidental navigation
           setIsProcessingConfirmation(true);
           setIsConfirmingArrival(true);
-
-          // mark confirmation as in progress to prevent accidental navigation
-          setIsProcessingConfirmation(true);
-          setIsConfirmingArrival(true);
-
           try {
             await confirmArrival(requestId);
           } catch {
-            Alert.alert('Error', 'Failed to confirm  arrival');
+            Alert.alert('Error', 'Failed to confirm arrival');
           } finally {
             setIsProcessingConfirmation(false);
             setIsConfirmingArrival(false);
@@ -529,7 +368,6 @@ export default function EmergencyTrackingScreen() {
 
   const handleRecenterMap = () => {
     if (!mapRef.current) return;
-
     const coordinates: LocationCoords[] = [];
     if (
       Number.isFinite(userLocation.latitude) &&
@@ -544,7 +382,6 @@ export default function EmergencyTrackingScreen() {
     ) {
       coordinates.push(providerLocation);
     }
-
     if (coordinates.length > 1) {
       mapRef.current.fitToCoordinates(coordinates, {
         edgePadding: MAP_CONFIG.FIT_TO_COORDINATES_PADDING,
@@ -559,6 +396,7 @@ export default function EmergencyTrackingScreen() {
     }
   };
 
+  //  render
   if (isLoadingRequest) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -573,7 +411,6 @@ export default function EmergencyTrackingScreen() {
       ? (emergencyType as keyof typeof EMERGENCY_ICONS)
       : 'ambulance';
   const emergencyInfo = EMERGENCY_ICONS[emergencyKey];
-  const statusInfo = getStatusMessage();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -604,17 +441,10 @@ export default function EmergencyTrackingScreen() {
 
       <EmergencyTrackingStatusCardProvider
         emergencyInfo={emergencyInfo}
-        statusMessage={statusInfo}
+        statusMessage={getStatusMessage()}
         status={currentStatus}
         pulseAnim={pulseAnim}
-        routeInfo={
-          routeInfo
-            ? {
-                distance: routeInfo.distance,
-                duration: routeInfo.duration,
-              }
-            : null
-        }
+        routeInfo={routeInfo ?? null}
         isLoadingRoute={isLoadingRoute}
         isConfirmingArrival={isConfirmingArrival}
         isConnected={isConnected}
@@ -625,10 +455,7 @@ export default function EmergencyTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.OFF_WHITE,
-  },
+  container: { flex: 1, backgroundColor: COLORS.OFF_WHITE },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -653,5 +480,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.LIGHT_GRAY,
   },
-  // Header, map markers, and status card styles live in the shared package.
 });

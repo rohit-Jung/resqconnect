@@ -1,3 +1,7 @@
+import { EmergencyStatus } from '@repo/types/constants';
+
+export { EmergencyStatus, EmergencyType } from '@repo/types/constants';
+
 export interface ILocation {
   latitude: number;
   longitude: number;
@@ -15,23 +19,6 @@ export interface IEmergencyRequest {
   assignedProviderId?: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-export enum EmergencyStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  NO_PROVIDERS = 'no_providers_available',
-}
-
-// Match backend ServiceTypeEnum
-export enum EmergencyType {
-  AMBULANCE = 'ambulance',
-  POLICE = 'police',
-  FIRE_TRUCK = 'fire_truck',
-  RESCUE_TEAM = 'rescue_team',
 }
 
 export interface IProvider {
@@ -65,7 +52,6 @@ export interface ICreateEmergencyResponse {
   emergencyRequest: IEmergencyRequest;
 }
 
-// History types
 export interface IEmergencyHistoryItem {
   id: string;
   emergencyType: string;
@@ -75,7 +61,6 @@ export interface IEmergencyHistoryItem {
   updatedAt?: string;
   resolvedAt?: string;
   emergencyLocation: ILocation;
-  // For user history - provider info
   provider?: {
     id: string;
     name: string;
@@ -83,15 +68,13 @@ export interface IEmergencyHistoryItem {
     vehicleNumber?: string;
     serviceType: string;
   };
-  // For provider history - user info
   user?: {
     id: string;
     name: string;
     phoneNumber?: string;
   };
-  // Stats
-  responseTime?: number; // in seconds
-  distanceTraveled?: number; // in meters
+  responseTime?: number;
+  distanceTraveled?: number;
 }
 
 export interface IEmergencyHistoryResponse {
