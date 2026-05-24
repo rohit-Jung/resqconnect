@@ -38,11 +38,13 @@ app.use(populateUserFromToken);
 app.use(auditLogMiddleware);
 app.use(phiMaskMiddleware);
 
-// global rate limiting to all routes (baseline DDoS protection)
-app.use(globalLimiter);
+if (envConfig.node_env === 'production') {
+  // global rate limiting to all routes (baseline DDoS protection)
+  app.use(globalLimiter);
+}
 
 // org limiter only on orgs
-if (envConfig.mode == 'silo') {
+if (envConfig.mode == 'silo' && envConfig.node_env === 'production') {
   // enforce org-tiered api limits (15m window).
   // uses redis so  works across instances.
   app.use(orgTierApiLimiter);
