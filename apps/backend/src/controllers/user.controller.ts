@@ -6,6 +6,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { latLngToCell } from 'h3-js';
 
+import { logger } from '@/config';
 import {
   DEFAULT_LATITUDE,
   DEFAULT_LONGITUDE,
@@ -52,7 +53,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (existingUser) {
-    console.log('User with this email or phone number already exists');
+    logger.debug('User with this email or phone number already exists');
     throw ApiError.badRequest(
       'User with this email or phone number already exists'
     );
@@ -95,11 +96,11 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!newUser) {
-    console.log('Error registering user. Please try again');
+    logger.debug('Error registering user. Please try again');
     throw ApiError.badRequest('Error registering user. Please try again');
   }
 
-  console.log('User registered');
+  logger.debug('User registered');
   res.status(201).json(
     new ApiResponse(201, 'User registered successfully', {
       user: newUser[0],
@@ -147,7 +148,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const isPasswordValid = await bcrypt.compare(password, existingUser.password);
 
   if (!isPasswordValid) {
-    console.log('Invalid credentials');
+    logger.debug('Invalid credentials');
     await recordLoginFailure(email);
     throw ApiError.badRequest('Invalid credentials');
   }
@@ -158,7 +159,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     const otpToken = await sendOTP(existingUser.email, existingUser.name);
 
     if (!otpToken) {
-      console.log('Error Sending OTP token. Please try again');
+      logger.debug('Error Sending OTP token. Please try again');
       throw ApiError.serviceUnavailable(
         'Error Sending OTP token. Please try again'
       );
@@ -166,7 +167,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    console.log('Setting token expiry:', {
+    logger.debug('Setting token expiry:', {
       tokenExpiry: tokenExpiry.toISOString(),
       currentTime: new Date().toISOString(),
     });
@@ -180,11 +181,11 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
       .where(eq(user.id, existingUser.id));
 
     if (!updatedUser) {
-      console.log('Error Updating user. Please try again');
+      logger.debug('Error Updating user. Please try again');
       throw ApiError.badRequest('Error Updating user. Please try again');
     }
 
-    console.log('OTP sent to user for verification', {
+    logger.debug('OTP sent to user for verification', {
       userId: existingUser.id,
       otpToken,
     });
@@ -275,7 +276,7 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
@@ -293,13 +294,13 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
   const updateData = req.body;
   if (!updateData || Object.keys(updateData).length === 0) {
-    console.log('No data to update');
+    logger.debug('No data to update');
     throw ApiError.badRequest('No data to update');
   }
 
@@ -308,7 +309,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
   const invalidKeys = Object.keys(updateData).filter(
@@ -316,7 +317,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (invalidKeys.length > 0) {
-    console.log(`Invalid data to update. Invalid keys: ${invalidKeys}`);
+    logger.debug(`Invalid data to update. Invalid keys: ${invalidKeys}`);
     throw ApiError.badRequest(
       `Invalid data to update. Invalid keys: ${invalidKeys}`
     );
@@ -336,7 +337,7 @@ const updateUser = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!updatedUser.length) {
-    console.log('Failed to update user');
+    logger.debug('Failed to update user');
     throw ApiError.internalServerError('Failed to update user');
   }
 
@@ -351,7 +352,7 @@ const getProfile = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
@@ -365,7 +366,7 @@ const getProfile = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.notFound('User not found');
   }
 
@@ -383,7 +384,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || loggedInUser.role !== 'admin') {
-    console.log('User not authorized');
+    logger.debug('User not authorized');
     throw ApiError.unauthorized('User not authorized');
   }
 
@@ -397,7 +398,7 @@ const getUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.notFound('User not found');
   }
 
@@ -419,17 +420,17 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.badRequest('User not found');
   }
 
   if (!user.verificationToken || !user.tokenExpiry) {
-    console.log('Verification token not found');
+    logger.debug('Verification token not found');
     throw ApiError.badRequest('Verification token not found');
   }
 
   if (!existingUser.tokenExpiry) {
-    console.log(
+    logger.debug(
       'Verification token expiry not registered. Please verify again.'
     );
     throw ApiError.badRequest(
@@ -442,12 +443,12 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
   const currentTime = new Date();
 
   if (currentTime.getTime() > tokenExpiry.getTime()) {
-    console.log('Verification token expired');
+    logger.debug('Verification token expired');
     throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.verificationToken) {
-    console.log('Invalid OTP');
+    logger.debug('Invalid OTP');
     throw ApiError.badRequest('Invalid OTP');
   }
 
@@ -472,7 +473,7 @@ const verifyUser = asyncHandler(async (req: Request, res: Response) => {
     !Array.isArray(updatedUser) ||
     (updatedUser[0] && !updatedUser[0].isVerified)
   ) {
-    console.log('Failed to verify user');
+    logger.debug('Failed to verify user');
     throw ApiError.internalServerError('Failed to verify user');
   }
 
@@ -502,7 +503,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found with given email or phone');
+    logger.debug('User not found with given email or phone');
     throw ApiError.notFound('User not found with given email or phone');
   }
 
@@ -513,7 +514,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (!otpToken) {
-    console.log('Error Sending OTP token. Please try again');
+    logger.debug('Error Sending OTP token. Please try again');
     throw ApiError.serviceUnavailable(
       'Error Sending OTP token. Please try again'
     );
@@ -530,7 +531,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     .where(eq(user.id, existingUser.id));
 
   if (!updatedUser) {
-    console.log('Error setting verfication token');
+    logger.debug('Error setting verfication token');
     throw ApiError.badRequest('Error setting verfication token');
   }
 
@@ -550,7 +551,7 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.badRequest('User not found');
   }
 
@@ -558,12 +559,12 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     !existingUser.resetPasswordToken ||
     !existingUser.resetPasswordTokenExpiry
   ) {
-    console.log('Reset Password token not found');
+    logger.debug('Reset Password token not found');
     throw ApiError.badRequest('Reset Password token not found');
   }
 
   if (!existingUser.resetPasswordTokenExpiry) {
-    console.log(
+    logger.debug(
       'Verification token expiry not registered. Please verify again.'
     );
     throw ApiError.badRequest(
@@ -576,12 +577,12 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
   const currentTime = new Date();
 
   if (currentTime.getTime() > tokenExpiry.getTime()) {
-    console.log('Verification token expired');
+    logger.debug('Verification token expired');
     throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.resetPasswordToken) {
-    console.log('Invalid OTP');
+    logger.debug('Invalid OTP');
     throw ApiError.badRequest('Invalid OTP');
   }
 
@@ -602,7 +603,7 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     });
 
   if (!updatedUser.length) {
-    console.log('Failed to update user');
+    logger.debug('Failed to update user');
     throw ApiError.internalServerError('Failed to update user');
   }
 
@@ -617,7 +618,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
   const loggedInUser = req.user;
 
   if (!loggedInUser || !loggedInUser.id) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
@@ -646,7 +647,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
@@ -656,7 +657,7 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (!isPasswordValid) {
-    console.log('Invalid credentials');
+    logger.debug('Invalid credentials');
     throw ApiError.badRequest('Invalid credentials');
   }
 

@@ -13,7 +13,7 @@ import db from '@/db';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
-import { getOptimalRoute, reverseGeoCode } from '@/utils/maps/galli-maps';
+import { getOptimalRoute } from '@/utils/maps/galli-maps';
 
 // Helper function to generate a nearby location
 const generateNearbyLocation = (baseLocation: {
@@ -37,7 +37,8 @@ const createEmergencyResponse = asyncHandler(
       throw ApiError.badRequest('Please login to perform this action');
     }
 
-    let { emergencyRequestId, destLocation } = req.body;
+    const { emergencyRequestId } = req.body;
+    let { destLocation } = req.body;
 
     if (!emergencyRequestId) {
       throw ApiError.badRequest('Emergency ID are required');
@@ -152,11 +153,6 @@ const createEmergencyResponse = asyncHandler(
         .where(eq(serviceProvider.id, serviceProviderId)),
     ]);
 
-    const locationName = await reverseGeoCode(
-      emergencyRequestDetails.location.longitude,
-      emergencyRequestDetails.location.latitude
-    );
-
     if (!updatedStatus) {
       await db
         .delete(emergencyResponse)
@@ -186,9 +182,11 @@ const getEmergencyResponse = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    if (!id) {
+    if (!id || typeof id != 'string') {
       logger.debug('Emergency response ID is required');
-      throw ApiError.badRequest('Emergency response ID is required');
+      throw ApiError.badRequest(
+        'Emergency response ID is required and as string'
+      );
     }
 
     const existingEmergencyResponse =
@@ -214,11 +212,11 @@ const updateEmergencyResponse = asyncHandler(
     const { id } = req.params;
     const { statusUpdate, updateDescription } = req.body;
 
-    logger.debug('🔄 Status Update:', { statusUpdate, updateDescription });
-
-    if (!id) {
+    if (!id || typeof id != 'string') {
       logger.debug('Emergency response ID is required');
-      throw ApiError.badRequest('Emergency response ID is required');
+      throw ApiError.badRequest(
+        'Emergency response ID is required and as string'
+      );
     }
 
     const existingEmergencyResponse =
@@ -321,9 +319,11 @@ const deleteEmergencyResponse = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    if (!id) {
+    if (!id || typeof id != 'string') {
       logger.debug('Emergency response ID is required');
-      throw ApiError.badRequest('Emergency response ID is required');
+      throw ApiError.badRequest(
+        'Emergency response ID is required and as string'
+      );
     }
 
     const existingEmergencyResponse =
@@ -420,6 +420,7 @@ const emergencyResponseController = {
 
 export default emergencyResponseController;
 
+// for backward compatibity TODO: clean up later
 export {
   createEmergencyResponse,
   getEmergencyResponse,

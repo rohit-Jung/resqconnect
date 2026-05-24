@@ -58,7 +58,6 @@ export const orgTierApiLimiter = rateLimit({
     },
   },
   handler: (req, res) => {
-    //@ts-expect-error: req may not have rateLimit field
     const reset = req.rateLimit?.resetTime;
     const resetMs =
       reset instanceof Date

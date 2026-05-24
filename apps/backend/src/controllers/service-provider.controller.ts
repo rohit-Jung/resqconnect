@@ -11,6 +11,7 @@ import { and, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { latLngToCell } from 'h3-js';
 
+import { logger } from '@/config';
 import {
   deleteImage,
   extractPublicIdFromUrl,
@@ -475,7 +476,7 @@ const verifyServiceProvider = asyncHandler(
     const currentTime = new Date();
 
     if (currentTime.getTime() > tokenExpiry.getTime()) {
-      console.log('Verification token expired');
+      logger.debug('Verification token expired');
       throw ApiError.badRequest('Verification token expired');
     }
 
@@ -773,7 +774,7 @@ const resetServiceProviderPassword = asyncHandler(
 
 const getServiceProviderProfile = asyncHandler(
   async (req: Request, res: Response) => {
-    console.log('hitting');
+    logger.debug('hitting');
     const loggedInServiceProvider = req.user;
 
     if (!loggedInServiceProvider || !loggedInServiceProvider.id) {
@@ -901,7 +902,7 @@ const updateServiceProviderStatus = asyncHandler(
       io.to(SocketRoom.PROVIDER(updatedProvider[0].id)).emit(
         SocketEvents.NOTIFICATION_RECEIVED,
         {
-          type: SocketEvents.UDPATE_STATUS,
+          type: SocketEvents.UPDATE_STATUS,
           status: updatedProvider[0].serviceStatus,
         }
       );
@@ -978,7 +979,7 @@ const changeProviderPassword = asyncHandler(
     const loggedInProvider = req.user;
 
     if (!loggedInProvider || !loggedInProvider.id) {
-      console.log('Unauthorized');
+      logger.debug('Unauthorized');
       throw ApiError.unauthorized('Unauthorized');
     }
 
@@ -1007,7 +1008,7 @@ const changeProviderPassword = asyncHandler(
     });
 
     if (!existingProvider) {
-      console.log('Unauthorized');
+      logger.debug('Unauthorized');
       throw ApiError.unauthorized('Unauthorized');
     }
 
@@ -1017,7 +1018,7 @@ const changeProviderPassword = asyncHandler(
     );
 
     if (!isPasswordValid) {
-      console.log('Invalid credentials');
+      logger.debug('Invalid credentials');
       throw ApiError.badRequest('Invalid credentials');
     }
 

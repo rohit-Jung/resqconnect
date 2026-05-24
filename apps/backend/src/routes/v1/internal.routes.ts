@@ -34,12 +34,8 @@ internalRouter.get('/sanitized-index', internalController.sanitizedIndex);
 // Uses internal auth instead of admin JWT.
 internalRouter.get('/admin-dashboard-analytics', getDashboardAnalytics);
 
-// Platform <-> Silo incident bridge endpoints (requires internal auth)
-internalRouter.post(
-  '/incidents/incoming',
-  incidentBridgeController.siloIncomingIncident
-);
-
+// Silo receives platform→silo cancel/status push (HTTP, silo-side only).
+// Silo→platform direction now uses Kafka INCIDENT_STATUS_UPDATE topic.
 internalRouter.post(
   '/incidents/:platformIncidentId/update',
   incidentBridgeController.platformIncidentUpdate

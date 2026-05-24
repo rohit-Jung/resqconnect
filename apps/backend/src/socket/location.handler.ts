@@ -5,10 +5,13 @@ import { latLngToCell } from 'h3-js';
 import { Server, Socket } from 'socket.io';
 
 import { envConfig, logger } from '@/config';
+import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
+import { safeSend } from '@/services/kafka/kafka.service';
+import type { IncidentStatusUpdatePayload } from '@/workers/incident-update.worker';
 
-const LOCATION_RADIUS_METERS = 50;
+const LOCATION_RADIUS_METERS = 1;
 
 function calculateDistance(
   lat1: number,
@@ -32,12 +35,12 @@ function calculateDistance(
 
 export function setupLocationHandlers(io: Server, socket: Socket) {
   socket.on(SocketEvents.LOCATION_UPDATE, async data => {
-    // Handle both nested and flat location formats
+    // handle both nested and flat location formats
     let latitude: number | undefined;
     let longitude: number | undefined;
 
     if (data.location && typeof data.location === 'object') {
-      // Nested format: location: { lat, lng } or location: { latitude, longitude }
+      // nested format: location: { lat, lng } or location: { latitude, longitude }
       latitude = data.location.lat || data.location.latitude;
       longitude = data.location.lng || data.location.longitude;
     } else {
@@ -47,9 +50,9 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
     }
 
     const { requestId, providerId, userId, timestamp } = data;
+    console.log('Received Location update from ', userId ? 'user' : 'provider');
 
     logger.debug(`Location update for request ${requestId}`);
-
     if (!requestId || (!providerId && !userId)) {
       logger.error('Invalid location update data');
       return;
@@ -63,7 +66,7 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
     }
 
     if (providerId) {
-      // Provider location → broadcast to emergency room
+      // provider location → broadcast to emergency room
       io.to(SocketRoom.EMERGENCY(requestId)).emit(
         SocketEvents.PROVIDER_LOCATION_UPDATED,
         {
@@ -75,34 +78,42 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
 
       // Forward to platform for user tracking
       if (envConfig.platform_base_url) {
-        const { postJsonWithRetry } =
-          await import('@/services/internal-http.service');
-
-        // Fetch userId from request in DB
+        logger.info(`Informing the platform about: LOCATION`, requestId);
+        // fetch userid from request in db
         const request = await db.query.emergencyRequest.findFirst({
           where: eq(emergencyRequest.id, requestId),
-          columns: { userId: true },
+          columns: { id: true, userId: true },
         });
 
-        postJsonWithRetry(
-          `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
-          {
-            headers: {
-              'x-internal-api-key': envConfig.internal_api_key as string,
+        if (!request) {
+          return;
+        }
+
+        const updateMsg: IncidentStatusUpdatePayload = {
+          platformIncidentId: request.id,
+          userId: request.userId,
+          eventType: SocketEvents.PROVIDER_LOCATION_UPDATED,
+          role: 'user',
+          provider: {
+            id: providerId,
+            location: { latitude, longitude },
+            timestamp: timestamp || Date.now(),
+          },
+          message: 'Provider accepted your request',
+          payload: {
+            location: {
+              latitude,
+              longitude,
             },
-            body: {
-              userId: request?.userId,
-              eventType: SocketEvents.PROVIDER_LOCATION_UPDATED,
-              payload: {
-                providerId,
-                location: { latitude, longitude },
-                timestamp: timestamp || Date.now(),
-              },
-            },
-            timeoutMs: 1000,
-            retries: 1,
-          }
-        ).catch(e => logger.warn(`[LOCATION] Failed to notify platform: ${e}`));
+          },
+        };
+
+        console.log('UPDATEMSG', JSON.stringify(updateMsg));
+
+        safeSend({
+          topic: KAFKA_TOPICS.INCIDENT_STATUS_UPDATE,
+          messages: [{ key: requestId, value: JSON.stringify(updateMsg) }],
+        }).catch(e => logger.warn(`[ACCEPT] Kafka notify failed: ${e}`));
       }
     } else if (userId) {
       // User location → broadcast to emergency room
@@ -114,6 +125,8 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
           timestamp: timestamp || Date.now(),
         }
       );
+
+      //TODO: Write the same logic for updating the user location in provider too
     }
   });
 
@@ -132,90 +145,92 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
     );
   });
 
-  socket.on(
-    SocketEvents.PROVIDER_PERIODIC_LOCATION,
-    async ({ latitude, longitude, serviceStatus }) => {
-      const providerId = socket.user.id;
-      logger.debug(
-        `[LOCATION] Periodic location update from provider ${providerId}: lat=${latitude}, lng=${longitude}, status=${serviceStatus}`
-      );
-
-      if (!latitude || !longitude) {
-        logger.error('Invalid location data in periodic update');
-        return;
-      }
-
-      if (serviceStatus !== 'available') {
+  if (envConfig.mode === 'silo') {
+    socket.on(
+      SocketEvents.PROVIDER_PERIODIC_LOCATION,
+      async ({ latitude, longitude, serviceStatus }) => {
+        const providerId = socket.user.id;
         logger.debug(
-          `Provider ${providerId} is not available, skipping location broadcast`
+          `[LOCATION] Periodic location update from provider ${providerId}: lat=${latitude}, lng=${longitude}, status=${serviceStatus}`
         );
-        return;
-      }
 
-      try {
-        const existingProvider = await db.query.serviceProvider.findFirst({
-          where: eq(serviceProvider.id, providerId),
-          columns: {
-            currentLocation: true,
-            lastLocation: true,
-          },
-        });
-
-        if (!existingProvider) {
-          logger.error('Provider not found:', providerId);
+        if (!latitude || !longitude) {
+          logger.error('Invalid location data in periodic update');
           return;
         }
 
-        const lastLat = existingProvider.currentLocation?.latitude
-          ? parseFloat(existingProvider.currentLocation.latitude)
-          : null;
-        const lastLng = existingProvider.currentLocation?.longitude
-          ? parseFloat(existingProvider.currentLocation.longitude)
-          : null;
-
-        const hasSignificantChange =
-          !lastLat ||
-          !lastLng ||
-          calculateDistance(lastLat, lastLng, latitude, longitude) >
-            LOCATION_RADIUS_METERS;
-
-        if (!hasSignificantChange) {
+        if (serviceStatus !== 'available') {
           logger.debug(
-            `Provider ${providerId} location within ${LOCATION_RADIUS_METERS}m radius, updating silently`
+            `Provider ${providerId} is not available, skipping location broadcast`
           );
+          return;
         }
 
-        const locationPoint = `POINT(${longitude} ${latitude})`;
-        const h3Index = latLngToCell(latitude, longitude, 8);
-        const h3IndexBigInt = BigInt(`0x${h3Index}`);
-
-        await db
-          .update(serviceProvider)
-          .set({
-            currentLocation: {
-              latitude: latitude.toString(),
-              longitude: longitude.toString(),
+        try {
+          const existingProvider = await db.query.serviceProvider.findFirst({
+            where: eq(serviceProvider.id, providerId),
+            columns: {
+              currentLocation: true,
+              lastLocation: true,
             },
-            lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
-            h3Index: h3IndexBigInt,
-          })
-          .where(eq(serviceProvider.id, providerId));
+          });
 
-        io.to(SocketRoom.PROVIDER(providerId)).emit(
-          SocketEvents.PROVIDER_LOCATION_UPDATED,
-          {
-            providerId,
-            location: { latitude, longitude },
-            timestamp: Date.now(),
+          if (!existingProvider) {
+            logger.error('Provider not found:', providerId);
+            return;
           }
-        );
 
-        logger.debug(
-          `[SUCCESS] Provider ${providerId} location updated and broadcasted`
-        );
-      } catch (error) {
-        logger.error('Error processing periodic location update:', error);
+          const lastLat = existingProvider.currentLocation?.latitude
+            ? parseFloat(existingProvider.currentLocation.latitude)
+            : null;
+          const lastLng = existingProvider.currentLocation?.longitude
+            ? parseFloat(existingProvider.currentLocation.longitude)
+            : null;
+
+          const hasSignificantChange =
+            !lastLat ||
+            !lastLng ||
+            calculateDistance(lastLat, lastLng, latitude, longitude) >
+              LOCATION_RADIUS_METERS;
+
+          if (!hasSignificantChange) {
+            logger.debug(
+              `Provider ${providerId} location within ${LOCATION_RADIUS_METERS}m radius, updating silently`
+            );
+          }
+
+          const locationPoint = `POINT(${longitude} ${latitude})`;
+          const h3Index = latLngToCell(latitude, longitude, 8);
+          const h3IndexBigInt = BigInt(`0x${h3Index}`);
+
+          await db
+            .update(serviceProvider)
+            .set({
+              currentLocation: {
+                latitude: latitude.toString(),
+                longitude: longitude.toString(),
+              },
+              lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
+              h3Index: h3IndexBigInt,
+            })
+            .where(eq(serviceProvider.id, providerId));
+
+          io.to(SocketRoom.PROVIDER(providerId)).emit(
+            SocketEvents.PROVIDER_LOCATION_UPDATED,
+            {
+              providerId,
+              location: { latitude, longitude },
+              timestamp: Date.now(),
+            }
+          );
+
+          logger.debug(
+            `[SUCCESS] Provider ${providerId} location updated and broadcasted`
+          );
+        } catch (error) {
+          logger.error('Error processing periodic location update:', error);
+        }
       }
-    }
-  );
+    );
+  }
 }

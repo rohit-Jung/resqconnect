@@ -22,10 +22,11 @@ import {
   getEmergencyProviders,
   releaseLock,
 } from '@/services/redis.service';
+import type { RouteResult } from '@/types/maps.types';
 import type { TEntityRole } from '@/utils/tokens/jwtTokens';
 import { SMS_TEMPLATES } from '@/workers/messaging.worker';
 
-// Register all emergency-related socket handlers
+// Register all emergency-related socket handlers according to role TODO:
 export function registerEmergencyHandlers(
   io: Server,
   socket: Socket,
@@ -33,6 +34,7 @@ export function registerEmergencyHandlers(
 ): void {
   // Handle provider connecting and joining their personal provider room
   // This allows backend to send NEW_EMERGENCY events to the provider
+  console.log('Reigstering handlers for', role);
   socket.on(
     SocketEvents.PROVIDER_CONNECT,
     async (data: { providerId?: string; requestId?: string }) => {
@@ -256,7 +258,7 @@ async function handleAcceptRequest(
     const provider = providerInfo[0];
 
     // Calculate route from provider to user using Mapbox
-    let routeData = null;
+    let routeData: RouteResult['route'] | null = null;
     if (provider?.currentLocation && request.location) {
       const providerLoc = provider.currentLocation;
       const userLoc = request.location;

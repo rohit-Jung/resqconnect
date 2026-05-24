@@ -4,13 +4,14 @@ import { createServer } from 'node:http';
 
 import 'dotenv/config';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 import '@/services/kafka/kafka.service';
 
 import { app } from './app';
 import { registerSmsWebhook } from './services/sms.service';
 import { initializeSocketServer } from './socket';
 import { startAllWorkers } from './workers/background.worker';
+import { startIncidentUpdateWorker } from './workers/incident-update.worker';
 import { startEmergencyRequestService } from './workers/request.worker';
 
 // now use envconfig which already has cli overrides applied in env.config.ts
@@ -44,8 +45,16 @@ function startServer() {
 
       registerSmsWebhook().catch(err => {
         // TODO: migrate console logs to logger
-        console.log('[WEBHOOK]: error while registering', err);
+        logger.error(
+          '[WEBHOOK]: error while registering',
+          err.message || err.response.message
+        );
       });
+    }
+
+    if (mode === 'platform') {
+      // consume silo→platform incident status updates via Kafka
+      startIncidentUpdateWorker().catch(console.log);
     }
 
     // TODO: this was old polling remove it

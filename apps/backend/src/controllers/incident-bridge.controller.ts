@@ -4,7 +4,7 @@ import { EmergencyRequestPayload } from '@repo/types/validations';
 import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { getIo } from '@/socket';
@@ -51,14 +51,14 @@ const platformIncidentUpdate = asyncHandler(
 
     // best-effort: keep platform db status in sync if requested.
     if (typeof requestStatus === 'string' && requestStatus.length > 0) {
-      console.log('UPdating STATUS', requestStatus);
+      logger.debug('UPdating STATUS', requestStatus);
       await db
         .update(emergencyRequest)
         .set({ requestStatus: requestStatus as any })
         .where(eq(emergencyRequest.id, platformIncidentId));
     }
 
-    console.log(
+    logger.debug(
       'Received incident update for',
       platformIncidentId,
       'eventType',
@@ -75,7 +75,7 @@ const platformIncidentUpdate = asyncHandler(
           ? SocketRoom.PROVIDER(userId)
           : SocketRoom.USER(userId);
 
-      console.log('Emitting to room', room, 'eventType', eventType);
+      logger.debug('Emitting to room', room, 'eventType', eventType);
 
       switch (eventType) {
         case SocketEvents.REQUEST_ACCEPTED:

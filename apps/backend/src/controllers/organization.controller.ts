@@ -13,6 +13,7 @@ import { and, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { latLngToCell } from 'h3-js';
 
+import { logger } from '@/config';
 import { H3_RESOLUTION } from '@/constants';
 import db from '@/db';
 import { getLatestOrgEntitlements } from '@/services/entitlements.service';
@@ -271,7 +272,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingOrg) {
-    console.log('User not found');
+    logger.debug('User not found');
     if (typeof email === 'string') await recordLoginFailure(email);
     throw ApiError.badRequest('User not found');
   }
@@ -279,7 +280,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   const isPasswordValid = await bcrypt.compare(password, existingOrg.password);
 
   if (!isPasswordValid) {
-    console.log('Invalid credentials');
+    logger.debug('Invalid credentials');
     if (typeof email === 'string') await recordLoginFailure(email);
     throw ApiError.badRequest('Invalid credentials');
   }
@@ -293,7 +294,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
     );
 
     if (!otpToken) {
-      console.log('Error Sending OTP token. Please try again');
+      logger.debug('Error Sending OTP token. Please try again');
       throw ApiError.serviceUnavailable(
         'Error Sending OTP token. Please try again'
       );
@@ -301,7 +302,7 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
 
     const tokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    console.log('Setting token expiry:', {
+    logger.debug('Setting token expiry:', {
       tokenExpiry: tokenExpiry.toISOString(),
       currentTime: new Date().toISOString(),
     });
@@ -315,11 +316,11 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
       .where(eq(organization.id, existingOrg.id));
 
     if (!updatedOrg) {
-      console.log('Error Updating org. Please try again');
+      logger.debug('Error Updating org. Please try again');
       throw ApiError.badRequest('Error Updating org. Please try again');
     }
 
-    console.log('OTP sent to user for verification', {
+    logger.debug('OTP sent to user for verification', {
       organizationId: existingOrg.id,
       otpToken,
     });
@@ -397,12 +398,12 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingUser) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.badRequest('User not found');
   }
 
   if (!existingUser.tokenExpiry) {
-    console.log(
+    logger.debug(
       'Verification token expiry not registered. Please verify again.'
     );
     throw ApiError.badRequest(
@@ -415,12 +416,12 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
   const currentTime = new Date();
 
   if (currentTime.getTime() > tokenExpiry.getTime()) {
-    console.log('Verification token expired');
+    logger.debug('Verification token expired');
     throw ApiError.badRequest('Verification token expired');
   }
 
   if (otpToken !== existingUser.verificationToken) {
-    console.log('Invalid OTP');
+    logger.debug('Invalid OTP');
     throw ApiError.badRequest('Invalid OTP');
   }
 
@@ -442,7 +443,7 @@ const verifyOrgOTP = asyncHandler(async (req: Request, res: Response) => {
     !Array.isArray(updatedUser) ||
     (updatedUser[0] && !updatedUser[0].isVerified)
   ) {
-    console.log('Failed to verify user');
+    logger.debug('Failed to verify user');
     throw ApiError.internalServerError('Failed to verify user');
   }
 
@@ -512,7 +513,7 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
   const loggedInOrg = req.user;
 
   if (!loggedInOrg || !loggedInOrg.id) {
-    console.log('Unauthorized');
+    logger.debug('Unauthorized');
     throw ApiError.unauthorized('Unauthorized');
   }
 
@@ -526,7 +527,7 @@ const getOrgProfile = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!existingOrg) {
-    console.log('User not found');
+    logger.debug('User not found');
     throw ApiError.notFound('User not found');
   }
 
@@ -611,7 +612,7 @@ const getOrgServiceProviders = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
 
-    console.log('[DEBUG] getOrgProviders', loggedInOrg);
+    logger.debug('[DEBUG] getOrgProviders', loggedInOrg);
 
     if (!loggedInOrg || !loggedInOrg.id) {
       throw ApiError.unauthorized('Unauthorized');
@@ -626,7 +627,7 @@ const getOrgServiceProviders = asyncHandler(
       },
     });
 
-    console.log('[DEBUG] getOrgProviders', providers);
+    logger.debug('[DEBUG] getOrgProviders', providers);
 
     res
       .status(200)
