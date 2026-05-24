@@ -10,6 +10,9 @@ export enum KAFKA_TOPICS {
   POLICE_EVENTS = 'police_events',
   RESCUE_EVENTS = 'rescue_events',
   FIRE_EVENTS = 'fire_events',
+
+  // silo -> platform incident status updates (replaces HTTP incident bridge)
+  INCIDENT_STATUS_UPDATE = 'incident_status_update',
 }
 
 export enum EVENT_TYPES {
@@ -22,6 +25,7 @@ export enum EVENT_TYPES {
 export enum KAFKA_CONSUMER_ID {
   NOTIFICATION = 'notification_updates_group',
   ASSIGN_RESPONDER = 'assign_responder_group',
+  INCIDENT_STATUS_UPDATE = 'incident_status_update_group',
 }
 
 export const OUTBOX_EVENT_TYPES = {
