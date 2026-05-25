@@ -135,6 +135,7 @@ vi.mock('@/services/redis.service', () => ({
   releaseLock: vi.fn().mockResolvedValue(true),
   getEmergencyProviders: vi.fn().mockResolvedValue([]),
   clearEmergencyProviders: vi.fn().mockResolvedValue(true),
+  cacheEmergencyProviders: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/socket', () => ({
@@ -149,6 +150,37 @@ vi.mock('@/socket', () => ({
 
 vi.mock('@/services/kafka/kafka.utils', () => ({
   publishWithRetry: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('@/services/kafka/kafka.service', () => ({
+  safeSend: vi.fn().mockResolvedValue(undefined),
+  producer: { send: vi.fn(), connect: vi.fn(), disconnect: vi.fn() },
+  notificationConsumer: {
+    connect: vi.fn(),
+    subscribe: vi.fn(),
+    run: vi.fn(),
+    disconnect: vi.fn(),
+  },
+  assignResponderConsumer: {
+    connect: vi.fn(),
+    subscribe: vi.fn(),
+    run: vi.fn(),
+    disconnect: vi.fn(),
+  },
+  incidentUpdateConsumer: {
+    connect: vi.fn(),
+    subscribe: vi.fn(),
+    run: vi.fn(),
+    disconnect: vi.fn(),
+  },
+  redis: { quit: vi.fn() },
+  initInfra: vi.fn().mockResolvedValue(undefined),
+  shutdownInfra: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/utils/services/email', () => ({
+  sendOTP: vi.fn().mockResolvedValue('123456'),
+  sendOTPEmail: vi.fn().mockResolvedValue(true),
 }));
 
 export const resetMocks = () => {

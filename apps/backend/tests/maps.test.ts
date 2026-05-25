@@ -1,7 +1,11 @@
-import { HttpStatusCode } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getRoute } from '@/controllers/maps.controller';
+import { getRouteFromMapbox } from '@/services/mapbox.service';
+
+vi.mock('@/services/mapbox.service', () => ({
+  getRouteFromMapbox: vi.fn(),
+}));
 
 const DEST = {
   lat: 27.712274418563016,
@@ -35,6 +39,25 @@ describe('Test Maps Controllers', () => {
     mockNext = vi.fn(() => {});
   });
 
-  it.todo('Get Routes Coordinates Give Route on valid data');
-  it.todo('Throws Error on invalid Data');
+  it('should return route data on valid request', async () => {
+    (getRouteFromMapbox as any).mockResolvedValue({
+      success: true,
+      route: { distance: 5000, duration: 600, geometry: { coordinates: [] } },
+    });
+
+    await getRoute(mockReq, mockRes, mockNext);
+
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Route Found Successfully' })
+    );
+  });
+
+  it('should return 400 on invalid body data', async () => {
+    mockReq.body = { profile: 'driving-traffic' }; // missing origin/dest
+
+    await getRoute(mockReq, mockRes, mockNext);
+
+    expect(mockRes.status).toHaveBeenCalledWith(400);
+  });
 });
