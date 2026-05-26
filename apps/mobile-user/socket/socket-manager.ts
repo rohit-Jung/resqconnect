@@ -105,9 +105,9 @@ class SocketManager {
     // Always attach to socket if it exists (Socket.IO handles queueing if not connected)
     if (this.socket) {
       this.socket.on(event, handler);
-      console.log(
-        `Subscribed to ${event} (socket ${this.socket.connected ? 'connected' : 'connecting'})`
-      );
+      // console.log(
+      //   `Subscribed to ${event} (socket ${this.socket.connected ? 'connected' : 'connecting'})`
+      // );
     } else {
       console.log(`Queued subscription to ${event} (no socket yet)`);
     }
@@ -125,7 +125,7 @@ class SocketManager {
         this.socket.off(event, handler);
       }
 
-      console.log(`Unsubscribed from event ${event}`);
+      // console.log(`Unsubscribed from event ${event}`);
     }
   }
 
