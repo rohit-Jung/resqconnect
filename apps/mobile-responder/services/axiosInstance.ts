@@ -18,9 +18,16 @@ const apiWithoutAuthLogout = axios.create({
 });
 
 function baseApiUrl() {
-  const siloBaseUrl = useProviderStore.getState().siloBaseUrl;
+  let siloBaseUrl = useProviderStore.getState().siloBaseUrl;
   const fallback = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (siloBaseUrl) {
+    siloBaseUrl = siloBaseUrl
+      .replace('localhost', '192.168.1.74')
+      .replace('127.0.0.1', '192.168.1.74');
+  }
   const root = (siloBaseUrl || fallback || '').replace(/\/$/, '');
+
+  console.log(`[AxiosInstance] Using API root: ${root}`);
   return root ? `${root}/api/${routerVersion}` : '';
 }
 
@@ -61,6 +68,8 @@ const addAuthToken = async (config: any) => {
   // Inject baseURL at request-time so we can route to the selected silo.
   config.baseURL = baseApiUrl();
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  console.log('[AxiosInstance] Adding auth token to request:', !!token, token);
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
