@@ -5,7 +5,15 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@repo/mobile/emergency-tracking": [
+        "../../packages/mobile/src/emergency-tracking/index.ts"
+      ],
+      "@repo/mobile/emergency-tracking/*": [
+        "../../packages/mobile/src/emergency-tracking/*"
+      ],
+      "@repo/mobile/ui": ["../../packages/mobile/src/ui/index.ts"],
+      "@repo/mobile/ui/*": ["../../packages/mobile/src/ui/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"],
