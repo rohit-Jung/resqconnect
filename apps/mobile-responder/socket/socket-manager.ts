@@ -6,7 +6,7 @@ import { useSocketStore } from '@/store/socketStore';
 
 type EventHandler = (data: any) => void;
 
-const DEBUG_SOCKET = true;
+const DEBUG_SOCKET = false;
 
 class SocketManager {
   private socket: Socket | null = null;
@@ -29,7 +29,17 @@ class SocketManager {
 
     const siloBaseUrl = useProviderStore.getState().siloBaseUrl;
     const fallback = process.env.EXPO_PUBLIC_BACKEND_URL;
-    const SOCKET_URL = (siloBaseUrl || fallback || '').replace(/\/$/, '');
+    let SOCKET_URL = (siloBaseUrl || fallback || '').replace(/\/$/, '');
+
+    if (SOCKET_URL && SOCKET_URL.includes('localhost')) {
+      SOCKET_URL = SOCKET_URL.replace('localhost', '192.168.1.74').replace(
+        '127.0.0.1',
+        '192.168.1.74'
+      );
+    }
+
+    console.log(`[SocketManager] Connecting to socket at: ${SOCKET_URL}`);
+
     const { setSocket, setIsConnected, setSocketId } =
       useSocketStore.getState();
 
@@ -46,13 +56,13 @@ class SocketManager {
     this.isInitialized = true;
 
     if (DEBUG_SOCKET) {
-      // this.socket.onAny((event, ...args) => {
-      //   console.log(
-      //     `[🏴‍☠️ ANY] SOCKET EVENT`,
-      //     event,
-      //     args.length === 1 ? args[0] : args
-      //   );
-      // });
+      this.socket.onAny((event, ...args) => {
+        console.log(
+          `[🏴‍☠️ ANY] SOCKET EVENT`,
+          event,
+          args.length === 1 ? args[0] : args
+        );
+      });
 
       // Wrap emit to log outgoing events
       const originalEmit = this.socket.emit.bind(this.socket);
@@ -108,9 +118,6 @@ class SocketManager {
     // Always attach to socket if it exists (Socket.IO handles queueing if not connected)
     if (this.socket) {
       this.socket.on(event, handler);
-      console.log(
-        `Subscribed to ${event} (socket ${this.socket.connected ? 'connected' : 'connecting'})`
-      );
     } else {
       console.log(`Queued subscription to ${event} (no socket yet)`);
     }
@@ -128,7 +135,7 @@ class SocketManager {
         this.socket.off(event, handler);
       }
 
-      console.log(`Unsubscribed from event ${event}`);
+      // console.log(`Unsubscribed from event ${event}`);
     }
   }
 

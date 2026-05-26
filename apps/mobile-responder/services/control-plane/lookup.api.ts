@@ -16,8 +16,8 @@ export function useLookupOrgs(params: { sector?: Sector; status?: string }) {
   const sector = params.sector;
   const status = params.status;
   const clientHost =
-    typeof process.env.EXPO_PUBLIC_CLIENT_HOST === 'string'
-      ? process.env.EXPO_PUBLIC_CLIENT_HOST
+    typeof process.env.EXPO_PUBLIC_CONTROL_PLANE_URL === 'string'
+      ? process.env.EXPO_PUBLIC_CONTROL_PLANE_URL
       : undefined;
 
   return useQuery({
@@ -31,6 +31,7 @@ export function useLookupOrgs(params: { sector?: Sector; status?: string }) {
           clientHost,
         },
       });
+      console.log('Lookup orgs response:', res.data);
       return (res.data?.orgs ?? []) as LookupOrg[];
     },
   });
