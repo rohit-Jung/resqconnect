@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 
+import { envConfig } from '@/config';
 import { issueMfaToken } from '@/services/mfa.service';
 import { redis } from '@/services/redis.service';
 import ApiError from '@/utils/api/ApiError';
@@ -16,13 +17,17 @@ export const requestMfaOtp = asyncHandler(
     const u = req.user;
     if (!u?.id || !u.email) throw ApiError.unauthorized('Unauthorized');
 
-    const otpToken = await sendOTP(u.email);
+    const otpToken = await sendOTP(
+      u.email,
+      u.name || 'User',
+      'welcomeVerification'
+    );
     if (!otpToken) throw ApiError.internalServerError('Failed to generate OTP');
 
     await redis.set(otpKey(u.id), otpToken, 'EX', MFA_OTP_TTL_SECONDS);
 
     const payload: Record<string, unknown> = { sent: true };
-    if (process.env.NODE_ENV !== 'production') {
+    if (envConfig.node_env !== 'production') {
       payload.otpToken = otpToken;
     }
 

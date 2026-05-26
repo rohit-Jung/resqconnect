@@ -286,7 +286,11 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
 
   if (typeof email === 'string') await clearLoginFailures(email);
   if (!existingOrg.isVerified) {
-    const otpToken = await sendOTP(existingOrg.email);
+    const otpToken = await sendOTP(
+      existingOrg.email,
+      existingOrg.name,
+      'welcomeVerification'
+    );
 
     if (!otpToken) {
       console.log('Error Sending OTP token. Please try again');
@@ -458,6 +462,7 @@ const resendOrganizationVerificationOTP = asyncHandler(
       columns: {
         id: true,
         email: true,
+        name: true,
         isVerified: true,
       },
     });
@@ -475,7 +480,11 @@ const resendOrganizationVerificationOTP = asyncHandler(
         .json(new ApiResponse(200, 'Account already verified', {}));
     }
 
-    const otpToken = await sendOTP(existingOrg.email);
+    const otpToken = await sendOTP(
+      existingOrg.email,
+      existingOrg.name,
+      'welcomeVerification'
+    );
     if (!otpToken) {
       throw ApiError.internalServerError(
         'Error sending OTP token. Please try again'

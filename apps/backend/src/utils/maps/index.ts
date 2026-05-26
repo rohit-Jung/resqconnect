@@ -3,6 +3,7 @@ import { serviceProvider } from '@repo/db/schemas';
 
 import { and, eq } from 'drizzle-orm';
 
+import { envConfig } from '@/config';
 import db from '@/db';
 
 interface LatLng {
@@ -143,7 +144,7 @@ async function getBestServiceProvider(
   }
 
   // optional fallback
-  if (process.env.NODE_ENV === 'development') {
+  if (envConfig.node_env === 'development') {
     const fallbackProvider = await db.query.serviceProvider.findFirst({
       where: and(
         eq(serviceProvider.serviceStatus, 'available'),

@@ -155,7 +155,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   await clearLoginFailures(email);
 
   if (!existingUser.isVerified) {
-    const otpToken = await sendOTP(existingUser.email);
+    const otpToken = await sendOTP(existingUser.email, existingUser.name);
 
     if (!otpToken) {
       console.log('Error Sending OTP token. Please try again');
@@ -225,6 +225,7 @@ const resendUserVerificationOTP = asyncHandler(
       columns: {
         id: true,
         email: true,
+        name: true,
         isVerified: true,
       },
     });
@@ -242,7 +243,11 @@ const resendUserVerificationOTP = asyncHandler(
         .json(new ApiResponse(200, 'Account already verified', {}));
     }
 
-    const otpToken = await sendOTP(existingUser.email);
+    const otpToken = await sendOTP(
+      existingUser.email,
+      existingUser.name,
+      'welcomeVerification'
+    );
     if (!otpToken) {
       throw ApiError.internalServerError(
         'Error sending OTP token. Please try again'
@@ -501,7 +506,11 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.notFound('User not found with given email or phone');
   }
 
-  const otpToken = await sendOTP(String(existingUser.email));
+  const otpToken = await sendOTP(
+    String(existingUser.email),
+    existingUser.name,
+    'forgotPassword'
+  );
 
   if (!otpToken) {
     console.log('Error Sending OTP token. Please try again');

@@ -16,28 +16,69 @@ const mailGenerator = new Mailgen({
   },
 });
 
+type EmailPurpose = 'forgotPassword' | 'welcome' | 'welcomeVerification';
+
+const welcomeEmailContent = (
+  name: string,
+  otpToken: string
+): Mailgen.Content => ({
+  body: {
+    name: name || 'User',
+    intro: 'Welcome to Resqconnect',
+    action: {
+      instructions:
+        'To complete your verification, please use the following OTP code:',
+      button: {
+        color: '#E13333',
+        text: otpToken,
+        link: '#',
+      },
+    },
+    outro:
+      'This OTP will expire in 10 minutes. If you did not request this, please ignore this email.',
+  },
+});
+
+const forgotPasswordEmailContent = (
+  name: string,
+  otpToken: string
+): Mailgen.Content => ({
+  body: {
+    name: name || 'User',
+    intro: 'You have requested to reset your password',
+    action: {
+      instructions:
+        'To reset your password, please use the following OTP code:',
+      button: {
+        color: '#E13333',
+        text: otpToken,
+        link: '#',
+      },
+    },
+    outro:
+      'This OTP will expire in 10 minutes. If you did not request this, please ignore this email.',
+  },
+});
+
 export const sendOTPEmail = async (
   email: string,
-  otpToken: string
+  name: string,
+  otpToken: string,
+  purpose: EmailPurpose = 'welcome'
 ): Promise<boolean> => {
   try {
-    const emailContent = {
-      body: {
-        name: 'User',
-        intro: 'Welcome to Resqconnect',
-        action: {
-          instructions:
-            'To complete your verification, please use the following OTP code:',
-          button: {
-            color: '#E13333',
-            text: otpToken,
-            link: '#',
-          },
-        },
-        outro:
-          'This OTP will expire in 10 minutes. If you did not request this, please ignore this email.',
-      },
-    };
+    let emailContent: Mailgen.Content;
+    switch (purpose) {
+      case 'welcome':
+      case 'welcomeVerification':
+        emailContent = welcomeEmailContent(name, otpToken);
+        break;
+      case 'forgotPassword':
+        emailContent = forgotPasswordEmailContent(name, otpToken);
+        break;
+      default:
+        emailContent = welcomeEmailContent(name, otpToken);
+    }
 
     const emailBody = mailGenerator.generate(emailContent);
     const emailText = mailGenerator.generatePlaintext(emailContent);
@@ -56,7 +97,10 @@ export const sendOTPEmail = async (
     const info = await transporter.sendMail({
       from: envConfig.google_mail,
       to: email,
-      subject: 'Your ResqConnect Verification OTP',
+      subject:
+        purpose === 'forgotPassword'
+          ? 'Reset Your Password'
+          : 'Welcome to Resqconnect',
       html: emailBody,
       text: emailText,
     });
@@ -69,12 +113,16 @@ export const sendOTPEmail = async (
   }
 };
 
-export const sendOTP = async (email: string): Promise<string | null> => {
+export const sendOTP = async (
+  email: string,
+  name: string,
+  purpose: EmailPurpose = 'welcome'
+): Promise<string | null> => {
   const otpToken = generateOtpToken(email);
 
   try {
-    if (process.env.NODE_ENV == 'production') {
-      const emailSent = await sendOTPEmail(email, otpToken);
+    if (envConfig.node_env === 'production') {
+      const emailSent = await sendOTPEmail(email, name, otpToken, purpose);
 
       if (!emailSent) {
         throw new Error('Error sending OTP email');

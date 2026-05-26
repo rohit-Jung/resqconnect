@@ -236,7 +236,10 @@ const loginServiceProvider = asyncHandler(
     await clearLoginFailures(email);
 
     if (existingServiceProvider && !existingServiceProvider.isVerified) {
-      const otpToken = await sendOTP(existingServiceProvider.email);
+      const otpToken = await sendOTP(
+        existingServiceProvider.email,
+        existingServiceProvider.name
+      );
 
       if (!otpToken) {
         throw ApiError.serviceUnavailable(
@@ -515,6 +518,7 @@ const resendServiceProviderVerificationOTP = asyncHandler(
       columns: {
         id: true,
         email: true,
+        name: true,
         isVerified: true,
       },
     });
@@ -532,7 +536,12 @@ const resendServiceProviderVerificationOTP = asyncHandler(
         .json(new ApiResponse(200, 'Account already verified', {}));
     }
 
-    const otpToken = await sendOTP(existingServiceProvider.email);
+    const otpToken = await sendOTP(
+      existingServiceProvider.email,
+      existingServiceProvider.name,
+      'welcomeVerification'
+    );
+
     if (!otpToken) {
       throw ApiError.internalServerError(
         'Error sending OTP token. Please try again'
@@ -662,7 +671,11 @@ const forgotServiceProviderPassword = asyncHandler(
       throw ApiError.notFound('ServiceProvider not found with given email');
     }
 
-    const otpToken = await sendOTP(existingServiceProvider.email);
+    const otpToken = await sendOTP(
+      existingServiceProvider.email,
+      existingServiceProvider.name,
+      'forgotPassword'
+    );
 
     if (!otpToken) {
       throw ApiError.serviceUnavailable(

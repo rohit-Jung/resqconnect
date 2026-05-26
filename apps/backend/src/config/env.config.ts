@@ -4,6 +4,9 @@ import { type z as zType } from 'zod';
 const envSchema = z.object({
   MODE: z.enum(['platform', 'silo']).default('silo'),
   DEV_IP: z.string().default('0.0.0.0'),
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
   CONTROL_PANE_URL: z.string(),
 
   ALLOWED_ORIGINS: z
