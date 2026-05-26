@@ -61,7 +61,7 @@ const handleEmergencyRequest = asyncHandler(
           description: emergencyDescription,
           location: userLocation,
         },
-        'inapp'
+        'app'
       );
 
     if (!success) {
