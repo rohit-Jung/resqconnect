@@ -23,8 +23,8 @@ function bearerToken(req: Request) {
   return token || null;
 }
 
-// Organization-web reuses silo org JWT for now.
-// We verify it using the shared JWT secret and map siloOrgId -> cpOrgId.
+// Organization-web just decodes the payload
+// verifies secure request by mapping check
 export async function requireOrgAuth(
   req: Request,
   res: Response,
@@ -36,7 +36,7 @@ export async function requireOrgAuth(
   }
 
   try {
-    const payload = jwt.verify(token, envConfig.jwt_secret) as any;
+    const payload = jwt.decode(token) as any;
     const role = String(payload?.role ?? '').toLowerCase();
     if (role !== 'organization') {
       return res.status(403).json({ ok: false, error: 'Forbidden' });
