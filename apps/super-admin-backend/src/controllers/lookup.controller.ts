@@ -1,19 +1,25 @@
 import { cpOrganization } from '@repo/db/control-plane';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, or } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import { db } from '@/db';
 
 // mobile responder lookup: resolve org name -> sector + silo url + orgid.
-export const lookupOrgByName = async (req: Request, res: Response) => {
+export const lookupOrgByNameOrId = async (req: Request, res: Response) => {
   const name = typeof req.query?.name === 'string' ? req.query.name.trim() : '';
-  if (!name) {
-    return res.status(400).json({ ok: false, error: 'Missing name' });
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+
+  if (!name && !id) {
+    return res.status(400).json({ ok: false, error: 'Missing name or id' });
   }
 
   const org = await db.query.cpOrganization.findFirst({
-    where: eq(cpOrganization.name, name),
+    where: or(
+      eq(cpOrganization.name, name),
+      eq(cpOrganization.id, id),
+      eq(cpOrganization.siloOrgId, id)
+    ),
     columns: {
       id: true,
       sector: true,
@@ -82,10 +88,10 @@ export const listOrgsForLookup = async (req: Request, res: Response) => {
   const normalizedOrgs = clientHost
     ? orgs.map(o => ({
         ...o,
-        siloBaseUrl:
-          typeof o.siloBaseUrl === 'string'
-            ? o.siloBaseUrl.replace(/\blocalhost\b/g, clientHost)
-            : o.siloBaseUrl,
+        // siloBaseUrl:
+        //   typeof o.siloBaseUrl === 'string'
+        //     ? o.siloBaseUrl.replace(/\blocalhost\b/g, clientHost)
+        //     : o.siloBaseUrl,
       }))
     : orgs;
 
