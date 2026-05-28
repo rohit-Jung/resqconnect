@@ -30,9 +30,9 @@ function PaymentErrorContent() {
             <Link href="/dashboard/plans">
               <Button className="w-full">Try Again</Button>
             </Link>
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button variant="outline" className="w-full">
-                Go to Dashboard
+                Login to continue
               </Button>
             </Link>
           </div>

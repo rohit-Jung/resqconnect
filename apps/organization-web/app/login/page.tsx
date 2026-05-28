@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { GuestGuard } from '@/components/guest-guard';
 import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
 import { useOrgLogin } from '@/services/organization/auth.api';
-import { IOrgLoginResponse, IOtpResponse } from '@/types/auth.types';
+import { IOrgLoginResponse } from '@/types/auth.types';
 import { TLoginUser, loginUserSchema } from '@/validations/auth.schema';
 
 export const dynamic = 'force-dynamic';
@@ -58,11 +58,15 @@ export default function LoginPage() {
       onSuccess: response => {
         const responseData = response.data.data;
 
-        if ('userId' in responseData) {
-          const otpData = responseData as IOtpResponse;
+        if ('organizationId' in responseData) {
+          const otpData = responseData as {
+            organizationId: string;
+          };
+          console.log('OTP Response:', otpData);
+
           toast.success('OTP sent to your email');
           router.push(
-            `/verify?organizationId=${otpData.userId}&email=${encodeURIComponent(data.email)}`
+            `/verify?organizationId=${otpData.organizationId}&email=${encodeURIComponent(data.email)}`
           );
         } else {
           const loginData = responseData as IOrgLoginResponse;
