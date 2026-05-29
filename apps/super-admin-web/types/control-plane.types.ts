@@ -85,6 +85,25 @@ export type CpOrgEntitlementsSetResponse =
       snapshot?: Pick<CpOrgEntitlementsSnapshot, 'version' | 'createdAt'>;
     };
 
+export type CpUser = {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: number;
+  primaryAddress: string;
+  isVerified: boolean | null;
+  role: string | null;
+  createdAt: string;
+};
+
+export type CpUsersListResponse = {
+  ok: true;
+  total: number;
+  page: number;
+  limit: number;
+  users: CpUser[];
+};
+
 export type CpPlansListResponse = {
   ok: true;
   plans: Array<{

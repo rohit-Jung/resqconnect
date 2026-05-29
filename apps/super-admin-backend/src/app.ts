@@ -10,6 +10,7 @@ import { healthRouter } from '@/routes/health.routes';
 import { lookupRouter } from '@/routes/lookup.routes';
 import { orgsRouter } from '@/routes/orgs.routes';
 import { plansRouter } from '@/routes/plans.routes';
+import { usersRouter } from '@/routes/users.routes';
 import { buildErrorCauseChain, unwrapPgError } from '@/utils/pg-error';
 
 const app = express();
@@ -42,6 +43,7 @@ app.use('/admin', adminRouter);
 app.use('/billing', billingRouter);
 app.use('/plans', plansRouter);
 app.use('/orgs', orgsRouter);
+app.use('/users', usersRouter);
 app.use('/dashboard', dashboardRouter);
 app.use('/lookup', lookupRouter);
 app.use('/', entitlementsRouter);
