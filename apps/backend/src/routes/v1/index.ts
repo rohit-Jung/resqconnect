@@ -13,6 +13,7 @@ import internalRouter from './internal.routes';
 import mapsRouter from './maps.routes';
 import mfaRouter from './mfa.routes';
 import notificationRouter from './notification.routes';
+import orgUploadRouter from './org-upload.routes';
 import organizationRouter from './organization.routes';
 import paymentRouter from './payment.routes';
 import serviceProviderRouter from './service-provider.routes';
@@ -40,6 +41,7 @@ if (envConfig.mode === 'platform') {
   // silo mode needs emergency-request routes for accept/reject/complete
   v1Router.use('/emergency-request', emergencyRequestRouter);
   v1Router.use('/organization', organizationRouter);
+  v1Router.use('/org-upload', orgUploadRouter);
   v1Router.use('/service-provider', serviceProviderRouter);
   v1Router.use('/maps', mapsRouter);
   v1Router.use('/mfa', mfaRouter);

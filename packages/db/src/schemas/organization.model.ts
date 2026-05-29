@@ -48,6 +48,8 @@ export const organization = pgTable('organization', {
   verificationToken: varchar('verification_token', { length: 255 }),
   tokenExpiry: timestamp('token_expiry', { mode: 'string' }),
 
+  logo: varchar('logo', { length: 500 }),
+
   resetPasswordToken: varchar('reset_password_token', { length: 255 }),
   resetPasswordTokenExpiry: timestamp('reset_password_token_expiry', {
     mode: 'string',

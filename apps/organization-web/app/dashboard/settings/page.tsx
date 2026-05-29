@@ -11,13 +11,18 @@ import {
 import { Input } from '@repo/ui/input';
 import { Label } from '@repo/ui/label';
 
-import { Loader2, Lock, Save } from 'lucide-react';
-import { useState } from 'react';
+import { ImageIcon, Loader2, Lock, Save, Trash2, Upload } from 'lucide-react';
+import Image from 'next/image';
+import { useRef, useState } from 'react';
 
 import {
   useOrgProfile,
   useOrgUpdateProfile,
 } from '@/services/organization/auth.api';
+import {
+  useDeleteOrgLogo,
+  useUpdateOrgLogo,
+} from '@/services/organization/upload.api';
 import { IOrgProfileResponse } from '@/types/auth.types';
 
 export default function SettingsPage() {
@@ -33,6 +38,9 @@ export default function SettingsPage() {
     null
   );
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const updateLogoMutation = useUpdateOrgLogo();
+  const deleteLogoMutation = useDeleteOrgLogo();
 
   const name = draftName ?? orgData?.name ?? '';
   const generalNumber =
@@ -97,6 +105,88 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="px-6 pb-8 space-y-6">
         <div className="grid gap-6">
+          {/* Logo Upload */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Organization Logo</CardTitle>
+              <CardDescription>
+                Used as your organization&apos;s identity across the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-6">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center border border-border bg-muted">
+                  {orgData?.logo ? (
+                    <Image
+                      src={orgData.logo}
+                      alt="Organization logo"
+                      width={96}
+                      height={96}
+                      className="h-24 w-24 object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    PNG, JPG or WEBP. Max 5MB.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={updateLogoMutation.isPending}
+                    >
+                      {updateLogoMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-3 w-3" />
+                          Upload Logo
+                        </>
+                      )}
+                    </Button>
+                    {orgData?.logo && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteLogoMutation.mutate()}
+                        disabled={deleteLogoMutation.isPending}
+                      >
+                        {deleteLogoMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  {updateLogoMutation.isError && (
+                    <p className="text-xs text-red-600">
+                      {updateLogoMutation.error?.message || 'Upload failed'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) updateLogoMutation.mutate({ file });
+                  e.target.value = '';
+                }}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>General Settings</CardTitle>

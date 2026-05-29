@@ -11,6 +11,8 @@ internalRouter.use(requireInternalAuth);
 
 internalRouter.get('/health', internalController.health);
 
+internalRouter.get('/users', internalController.listUsers);
+
 internalRouter.get('/metrics', internalController.metrics);
 
 internalRouter.get('/org-snapshots', internalController.orgSnapshots);

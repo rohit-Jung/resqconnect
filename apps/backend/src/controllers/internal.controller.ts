@@ -7,7 +7,7 @@ import {
 } from '@repo/db/schemas';
 
 import bcrypt from 'bcryptjs';
-import { desc, eq, gte, sql } from 'drizzle-orm';
+import { asc, desc, eq, gte, ilike, or, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import { envConfig } from '@/config';
@@ -278,6 +278,55 @@ const sanitizedIndex = asyncHandler(async (req: Request, res: Response) => {
   );
 });
 
+const listUsers = asyncHandler(async (req: Request, res: Response) => {
+  const pageRaw = typeof req.query?.page === 'string' ? req.query.page : '1';
+  const limitRaw =
+    typeof req.query?.limit === 'string' ? req.query.limit : '20';
+  const searchRaw =
+    typeof req.query?.search === 'string' ? req.query.search.trim() : '';
+
+  const page = Math.max(1, Number(pageRaw) || 1);
+  const limit = Math.min(100, Math.max(1, Number(limitRaw) || 20));
+
+  const whereClause = searchRaw
+    ? or(
+        ilike(user.name, `%${searchRaw}%`),
+        ilike(user.email, `%${searchRaw}%`)
+      )
+    : undefined;
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(user)
+    .where(whereClause);
+
+  const users = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      primaryAddress: user.primaryAddress,
+      isVerified: user.isVerified,
+      role: user.role,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .where(whereClause)
+    .orderBy(desc(user.createdAt))
+    .limit(limit)
+    .offset((page - 1) * limit);
+
+  return res.status(200).json(
+    new ApiResponse(200, 'Users list', {
+      total: totalRow?.count ?? 0,
+      page,
+      limit,
+      users,
+    })
+  );
+});
+
 const internalController = {
   // data helpers
   getInternalMetrics,
@@ -287,6 +336,7 @@ const internalController = {
   health,
   metrics,
   orgSnapshots,
+  listUsers,
   provisionOrg,
   updateOrgStatus,
   storeOrgEntitlementsSnapshot,

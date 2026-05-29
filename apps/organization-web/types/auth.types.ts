@@ -79,6 +79,7 @@ export interface IOrgProfileResponse {
   serviceCategory: ServiceCategory;
   generalNumber: number;
   role: string;
+  logo?: string | null;
 }
 
 export interface IOrgProfileWithEntitlements {
@@ -226,6 +227,8 @@ export interface IOrgDashboardAnalytics {
     total: number;
     thisMonth: number;
     lastMonth: number;
+    thisWeek: number;
+    lastWeek: number;
     available: number;
     availabilityPercentage: number;
     recent: IRecentProvider[];
@@ -233,14 +236,19 @@ export interface IOrgDashboardAnalytics {
   emergencyRequests: {
     total: number;
     thisMonth: number;
+    thisWeek: number;
     pending: number;
     completed: number;
     recent: IRecentEmergencyRequest[];
+    monthlyTrend?: { month: string; count: number }[];
+    weeklyTrend?: { month: string; count: number }[];
   };
   emergencyResponses: {
     total: number;
     thisMonth: number;
     lastMonth: number;
+    thisWeek: number;
+    lastWeek: number;
     recent: IRecentEmergencyResponse[];
   };
 }

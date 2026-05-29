@@ -18,8 +18,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'ResQConnect',
-  description: 'Emergency Response Platform',
+  title: {
+    default: 'Resqconnect | Organization Portal',
+    template: '%s | Resqconnect Org',
+  },
+  description:
+    'Resqconnect Organization Portal | manage your emergency responders, track incidents in real time, and coordinate rescue operations across your service area.',
+  applicationName: 'Resqconnect',
+  keywords: [
+    'emergency response',
+    'rescue management',
+    'incident tracking',
+    'resqconnect',
+    'organization portal',
+  ],
+  authors: [{ name: 'Resqconnect' }],
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
+  openGraph: {
+    title: 'Resqconnect | Organization Portal',
+    description:
+      'Manage emergency responders, track incidents, and coordinate rescue operations.',
+    siteName: 'Resqconnect',
+    locale: 'en_US',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({

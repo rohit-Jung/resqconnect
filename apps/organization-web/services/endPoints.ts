@@ -20,6 +20,7 @@ export const orgEndpoints = {
 
   // service provider management by organization
   serviceProviders: `/organization/service-providers`,
+  bulkRegisterProviders: `/organization/service-providers/bulk`,
   getProvider: (id: string) => `/organization/service-providers/${id}`,
   updateProvider: (id: string) => `/organization/service-providers/${id}`,
   deleteProvider: (id: string) => `/organization/service-providers/${id}`,
@@ -32,6 +33,11 @@ export const orgEndpoints = {
     `/organization/verifications/${providerId}`,
   verifyDocuments: (providerId: string) =>
     `/organization/verifications/${providerId}/verify`,
+};
+
+export const orgUploadEndpoints = {
+  signature: `/org-upload/signature`,
+  logo: `/org-upload/logo`,
 };
 
 export const paymentEndpoints = {
