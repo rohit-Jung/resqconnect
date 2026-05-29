@@ -98,6 +98,14 @@ organizationRouter
   );
 
 organizationRouter
+  .route('/service-providers/bulk')
+  .post(
+    validateOrg,
+    requireActiveOrganization,
+    organizationController.bulkRegisterProviders
+  );
+
+organizationRouter
   .route('/service-providers/:id')
   .get(
     validateOrg,

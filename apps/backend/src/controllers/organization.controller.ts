@@ -927,6 +927,17 @@ const getOrgDashboardAnalytics = asyncHandler(
       59
     );
 
+    // Weekly date helpers (Monday-based)
+    const dayOfWeek = now.getDay(); // 0=Sun
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() + daysToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+    const endOfLastWeek = new Date(startOfWeek);
+    endOfLastWeek.setMilliseconds(-1);
+
     // Get organization's service type
     const org = await db.query.organization.findFirst({
       where: eq(organization.id, orgId),
@@ -941,6 +952,8 @@ const getOrgDashboardAnalytics = asyncHandler(
       totalProviders,
       providersThisMonth,
       providersLastMonth,
+      providersThisWeek,
+      providersLastWeek,
       availableProviders,
       recentProviders,
     ] = await Promise.all([
@@ -968,6 +981,27 @@ const getOrgDashboardAnalytics = asyncHandler(
             eq(serviceProvider.organizationId, orgId),
             sql`${serviceProvider.createdAt} >= ${startOfLastMonth.toISOString()}`,
             sql`${serviceProvider.createdAt} <= ${endOfLastMonth.toISOString()}`
+          )
+        ),
+      // Providers created this week
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${serviceProvider.createdAt} >= ${startOfWeek.toISOString()}`
+          )
+        ),
+      // Providers created last week
+      db
+        .select({ count: count() })
+        .from(serviceProvider)
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${serviceProvider.createdAt} >= ${startOfLastWeek.toISOString()}`,
+            sql`${serviceProvider.createdAt} <= ${endOfLastWeek.toISOString()}`
           )
         ),
       // Available providers
@@ -1002,6 +1036,8 @@ const getOrgDashboardAnalytics = asyncHandler(
       totalEmergencyResponses,
       responsesThisMonth,
       responsesLastMonth,
+      responsesThisWeek,
+      responsesLastWeek,
       recentEmergencyResponses,
     ] = await Promise.all([
       // Total emergency responses by org's providers
@@ -1042,6 +1078,35 @@ const getOrgDashboardAnalytics = asyncHandler(
             sql`${emergencyResponse.createdAt} <= ${endOfLastMonth.toISOString()}`
           )
         ),
+      // Responses this week
+      db
+        .select({ count: count() })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${emergencyResponse.createdAt} >= ${startOfWeek.toISOString()}`
+          )
+        ),
+      // Responses last week
+      db
+        .select({ count: count() })
+        .from(emergencyResponse)
+        .innerJoin(
+          serviceProvider,
+          eq(emergencyResponse.serviceProviderId, serviceProvider.id)
+        )
+        .where(
+          and(
+            eq(serviceProvider.organizationId, orgId),
+            sql`${emergencyResponse.createdAt} >= ${startOfLastWeek.toISOString()}`,
+            sql`${emergencyResponse.createdAt} <= ${endOfLastWeek.toISOString()}`
+          )
+        ),
       // Recent emergency responses (last 10)
       db
         .select({
@@ -1065,6 +1130,7 @@ const getOrgDashboardAnalytics = asyncHandler(
     const [
       totalEmergencyRequests,
       requestsThisMonth,
+      requestsThisWeek,
       pendingRequests,
       completedRequests,
       recentEmergencyRequestsRaw,
@@ -1082,6 +1148,16 @@ const getOrgDashboardAnalytics = asyncHandler(
           and(
             eq(emergencyRequest.serviceType, org.serviceCategory),
             sql`${emergencyRequest.createdAt} >= ${startOfMonth.toISOString()}`
+          )
+        ),
+      // Requests this week
+      db
+        .select({ count: count() })
+        .from(emergencyRequest)
+        .where(
+          and(
+            eq(emergencyRequest.serviceType, org.serviceCategory),
+            sql`${emergencyRequest.createdAt} >= ${startOfWeek.toISOString()}`
           )
         ),
       // Pending requests
@@ -1211,6 +1287,28 @@ const getOrgDashboardAnalytics = asyncHandler(
       )
       .orderBy(sql`date_trunc('month', ${emergencyRequest.createdAt})`);
 
+    // Weekly trend data (last 7 days)
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const weeklyTrend = await db
+      .select({
+        month: sql<string>`to_char(${emergencyRequest.createdAt}, 'Dy')`,
+        count: count(),
+      })
+      .from(emergencyRequest)
+      .where(
+        and(
+          eq(emergencyRequest.serviceType, org.serviceCategory),
+          sql`${emergencyRequest.createdAt} >= ${sevenDaysAgo.toISOString()}`
+        )
+      )
+      .groupBy(
+        sql`to_char(${emergencyRequest.createdAt}, 'Dy'), date_trunc('day', ${emergencyRequest.createdAt})`
+      )
+      .orderBy(sql`date_trunc('day', ${emergencyRequest.createdAt})`);
+
     res.status(200).json(
       new ApiResponse(200, 'Organization dashboard analytics retrieved', {
         organization: {
@@ -1222,6 +1320,8 @@ const getOrgDashboardAnalytics = asyncHandler(
           total: totalProvidersCount,
           thisMonth: providersThisMonth[0]?.count ?? 0,
           lastMonth: providersLastMonth[0]?.count ?? 0,
+          thisWeek: providersThisWeek[0]?.count ?? 0,
+          lastWeek: providersLastWeek[0]?.count ?? 0,
           available: availableProvidersCount,
           availabilityPercentage,
           recent: recentProviders,
@@ -1229,10 +1329,15 @@ const getOrgDashboardAnalytics = asyncHandler(
         emergencyRequests: {
           total: totalEmergencyRequests[0]?.count ?? 0,
           thisMonth: requestsThisMonth[0]?.count ?? 0,
+          thisWeek: requestsThisWeek[0]?.count ?? 0,
           pending: pendingRequests[0]?.count ?? 0,
           completed: completedRequests[0]?.count ?? 0,
           recent: recentEmergencyRequests,
           monthlyTrend: monthlyTrend.map(item => ({
+            month: item.month,
+            count: Number(item.count),
+          })),
+          weeklyTrend: weeklyTrend.map(item => ({
             month: item.month,
             count: Number(item.count),
           })),
@@ -1241,10 +1346,131 @@ const getOrgDashboardAnalytics = asyncHandler(
           total: totalEmergencyResponses[0]?.count ?? 0,
           thisMonth: responsesThisMonth[0]?.count ?? 0,
           lastMonth: responsesLastMonth[0]?.count ?? 0,
+          thisWeek: responsesThisWeek[0]?.count ?? 0,
+          lastWeek: responsesLastWeek[0]?.count ?? 0,
           recent: recentEmergencyResponses,
         },
       })
     );
+  }
+);
+
+const bulkRegisterOrgServiceProviders = asyncHandler(
+  async (req: Request, res: Response) => {
+    const loggedInOrg = req.user;
+    if (!loggedInOrg?.id) throw ApiError.unauthorized('Unauthorized');
+
+    const rows: unknown[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (rows.length === 0) throw ApiError.badRequest('No rows provided');
+    if (rows.length > 500)
+      throw ApiError.badRequest('Maximum 500 rows per batch');
+
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, loggedInOrg.id),
+    });
+    if (!org) throw ApiError.notFound('Organization not found');
+
+    const results: Array<{
+      row: number;
+      email: string;
+      status: 'created' | 'failed';
+      error?: string;
+    }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] as any;
+      const email = String(row?.email ?? '');
+      try {
+        const { registerOrgServiceProviderSchema } =
+          await import('@repo/types/validations');
+        const parsed = registerOrgServiceProviderSchema.safeParse(row);
+        if (!parsed.success) {
+          results.push({
+            row: i + 1,
+            email,
+            status: 'failed',
+            error: parsed.error.issues.map((e: any) => e.message).join('; '),
+          });
+          continue;
+        }
+        const d = parsed.data;
+        if (org.serviceCategory !== d.serviceType) {
+          results.push({
+            row: i + 1,
+            email,
+            status: 'failed',
+            error: `serviceType must be ${org.serviceCategory}`,
+          });
+          continue;
+        }
+        const existing = await db.query.serviceProvider.findFirst({
+          where: or(
+            eq(serviceProvider.phoneNumber, d.phoneNumber),
+            eq(serviceProvider.email, d.email)
+          ),
+        });
+        if (existing) {
+          results.push({
+            row: i + 1,
+            email,
+            status: 'failed',
+            error: 'Email or phone already exists',
+          });
+          continue;
+        }
+        const hashedPassword = await bcrypt.hash(d.password, 10);
+        const lat = Number(d.currentLocation?.latitude ?? 27.7172);
+        const lng = Number(d.currentLocation?.longitude ?? 85.324);
+        const h3Idx = latLngToCell(lat, lng, H3_RESOLUTION);
+        const h3IdxBig = BigInt(`0x${h3Idx}`);
+        const locationPoint = `POINT(${lng} ${lat})`;
+        await db.insert(serviceProvider).values({
+          name: d.name,
+          age: d.age,
+          email: d.email,
+          phoneNumber: d.phoneNumber,
+          primaryAddress: d.primaryAddress,
+          password: hashedPassword,
+          serviceType: d.serviceType,
+          organizationId: loggedInOrg.id,
+          lastLocation: sql`ST_SetSRID(ST_GeomFromText(${locationPoint}), 4326)`,
+          h3Index: h3IdxBig,
+          currentLocation: {
+            latitude: lat.toString(),
+            longitude: lng.toString(),
+          },
+          vehicleInformation: d.vehicleInformation || {
+            type: 'Not filled',
+            number: 'Not filled',
+            model: 'Not filled',
+            color: 'Not filled',
+          },
+          documentStatus:
+            d.panCardUrl || d.citizenshipUrl ? 'pending' : 'not_submitted',
+          ...(d.panCardUrl ? { panCardUrl: d.panCardUrl } : {}),
+          ...(d.citizenshipUrl ? { citizenshipUrl: d.citizenshipUrl } : {}),
+        });
+        results.push({ row: i + 1, email, status: 'created' });
+      } catch {
+        results.push({
+          row: i + 1,
+          email,
+          status: 'failed',
+          error: 'Internal error',
+        });
+      }
+    }
+
+    const created = results.filter(r => r.status === 'created').length;
+    res
+      .status(207)
+      .json(
+        new ApiResponse(207, 'Bulk registration complete', {
+          created,
+          failed: results.length - created,
+          results,
+        })
+      );
   }
 );
 
@@ -1266,6 +1492,7 @@ const organizationController = {
   updateProvider: updateOrgServiceProvider,
   deleteProvider: deleteOrgServiceProvider,
   verifyProvider: verifyOrgServiceProvider,
+  bulkRegisterProviders: bulkRegisterOrgServiceProviders,
   dashboardAnalytics: getOrgDashboardAnalytics,
 } as const;
 

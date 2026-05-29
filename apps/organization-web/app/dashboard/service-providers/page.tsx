@@ -20,12 +20,14 @@ import {
   Search,
   Shield,
   Trash2,
+  Upload,
   Users,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { BulkUploadProvidersModal } from '@/components/bulk-upload-providers-modal';
 import {
   useOrgDeleteProvider,
   useOrgServiceProviders,
@@ -83,9 +85,9 @@ const STATUS_CONFIG: Record<
 export default function ServiceProvidersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterType, setFilterType] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const { data: providersData, isLoading } = useOrgServiceProviders();
   const deleteMutation = useOrgDeleteProvider();
@@ -101,9 +103,7 @@ export default function ServiceProvidersPage() {
       responder.phoneNumber.toString().includes(searchQuery);
     const matchesStatus =
       filterStatus === 'all' || responder.serviceStatus === filterStatus;
-    const matchesType =
-      filterType === 'all' || responder.serviceType === filterType;
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesSearch && matchesStatus;
   });
 
   const handleDelete = async (id: string) => {
@@ -141,12 +141,22 @@ export default function ServiceProvidersPage() {
               .
             </span>
           </div>
-          <Link href="/dashboard/service-providers/new">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
-              <Plus className="h-4 w-4" />
-              Add Responder
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="rounded-none gap-2"
+              onClick={() => setShowBulkModal(true)}
+            >
+              <Upload className="h-4 w-4" />
+              Bulk Upload
             </Button>
-          </Link>
+            <Link href="/dashboard/service-providers/new">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
+                <Plus className="h-4 w-4" />
+                Add Responder
+              </Button>
+            </Link>
+          </div>
         </div>
         <div className="mt-3 h-0.5 w-full bg-primary dark:bg-primary" />
         <div className="mt-4">
@@ -254,17 +264,6 @@ export default function ServiceProvidersPage() {
             <option value="available">Available</option>
             <option value="assigned">On Assignment</option>
             <option value="off_duty">Off Duty</option>
-          </select>
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className="bg-card rounded-none border-border px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All Types</option>
-            <option value="ambulance">Ambulance</option>
-            <option value="fire_truck">Fire Truck</option>
-            <option value="police">Police</option>
-            <option value="rescue_team">Rescue Team</option>
           </select>
         </div>
 
@@ -446,6 +445,10 @@ export default function ServiceProvidersPage() {
           )}
         </div>
       </div>
+
+      {showBulkModal && (
+        <BulkUploadProvidersModal onClose={() => setShowBulkModal(false)} />
+      )}
     </div>
   );
 }

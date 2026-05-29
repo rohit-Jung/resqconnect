@@ -100,3 +100,37 @@ export const useOrgVerifyProvider = () => {
     },
   });
 };
+
+export interface IBulkProviderRow {
+  name: string;
+  email: string;
+  age: number;
+  phoneNumber: number;
+  primaryAddress: string;
+  serviceType: 'ambulance' | 'police' | 'fire_truck' | 'rescue_team';
+  password: string;
+}
+
+export interface IBulkProviderResult {
+  row: number;
+  email: string;
+  status: 'created' | 'failed';
+  error?: string;
+}
+
+export const useOrgBulkRegisterProviders = () => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    AxiosResponse<{
+      data: { created: number; failed: number; results: IBulkProviderResult[] };
+    }>,
+    AxiosError,
+    { rows: IBulkProviderRow[] }
+  >({
+    mutationFn: ({ rows }) =>
+      api.post(orgEndpoints.bulkRegisterProviders, { rows }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orgServiceProviders'] });
+    },
+  });
+};
