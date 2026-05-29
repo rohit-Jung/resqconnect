@@ -1,9 +1,8 @@
 'use client';
 
-import { Button } from '@repo/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
 
-import { AlertTriangle, Loader2, UserCog } from 'lucide-react';
+import { AlertTriangle, Info, Loader2, UserCog } from 'lucide-react';
 
 import { useDashboardAnalytics } from '@/services/super-admin/dashboard.api';
 
@@ -133,21 +132,53 @@ export default function ServiceProvidersPage() {
           </Card>
         </div>
 
-        <Card>
+        <Card className="border-border">
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="text-base font-semibold">
-              Responder Listing
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              Why individual responder details are not shown here
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground py-6 text-sm">
-              The control plane currently only ingests aggregate responder
-              counts (via silo metrics). Detailed responder lists are not
-              replicated.
-            </p>
-            <Button variant="outline" disabled>
-              Export Responders (not implemented)
-            </Button>
+          <CardContent className="pt-4 space-y-4">
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Resqconnect uses a{' '}
+                <span className="font-semibold text-foreground">
+                  silo architecture
+                </span>{' '}
+                where each organization&apos;s operational data (including
+                responder profiles, credentials, documents, and location data)
+                lives exclusively inside that organization&apos;s silo backend.
+                The control plane (this interface) is a lightweight registry
+                that coordinates provisioning; it deliberately does{' '}
+                <span className="font-semibold text-foreground">not</span>{' '}
+                replicate or store PII from any silo.
+              </p>
+              <p>
+                This is by design: silo isolation means a breach of the control
+                plane cannot expose responder PII from any organization. Each
+                silo enforces its own authentication boundary; the control plane
+                can only reach a silo via a shared internal API key for
+                aggregate metrics collection, not for individual record access.
+              </p>
+              <p>
+                The aggregate counts shown above (total, this month, growth)
+                come from periodic silo metrics snapshots ingested by the
+                control plane. Individual responder records (name, contact,
+                service status, documents) remain inside each silo and are only
+                accessible through that organization&apos;s own portal.
+              </p>
+            </div>
+            <div className="border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground">
+                To view or manage individual responders, log in to the relevant
+                organization&apos;s portal and navigate to{' '}
+                <span className="font-mono font-medium">
+                  Team &rarr; Service Providers
+                </span>
+                .
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
