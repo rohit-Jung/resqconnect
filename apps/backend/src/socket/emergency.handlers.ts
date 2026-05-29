@@ -7,13 +7,16 @@ import {
 } from '@repo/db/schemas';
 
 import { and, eq } from 'drizzle-orm';
+import { latLngToCell } from 'h3-js';
 import type { Server, Socket } from 'socket.io';
 
 import { envConfig } from '@/config';
 import { logger } from '@/config/logger/winston.config';
 import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
+import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
+import { publishWithRetry } from '@/services/kafka/kafka.utils';
 import { sendLocalSMS } from '@/services/local-sms.service';
 import { getRouteFromMapbox } from '@/services/mapbox.service';
 import {
@@ -25,6 +28,13 @@ import {
 import type { RouteResult } from '@/types/maps.types';
 import type { TEntityRole } from '@/utils/tokens/jwtTokens';
 import { SMS_TEMPLATES } from '@/workers/messaging.worker';
+
+const SERVICE_TYPE_TOPIC: Record<string, KAFKA_TOPICS> = {
+  ambulance: KAFKA_TOPICS.MEDICAL_EVENTS,
+  police: KAFKA_TOPICS.POLICE_EVENTS,
+  fire_truck: KAFKA_TOPICS.FIRE_EVENTS,
+  rescue_team: KAFKA_TOPICS.RESCUE_EVENTS,
+};
 
 // Register all emergency-related socket handlers according to role TODO:
 export function registerEmergencyHandlers(
@@ -405,25 +415,82 @@ async function handleRejectRequest(
   const { requestId, providerId } = data;
 
   try {
-    logger.error(
-      `[ERROR] Provider ${providerId} rejected request ${requestId}`
+    logger.info(
+      `[REJECT] Provider ${providerId} rejected request ${requestId}`
     );
 
-    await db.insert(requestEvents).values({
-      requestId,
-      eventType: 'rejected',
-      providerId,
-      metadata: { rejectedAt: new Date().toISOString() },
+    const req = await db.query.emergencyRequest.findFirst({
+      where: eq(emergencyRequest.id, requestId),
     });
 
-    // Confirm rejection to provider
+    if (!req) {
+      logger.warn(`[REJECT] Request ${requestId} not found`);
+      socket.emit('reject-confirmed', {
+        requestId,
+        message: 'Request rejected.',
+      });
+      return;
+    }
+
+    const topic = SERVICE_TYPE_TOPIC[req.serviceType];
+
+    await Promise.all([
+      db.insert(requestEvents).values({
+        requestId,
+        eventType: 'rejected',
+        providerId,
+        metadata: { rejectedAt: new Date().toISOString() },
+      }),
+      // Reset to pending so the next consumer can claim it
+      db
+        .update(emergencyRequest)
+        .set({ requestStatus: 'pending' })
+        .where(eq(emergencyRequest.id, requestId)),
+    ]);
+
+    // Republish to Kafka so other silo orgs can consume the request
+    if (topic && req.location) {
+      const h3Index = latLngToCell(
+        req.location.latitude,
+        req.location.longitude,
+        8
+      );
+      const payload = JSON.stringify({
+        requestId: req.id,
+        userId: req.userId,
+        emergencyType: req.serviceType,
+        emergencyLocation: {
+          latitude: req.location.latitude,
+          longitude: req.location.longitude,
+        },
+        status: 'pending',
+        h3Index,
+        emergencyDescription: req.description ?? undefined,
+        expiresAt: req.expiresAt ?? undefined,
+      });
+
+      const published = await publishWithRetry(topic, {
+        key: requestId,
+        value: payload,
+      });
+      if (published) {
+        logger.info(
+          `[REJECT] Republished request ${requestId} to topic ${topic}`
+        );
+      } else {
+        logger.error(
+          `[REJECT] Failed to republish request ${requestId} to Kafka after retries`
+        );
+      }
+    }
+
     socket.emit('reject-confirmed', {
       requestId,
       message: 'Request rejected.',
     });
   } catch (error) {
     logger.error(
-      `[ERROR] Error handling reject from provider ${providerId}:`,
+      `[REJECT] Error handling reject from provider ${providerId}:`,
       error
     );
   }
