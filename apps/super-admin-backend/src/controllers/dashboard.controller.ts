@@ -15,6 +15,8 @@ type DashboardStats = {
   total: number;
   thisMonth: number;
   lastMonth: number;
+  thisWeek: number;
+  lastWeek: number;
   info: DashboardEntity[];
 };
 
@@ -37,6 +39,27 @@ function addMonths(d: Date, months: number) {
   return new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1, 0, 0, 0, 0)
   );
+}
+
+function startOfWeek(d: Date) {
+  // Monday as start of week
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, ...
+  const diff = day === 0 ? -6 : 1 - day;
+  return new Date(
+    Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate() + diff,
+      0,
+      0,
+      0,
+      0
+    )
+  );
+}
+
+function addDays(d: Date, days: number) {
+  return new Date(d.getTime() + days * 86400000);
 }
 
 function metricNum(
@@ -179,6 +202,10 @@ export const getDashboard = async (req: Request, res: Response) => {
   const prevMonthStart = addMonths(monthStart, -1);
   const nextMonthStart = addMonths(monthStart, 1);
 
+  const weekStart = startOfWeek(now);
+  const prevWeekStart = addDays(weekStart, -7);
+  const nextWeekStart = addDays(weekStart, 7);
+
   // Orgs counts from control-plane registry.
   const [orgTotalRow] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -199,6 +226,24 @@ export const getDashboard = async (req: Request, res: Response) => {
       and(
         gte(cpOrganization.createdAt, prevMonthStart),
         lt(cpOrganization.createdAt, monthStart)
+      )
+    );
+  const [orgThisWeekRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(cpOrganization)
+    .where(
+      and(
+        gte(cpOrganization.createdAt, weekStart),
+        lt(cpOrganization.createdAt, nextWeekStart)
+      )
+    );
+  const [orgLastWeekRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(cpOrganization)
+    .where(
+      and(
+        gte(cpOrganization.createdAt, prevWeekStart),
+        lt(cpOrganization.createdAt, weekStart)
       )
     );
 
@@ -248,8 +293,11 @@ export const getDashboard = async (req: Request, res: Response) => {
   });
 
   // Users/providers counts from silo metrics (aggregated only).
+  // Fetch from furthest lookback needed (prev month or prev week - whichever is older).
+  const metricsLookback =
+    prevMonthStart < prevWeekStart ? prevMonthStart : prevWeekStart;
   const metricsRows = await db.query.cpSiloMetrics.findMany({
-    where: gte(cpSiloMetrics.collectedAt, prevMonthStart),
+    where: gte(cpSiloMetrics.collectedAt, metricsLookback),
     orderBy: [asc(cpSiloMetrics.collectedAt)],
     columns: { siloBaseUrl: true, collectedAt: true, metrics: true },
   });
@@ -264,32 +312,52 @@ export const getDashboard = async (req: Request, res: Response) => {
   let usersTotal = 0;
   let usersThisMonth = 0;
   let usersLastMonth = 0;
+  let usersThisWeek = 0;
+  let usersLastWeek = 0;
   let providersTotal = 0;
   let providersThisMonth = 0;
   let providersLastMonth = 0;
+  let providersThisWeek = 0;
+  let providersLastWeek = 0;
 
   for (const rows of bySilo.values()) {
     const latest = rows[rows.length - 1];
     if (!latest) continue;
 
-    const atPrev = latestAtOrBefore(rows, prevMonthStart) ?? rows[0];
+    const atPrevMonth = latestAtOrBefore(rows, prevMonthStart) ?? rows[0];
     const atMonth = latestAtOrBefore(rows, monthStart) ?? rows[0];
+    const atPrevWeek = latestAtOrBefore(rows, prevWeekStart) ?? rows[0];
+    const atWeek = latestAtOrBefore(rows, weekStart) ?? rows[0];
 
     const latestUsers = metricNum(latest.metrics as any, 'users');
     const monthUsers = metricNum(atMonth?.metrics as any, 'users');
-    const prevUsers = metricNum(atPrev?.metrics as any, 'users');
+    const prevMonthUsers = metricNum(atPrevMonth?.metrics as any, 'users');
+    const weekUsers = metricNum(atWeek?.metrics as any, 'users');
+    const prevWeekUsers = metricNum(atPrevWeek?.metrics as any, 'users');
 
     const latestProviders = metricNum(latest.metrics as any, 'providers');
     const monthProviders = metricNum(atMonth?.metrics as any, 'providers');
-    const prevProviders = metricNum(atPrev?.metrics as any, 'providers');
+    const prevMonthProviders = metricNum(
+      atPrevMonth?.metrics as any,
+      'providers'
+    );
+    const weekProviders = metricNum(atWeek?.metrics as any, 'providers');
+    const prevWeekProviders = metricNum(
+      atPrevWeek?.metrics as any,
+      'providers'
+    );
 
     usersTotal += latestUsers;
     usersThisMonth += Math.max(0, latestUsers - monthUsers);
-    usersLastMonth += Math.max(0, monthUsers - prevUsers);
+    usersLastMonth += Math.max(0, monthUsers - prevMonthUsers);
+    usersThisWeek += Math.max(0, latestUsers - weekUsers);
+    usersLastWeek += Math.max(0, weekUsers - prevWeekUsers);
 
     providersTotal += latestProviders;
     providersThisMonth += Math.max(0, latestProviders - monthProviders);
-    providersLastMonth += Math.max(0, monthProviders - prevProviders);
+    providersLastMonth += Math.max(0, monthProviders - prevMonthProviders);
+    providersThisWeek += Math.max(0, latestProviders - weekProviders);
+    providersLastWeek += Math.max(0, weekProviders - prevWeekProviders);
   }
 
   // Recent user/provider lists: fan-out to silos (internal auth) and merge.
@@ -371,10 +439,14 @@ export const getDashboard = async (req: Request, res: Response) => {
       usersTotal += Number((r as any)?.users?.total) || 0;
       usersThisMonth += Number((r as any)?.users?.thisMonth) || 0;
       usersLastMonth += Number((r as any)?.users?.lastMonth) || 0;
+      usersThisWeek += Number((r as any)?.users?.thisWeek) || 0;
+      usersLastWeek += Number((r as any)?.users?.lastWeek) || 0;
 
       providersTotal += Number((r as any)?.providers?.total) || 0;
       providersThisMonth += Number((r as any)?.providers?.thisMonth) || 0;
       providersLastMonth += Number((r as any)?.providers?.lastMonth) || 0;
+      providersThisWeek += Number((r as any)?.providers?.thisWeek) || 0;
+      providersLastWeek += Number((r as any)?.providers?.lastWeek) || 0;
     }
   }
 
@@ -383,18 +455,24 @@ export const getDashboard = async (req: Request, res: Response) => {
       total: orgTotalRow?.count ?? 0,
       thisMonth: orgThisMonthRow?.count ?? 0,
       lastMonth: orgLastMonthRow?.count ?? 0,
+      thisWeek: orgThisWeekRow?.count ?? 0,
+      lastWeek: orgLastWeekRow?.count ?? 0,
       info: orgInfo,
     } satisfies DashboardStats,
     users: {
       total: usersTotal,
       thisMonth: usersThisMonth,
       lastMonth: usersLastMonth,
+      thisWeek: usersThisWeek,
+      lastWeek: usersLastWeek,
       info: usersInfo,
     } satisfies DashboardStats,
     providers: {
       total: providersTotal,
       thisMonth: providersThisMonth,
       lastMonth: providersLastMonth,
+      thisWeek: providersThisWeek,
+      lastWeek: providersLastWeek,
       info: providersInfo,
     } satisfies DashboardStats,
   };

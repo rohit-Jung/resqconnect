@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
 import {
   ChartConfig,
@@ -20,11 +21,13 @@ import {
   Smartphone,
   Users,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from 'recharts';
 
 import { useDashboardAnalytics } from '@/services/super-admin/dashboard.api';
 import { IDashboardEntity } from '@/types/auth.types';
+
+type Period = 'weekly' | 'monthly';
 
 const chartConfig = {
   Orgs: { label: 'Orgs', color: 'hsl(221.2 83.2% 53.3%)' },
@@ -32,38 +35,53 @@ const chartConfig = {
   Responders: { label: 'Responders', color: 'hsl(262.1 83.3% 57.8%)' },
 } satisfies ChartConfig;
 
-const barChartConfig = {
-  thisMonth: { label: 'This Month', color: 'hsl(221.2 83.2% 53.3%)' },
-  lastMonth: { label: 'Last Month', color: 'hsl(215.4 16.3% 46.9%)' },
+const weeklyChartConfig = {
+  thisPeriod: { label: 'This Week', color: 'hsl(221.2 83.2% 53.3%)' },
+  lastPeriod: { label: 'Last Week', color: 'hsl(215.4 16.3% 46.9%)' },
+} satisfies ChartConfig;
+
+const monthlyChartConfig = {
+  thisPeriod: { label: 'This Month', color: 'hsl(221.2 83.2% 53.3%)' },
+  lastPeriod: { label: 'Last Month', color: 'hsl(215.4 16.3% 46.9%)' },
 } satisfies ChartConfig;
 
 export default function SuperAdminDashboardPage() {
+  const [period, setPeriod] = useState<Period>('weekly');
   const { data, isLoading, isError, error } = useDashboardAnalytics();
   const analytics = data?.data?.data;
 
-  const calculateGrowth = (thisMonth: number, lastMonth: number) => {
-    if (lastMonth === 0) return thisMonth > 0 ? 100 : 0;
-    return Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
+  const isWeekly = period === 'weekly';
+
+  const getCurrent = (
+    stat: { thisMonth: number; thisWeek: number } | undefined
+  ) => (isWeekly ? (stat?.thisWeek ?? 0) : (stat?.thisMonth ?? 0));
+  const getPrevious = (
+    stat: { lastMonth: number; lastWeek: number } | undefined
+  ) => (isWeekly ? (stat?.lastWeek ?? 0) : (stat?.lastMonth ?? 0));
+
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
   };
 
   const orgsGrowth = calculateGrowth(
-    analytics?.orgs.thisMonth ?? 0,
-    analytics?.orgs.lastMonth ?? 0
+    getCurrent(analytics?.orgs),
+    getPrevious(analytics?.orgs)
   );
   const usersGrowth = calculateGrowth(
-    analytics?.users.thisMonth ?? 0,
-    analytics?.users.lastMonth ?? 0
+    getCurrent(analytics?.users),
+    getPrevious(analytics?.users)
   );
   const providersGrowth = calculateGrowth(
-    analytics?.providers.thisMonth ?? 0,
-    analytics?.providers.lastMonth ?? 0
+    getCurrent(analytics?.providers),
+    getPrevious(analytics?.providers)
   );
 
   const stats = [
     {
       title: 'Organizations',
       total: analytics?.orgs.total ?? 0,
-      thisMonth: analytics?.orgs.thisMonth ?? 0,
+      current: getCurrent(analytics?.orgs),
       growth: orgsGrowth,
       icon: Building2,
       color: 'text-blue-600',
@@ -72,7 +90,7 @@ export default function SuperAdminDashboardPage() {
     {
       title: 'Users',
       total: analytics?.users.total ?? 0,
-      thisMonth: analytics?.users.thisMonth ?? 0,
+      current: getCurrent(analytics?.users),
       growth: usersGrowth,
       icon: Users,
       color: 'text-green-600',
@@ -81,7 +99,7 @@ export default function SuperAdminDashboardPage() {
     {
       title: 'Responders',
       total: analytics?.providers.total ?? 0,
-      thisMonth: analytics?.providers.thisMonth ?? 0,
+      current: getCurrent(analytics?.providers),
       growth: providersGrowth,
       icon: Smartphone,
       color: 'text-purple-600',
@@ -89,25 +107,28 @@ export default function SuperAdminDashboardPage() {
     },
   ];
 
-  const monthlyComparisonData = useMemo(
+  const barChartConfig = isWeekly ? weeklyChartConfig : monthlyChartConfig;
+
+  const comparisonData = useMemo(
     () => [
       {
         category: 'Orgs',
-        thisMonth: analytics?.orgs.thisMonth ?? 0,
-        lastMonth: analytics?.orgs.lastMonth ?? 0,
+        thisPeriod: getCurrent(analytics?.orgs),
+        lastPeriod: getPrevious(analytics?.orgs),
       },
       {
         category: 'Users',
-        thisMonth: analytics?.users.thisMonth ?? 0,
-        lastMonth: analytics?.users.lastMonth ?? 0,
+        thisPeriod: getCurrent(analytics?.users),
+        lastPeriod: getPrevious(analytics?.users),
       },
       {
         category: 'Responders',
-        thisMonth: analytics?.providers.thisMonth ?? 0,
-        lastMonth: analytics?.providers.lastMonth ?? 0,
+        thisPeriod: getCurrent(analytics?.providers),
+        lastPeriod: getPrevious(analytics?.providers),
       },
     ],
-    [analytics]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [analytics, period]
   );
 
   const distributionData = useMemo(
@@ -176,13 +197,33 @@ export default function SuperAdminDashboardPage() {
           </div>
         </div>
         <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
-        <div className="mt-4">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
-            System-wide statistics and analytics
-          </p>
+        <div className="mt-4 flex items-end justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+              System-wide statistics and analytics
+            </p>
+          </div>
+          <div className="flex items-center gap-1 border border-border">
+            <Button
+              variant={isWeekly ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none text-xs"
+              onClick={() => setPeriod('weekly')}
+            >
+              Weekly
+            </Button>
+            <Button
+              variant={!isWeekly ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none text-xs"
+              onClick={() => setPeriod('monthly')}
+            >
+              Monthly
+            </Button>
+          </div>
         </div>
       </div>
       <div className="px-6 pb-8 space-y-6">
@@ -212,7 +253,7 @@ export default function SuperAdminDashboardPage() {
                     {Math.abs(stat.growth)}%
                   </span>
                   <span className="text-muted-foreground text-xs">
-                    vs last month
+                    vs {isWeekly ? 'last week' : 'last month'}
                   </span>
                 </div>
               </CardContent>
@@ -240,7 +281,7 @@ export default function SuperAdminDashboardPage() {
           <Card>
             <CardHeader className="border-b border-border pb-3">
               <CardTitle className="text-base font-semibold">
-                Monthly Comparison
+                {isWeekly ? 'Weekly Comparison' : 'Monthly Comparison'}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
@@ -249,7 +290,7 @@ export default function SuperAdminDashboardPage() {
                 className="h-[300px] w-full"
                 style={{ overflow: 'visible' }}
               >
-                <BarChart data={monthlyComparisonData}>
+                <BarChart data={comparisonData}>
                   <XAxis
                     dataKey="category"
                     tickLine={false}
@@ -260,13 +301,13 @@ export default function SuperAdminDashboardPage() {
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <ChartLegend content={<ChartLegendContent />} />
                   <Bar
-                    dataKey="thisMonth"
-                    fill="var(--color-thisMonth)"
+                    dataKey="thisPeriod"
+                    fill="var(--color-thisPeriod)"
                     radius={4}
                   />
                   <Bar
-                    dataKey="lastMonth"
-                    fill="var(--color-lastMonth)"
+                    dataKey="lastPeriod"
+                    fill="var(--color-lastPeriod)"
                     radius={4}
                   />
                 </BarChart>

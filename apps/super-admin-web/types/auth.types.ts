@@ -62,6 +62,8 @@ export interface IDashboardStats {
   total: number;
   thisMonth: number;
   lastMonth: number;
+  thisWeek: number;
+  lastWeek: number;
 }
 
 export interface IDashboardEntity {
