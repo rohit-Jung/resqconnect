@@ -1,6 +1,9 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
+
 import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
 
 import { DashboardAlerts } from '@/components/dashboard-alerts';
 import { DashboardCharts } from '@/components/dashboard-charts';
@@ -9,7 +12,10 @@ import { DashboardTeams } from '@/components/dashboard-teams';
 import { useOrgProfile } from '@/services/organization/auth.api';
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 
+type Period = 'weekly' | 'monthly';
+
 export default function DashboardPage() {
+  const [period, setPeriod] = useState<Period>('weekly');
   const { data: analyticsResponse, isLoading } = useOrgDashboardAnalytics();
   const { data: profileResponse } = useOrgProfile();
   const analytics = analyticsResponse?.data?.data;
@@ -40,23 +46,48 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
-        <div className="mt-4">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
-            Overview of your organization activity
-          </p>
+        <div className="mt-4 flex items-end justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
+              Overview of your organization activity
+            </p>
+          </div>
+          <div className="flex items-center gap-1 border border-border">
+            <Button
+              variant={period === 'weekly' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none text-xs"
+              onClick={() => setPeriod('weekly')}
+            >
+              Weekly
+            </Button>
+            <Button
+              variant={period === 'monthly' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none text-xs"
+              onClick={() => setPeriod('monthly')}
+            >
+              Monthly
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="px-6 pb-8 space-y-6">
-        <DashboardStats data={analytics} isLoading={isLoading} />
+        <DashboardStats
+          data={analytics}
+          isLoading={isLoading}
+          period={period}
+        />
         <div className={analyticsEnabled ? '' : 'blur-sm select-none'}>
           <DashboardCharts
             emergencyRequests={analytics?.emergencyRequests}
             isLoading={isLoading}
+            period={period}
           />
         </div>
         {!analyticsEnabled && (

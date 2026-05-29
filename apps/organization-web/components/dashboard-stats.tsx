@@ -10,6 +10,7 @@ import { IOrgDashboardAnalytics } from '@/types/auth.types';
 interface DashboardStatsProps {
   data?: IOrgDashboardAnalytics;
   isLoading?: boolean;
+  period?: 'weekly' | 'monthly';
 }
 
 function StatSkeleton() {
@@ -26,7 +27,11 @@ function StatSkeleton() {
   );
 }
 
-export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
+export function DashboardStats({
+  data,
+  isLoading,
+  period = 'weekly',
+}: DashboardStatsProps) {
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -37,26 +42,42 @@ export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
     );
   }
 
+  const isWeekly = period === 'weekly';
+  const periodLabel = isWeekly ? 'vs last week' : 'vs last month';
+
+  const providersCurrentPeriod = isWeekly
+    ? (data?.providers.thisWeek ?? 0)
+    : (data?.providers.thisMonth ?? 0);
+  const providersPreviousPeriod = isWeekly
+    ? (data?.providers.lastWeek ?? 0)
+    : (data?.providers.lastMonth ?? 0);
+
+  const responsesCurrentPeriod = isWeekly
+    ? (data?.emergencyResponses.thisWeek ?? 0)
+    : (data?.emergencyResponses.thisMonth ?? 0);
+  const responsesPreviousPeriod = isWeekly
+    ? (data?.emergencyResponses.lastWeek ?? 0)
+    : (data?.emergencyResponses.lastMonth ?? 0);
+
   const providersChange =
-    data?.providers.lastMonth && data.providers.lastMonth > 0
+    providersPreviousPeriod > 0
       ? Math.round(
-          ((data.providers.thisMonth - data.providers.lastMonth) /
-            data.providers.lastMonth) *
+          ((providersCurrentPeriod - providersPreviousPeriod) /
+            providersPreviousPeriod) *
             100
         )
-      : data?.providers.thisMonth
+      : providersCurrentPeriod > 0
         ? 100
         : 0;
 
   const responsesChange =
-    data?.emergencyResponses.lastMonth && data.emergencyResponses.lastMonth > 0
+    responsesPreviousPeriod > 0
       ? Math.round(
-          ((data.emergencyResponses.thisMonth -
-            data.emergencyResponses.lastMonth) /
-            data.emergencyResponses.lastMonth) *
+          ((responsesCurrentPeriod - responsesPreviousPeriod) /
+            responsesPreviousPeriod) *
             100
         )
-      : data?.emergencyResponses.thisMonth
+      : responsesCurrentPeriod > 0
         ? 100
         : 0;
 
@@ -66,7 +87,7 @@ export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
       value: data?.providers.total.toString() ?? '0',
       trend: `${providersChange >= 0 ? '+' : ''}${providersChange}%`,
       trendUp: providersChange >= 0,
-      detail: 'vs last month',
+      detail: periodLabel,
       icon: Users,
     },
     {
@@ -90,7 +111,7 @@ export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
       value: data?.emergencyResponses.total.toString() ?? '0',
       trend: `${responsesChange >= 0 ? '+' : ''}${responsesChange}%`,
       trendUp: responsesChange >= 0,
-      detail: 'vs last month',
+      detail: periodLabel,
       icon: Clock,
     },
   ];
@@ -123,7 +144,6 @@ export function DashboardStats({ data, isLoading }: DashboardStatsProps) {
                 {stat.detail}
               </span>
             </div>
-            {/* Signal red accent bar on active stat */}
             {stat.label === 'EMERGENCY REQUESTS' &&
               (data?.emergencyRequests.pending ?? 0) > 0 && (
                 <div className="mt-3 h-[2px] w-8 bg-primary" />

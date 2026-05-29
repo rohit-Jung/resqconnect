@@ -16,7 +16,7 @@ import {
   YAxis,
 } from 'recharts';
 
-interface MonthlyTrendItem {
+interface TrendItem {
   month: string;
   count: number;
 }
@@ -26,12 +26,14 @@ interface EmergencyRequestsData {
   thisMonth: number;
   pending: number;
   completed: number;
-  monthlyTrend?: MonthlyTrendItem[];
+  monthlyTrend?: TrendItem[];
+  weeklyTrend?: TrendItem[];
 }
 
 interface DashboardChartsProps {
   emergencyRequests?: EmergencyRequestsData;
   isLoading?: boolean;
+  period?: 'weekly' | 'monthly';
 }
 
 const COLORS = [
@@ -81,6 +83,7 @@ function CustomTooltip({
 export function DashboardCharts({
   emergencyRequests,
   isLoading,
+  period = 'weekly',
 }: DashboardChartsProps) {
   if (isLoading) {
     return (
@@ -109,15 +112,17 @@ export function DashboardCharts({
     );
   }
 
+  const isWeekly = period === 'weekly';
   const monthlyTrend = emergencyRequests?.monthlyTrend ?? [];
+  const weeklyTrend = emergencyRequests?.weeklyTrend ?? [];
   const pending = emergencyRequests?.pending ?? 0;
   const completed = emergencyRequests?.completed ?? 0;
   const total = emergencyRequests?.total ?? 0;
 
-  // Use monthlyTrend if available, otherwise fall back to summary
+  const activeTrend = isWeekly ? weeklyTrend : monthlyTrend;
   const trendData =
-    monthlyTrend.length > 0
-      ? monthlyTrend
+    activeTrend.length > 0
+      ? activeTrend
       : [
           { month: 'Pending', count: pending },
           { month: 'Completed', count: completed },
@@ -132,11 +137,11 @@ export function DashboardCharts({
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Area Chart - Monthly Trend */}
+      {/* Area Chart - Trend */}
       <Card>
         <CardHeader className="border-b border-border pb-3">
           <CardTitle className="text-base font-semibold">
-            Requests Trend
+            {isWeekly ? 'Weekly Request Trend' : 'Monthly Request Trend'}
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
