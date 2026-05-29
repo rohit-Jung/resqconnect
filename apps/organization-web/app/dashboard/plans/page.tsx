@@ -10,10 +10,12 @@ import {
   Clock,
   CreditCard,
   Crown,
+  ExternalLink,
   Loader2,
   XCircle,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import {
@@ -22,6 +24,32 @@ import {
   useGetSubscriptionPlans,
   useSubscribeToPlan,
 } from '@/services/organization/payments.api';
+
+function derivePlanFeatures(features: string[]): string[] {
+  const labels: string[] = [];
+  for (const item of features ?? []) {
+    const idx = item.indexOf('=');
+    if (idx <= 0) continue;
+    const key = item.slice(0, idx).trim();
+    const value = item.slice(idx + 1).trim();
+    switch (key) {
+      case 'provider_count_limit':
+        labels.push(`Up to ${value} responders`);
+        break;
+      case 'api_rate_limit_tier':
+        labels.push(`${value} requests / 15 min`);
+        break;
+      case 'notification_fallback_quota':
+        labels.push(`${value} SMS fallback notifications`);
+        break;
+      case 'analytics_enabled':
+        if (value === 'true' || value === '1' || value === 'yes')
+          labels.push('Dashboard analytics');
+        break;
+    }
+  }
+  return labels;
+}
 
 const paymentStatusColors: Record<string, string> = {
   pending:
@@ -188,19 +216,24 @@ export default function PlansPage() {
                   </div>
                 </div>
               </div>
-              {activeSubscription.plan.features?.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {activeSubscription.plan.features.map((feature, i) => (
-                    <span
-                      key={i}
-                      className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium"
-                    >
-                      <Check className="h-3 w-3" />
-                      {feature}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const labels = derivePlanFeatures(
+                  activeSubscription.plan.features ?? []
+                );
+                return labels.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {labels.map((feature, i) => (
+                      <span
+                        key={i}
+                        className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium"
+                      >
+                        <Check className="h-3 w-3" />
+                        {feature}
+                      </span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </CardContent>
           </Card>
         ) : (
@@ -277,19 +310,22 @@ export default function PlansPage() {
                         </span>
                       </div>
 
-                      {plan.features?.length > 0 && (
-                        <ul className="space-y-2">
-                          {plan.features.map((feature, i) => (
-                            <li
-                              key={i}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <Check className="h-4 w-4 shrink-0 text-green-500" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      {(() => {
+                        const labels = derivePlanFeatures(plan.features ?? []);
+                        return labels.length > 0 ? (
+                          <ul className="space-y-2">
+                            {labels.map((feature, i) => (
+                              <li
+                                key={i}
+                                className="flex items-center gap-2 text-sm"
+                              >
+                                <Check className="h-4 w-4 shrink-0 text-green-500" />
+                                {feature}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null;
+                      })()}
 
                       <Button
                         className="w-full"
@@ -364,6 +400,9 @@ export default function PlansPage() {
                         <th className="text-muted-foreground pb-3 text-sm font-medium">
                           Method
                         </th>
+                        <th className="text-muted-foreground pb-3 text-sm font-medium">
+                          Invoice
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -398,6 +437,15 @@ export default function PlansPage() {
                             </td>
                             <td className="text-muted-foreground py-4 text-sm capitalize">
                               {payment.paymentMethod}
+                            </td>
+                            <td className="py-4">
+                              <Link
+                                href={`/dashboard/invoices/${payment.id}`}
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                View
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
                             </td>
                           </tr>
                         );
