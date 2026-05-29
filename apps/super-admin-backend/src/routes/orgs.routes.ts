@@ -3,6 +3,7 @@ import { asyncHandler } from '@repo/utils/api';
 import { Router } from 'express';
 
 import {
+  bulkProvisionOrgs,
   deleteOrg,
   getOrgById,
   listOrgs,
@@ -19,4 +20,5 @@ orgsRouter.get('/', asyncHandler(listOrgs));
 orgsRouter.get('/:id', asyncHandler(getOrgById));
 orgsRouter.delete('/:id', asyncHandler(deleteOrg));
 orgsRouter.post('/provision', asyncHandler(provisionOrg));
+orgsRouter.post('/bulk-provision', asyncHandler(bulkProvisionOrgs));
 orgsRouter.post('/:id/status', asyncHandler(updateOrgStatus));

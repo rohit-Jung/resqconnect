@@ -3,11 +3,12 @@
 import { Button } from '@repo/ui/button';
 import { Input } from '@repo/ui/input';
 
-import { AlertTriangle, Loader2, Plus, Search } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus, Search, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { BulkUploadOrgsModal } from '@/components/bulk-upload-orgs-modal';
 import {
   useDeleteOrganization,
   useGetAllOrganizations,
@@ -29,6 +30,7 @@ type CpOrg = {
 export default function OrganizationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const { data, isLoading, isError, error } = useGetAllOrganizations();
   const deleteOrganization = useDeleteOrganization();
@@ -118,12 +120,22 @@ export default function OrganizationsPage() {
             </span>
             <span className="text-xl font-bold text-primary">.</span>
           </div>
-          <Link href="/dashboard/organizations/new">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
-              <Plus className="h-4 w-4" />
-              Create Organization
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="rounded-none gap-2"
+              onClick={() => setShowBulkModal(true)}
+            >
+              <Upload className="h-4 w-4" />
+              Bulk Upload
             </Button>
-          </Link>
+            <Link href="/dashboard/organizations/new">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none gap-2">
+                <Plus className="h-4 w-4" />
+                Create Organization
+              </Button>
+            </Link>
+          </div>
         </div>
         <div className="mt-3 h-[2px] w-full bg-primary" />
         <div className="mt-4">
@@ -167,6 +179,10 @@ export default function OrganizationsPage() {
           onDelete={handleDelete}
         />
       </div>
+
+      {showBulkModal && (
+        <BulkUploadOrgsModal onClose={() => setShowBulkModal(false)} />
+      )}
     </div>
   );
 }

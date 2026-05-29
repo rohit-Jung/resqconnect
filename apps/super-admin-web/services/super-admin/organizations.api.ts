@@ -128,6 +128,46 @@ export const useGetOrganizationEntitlements = (
   });
 };
 
+export interface IBulkProvisionRow {
+  name: string;
+  email: string;
+  serviceCategory: 'ambulance' | 'police' | 'rescue_team' | 'fire_truck';
+  generalNumber: number;
+  password: string;
+  sector: 'hospital' | 'police' | 'fire';
+  siloBaseUrl: string;
+}
+
+export interface IBulkProvisionResult {
+  row: number;
+  email: string;
+  status: 'created' | 'failed';
+  error?: string;
+  orgId?: string;
+}
+
+export interface IBulkProvisionResponse {
+  ok: boolean;
+  created: number;
+  failed: number;
+  results: IBulkProvisionResult[];
+}
+
+export const useBulkProvisionOrgs = () => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    AxiosResponse<IBulkProvisionResponse>,
+    AxiosError,
+    { rows: IBulkProvisionRow[] }
+  >({
+    mutationFn: ({ rows }) =>
+      api.post(organizationEndpoints.bulkProvision, { rows }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.lists() });
+    },
+  });
+};
+
 export const useSetOrganizationEntitlements = () => {
   const queryClient = useQueryClient();
 

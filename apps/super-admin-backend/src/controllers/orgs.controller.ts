@@ -477,6 +477,198 @@ export const provisionOrg = async (req: Request, res: Response) => {
   });
 };
 
+type ProvisionOrgInput = {
+  name: string;
+  email: string;
+  serviceCategory: string;
+  generalNumber: number;
+  password: string;
+  sector: string;
+  siloBaseUrl: string;
+};
+
+async function provisionOrgCore(
+  input: ProvisionOrgInput
+): Promise<{ ok: true; orgId: string } | { ok: false; error: string }> {
+  const {
+    name,
+    email,
+    serviceCategory,
+    generalNumber,
+    password,
+    sector,
+    siloBaseUrl,
+  } = input;
+  const normalizedName = name;
+
+  const existingMatches = await db
+    .select({
+      id: cpOrganization.id,
+      name: cpOrganization.name,
+      siloOrgId: cpOrganization.siloOrgId,
+      siloBaseUrl: cpOrganization.siloBaseUrl,
+      sector: cpOrganization.sector,
+    })
+    .from(cpOrganization)
+    .where(sql`btrim(${cpOrganization.name}) = ${normalizedName}`)
+    .orderBy(asc(cpOrganization.createdAt))
+    .limit(2);
+
+  if (existingMatches.length > 1)
+    return { ok: false, error: 'Multiple orgs match this name' };
+
+  const existing = existingMatches[0];
+  if (existing?.id) {
+    if (existing.sector !== sector || existing.siloBaseUrl !== siloBaseUrl) {
+      return { ok: false, error: 'Org already exists with different config' };
+    }
+    if (existing.siloOrgId) return { ok: false, error: 'Org already exists' };
+  }
+
+  let cpId: string | undefined;
+  if (existing?.id) {
+    cpId = String(existing.id);
+  } else {
+    try {
+      const [row] = await db
+        .insert(cpOrganization)
+        .values({
+          name: normalizedName,
+          sector: sector as any,
+          status: 'pending_approval',
+          siloBaseUrl,
+        })
+        .returning({ id: cpOrganization.id });
+      cpId = row?.id ? String(row.id) : undefined;
+    } catch (err) {
+      if (isPgError(err, '23505'))
+        return { ok: false, error: 'Org already exists (concurrent)' };
+      throw err;
+    }
+  }
+
+  if (!cpId) return { ok: false, error: 'Failed to create org registry' };
+
+  const provisionUrl = `${siloBaseUrl.replace(/\/$/, '')}/api/v1/internal/orgs/provision`;
+  const siloRes = await fetch(provisionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-internal-api-key': envConfig.internal_api_key,
+    },
+    body: JSON.stringify({
+      name,
+      email,
+      serviceCategory,
+      generalNumber,
+      password,
+    }),
+  });
+
+  const siloBodyText = await siloRes.text().catch(() => '');
+  if (!siloRes.ok) {
+    await db
+      .delete(cpOrganization)
+      .where(
+        and(
+          eq(cpOrganization.id, cpId),
+          sql`${cpOrganization.siloOrgId} IS NULL`
+        )
+      );
+    return {
+      ok: false,
+      error: `Silo provision failed (${siloRes.status}): ${siloBodyText.slice(0, 200)}`,
+    };
+  }
+
+  let siloOrgId: string | undefined;
+  try {
+    const siloJson = JSON.parse(siloBodyText);
+    siloOrgId = siloJson?.data?.id ?? siloJson?.id;
+  } catch {}
+
+  if (!siloOrgId) {
+    await db
+      .delete(cpOrganization)
+      .where(
+        and(
+          eq(cpOrganization.id, cpId),
+          sql`${cpOrganization.siloOrgId} IS NULL`
+        )
+      );
+    return { ok: false, error: 'Silo response missing org id' };
+  }
+
+  await db
+    .update(cpOrganization)
+    .set({ siloOrgId })
+    .where(eq(cpOrganization.id, cpId));
+  return { ok: true, orgId: cpId };
+}
+
+export const bulkProvisionOrgs = async (req: Request, res: Response) => {
+  const rows: unknown[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (rows.length === 0) {
+    return res.status(400).json({ ok: false, error: 'No rows provided' });
+  }
+  if (rows.length > 500) {
+    return res
+      .status(400)
+      .json({ ok: false, error: 'Maximum 500 rows per batch' });
+  }
+
+  const results: Array<{
+    row: number;
+    email: string;
+    status: 'created' | 'failed';
+    error?: string;
+    orgId?: string;
+  }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const parsed = provisionOrgSchema.safeParse(rows[i]);
+    if (!parsed.success) {
+      results.push({
+        row: i + 1,
+        email: String((rows[i] as any)?.email ?? ''),
+        status: 'failed',
+        error: parsed.error.issues.map(e => e.message).join('; '),
+      });
+      continue;
+    }
+    try {
+      const result = await provisionOrgCore(parsed.data);
+      if (result.ok) {
+        results.push({
+          row: i + 1,
+          email: parsed.data.email,
+          status: 'created',
+          orgId: result.orgId,
+        });
+      } else {
+        results.push({
+          row: i + 1,
+          email: parsed.data.email,
+          status: 'failed',
+          error: result.error,
+        });
+      }
+    } catch (err) {
+      results.push({
+        row: i + 1,
+        email: String(parsed.data.email),
+        status: 'failed',
+        error: 'Internal error',
+      });
+    }
+  }
+
+  const created = results.filter(r => r.status === 'created').length;
+  return res
+    .status(207)
+    .json({ ok: true, created, failed: results.length - created, results });
+};
+
 export const updateOrgStatus = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {

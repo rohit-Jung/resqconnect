@@ -11,12 +11,13 @@ export const organizationEndpoints = {
   getById: (id: string) => `/orgs/${id}`,
   deleteById: (id: string) => `/orgs/${id}`,
   provision: `/orgs/provision`,
+  bulkProvision: `/orgs/bulk-provision`,
   updateStatus: (id: string) => `/orgs/${id}/status`,
   entitlements: (id: string) => `/orgs/${id}/entitlements`,
 };
 
 export const userEndpoints = {
-  // todo: control plane doesn't implement per-user detail endpoint yet
+  getAll: `/users`,
   getById: (_id: string) => {
     void _id;
     return '';
