@@ -1,16 +1,17 @@
 'use client';
 
+import { Button } from '@repo/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
-import { Skeleton } from '@repo/ui/skeleton';
 
-import { Apple, Info, Loader2, Monitor, Smartphone } from 'lucide-react';
+import { Download, Info, Loader2, Monitor, Smartphone } from 'lucide-react';
+import { FaAndroid, FaApple } from 'react-icons/fa';
 
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
 import { useOrgServiceProviders } from '@/services/organization/providers.api';
 
 const APP_CONFIG = {
   ios: { version: '1.0.0', storeUrl: '#' },
-  android: { version: '1.0.0', storeUrl: '#' },
+  android: { version: '1.0.0', apkUrl: '#' },
   web: { version: '1.0.0' },
 };
 
@@ -28,175 +29,157 @@ export default function MobileAppsPage() {
   const verifiedProviders = responders.filter(p => p.isVerified).length;
   const totalEmergencyRequests = analytics?.emergencyRequests.total ?? 0;
 
-  const apps = [
-    {
-      name: 'Responder App',
-      version: APP_CONFIG.android.version,
-      description: 'For responders to receive and respond to emergencies',
-      users: totalProviders,
-      userLabel: 'Registered Responders',
-      status: 'ACTIVE',
-      icon: <Smartphone className="h-4 w-4" />,
-    },
-    {
-      name: 'User App',
-      version: APP_CONFIG.ios.version,
-      description: 'For users to request emergency services',
-      users: totalEmergencyRequests,
-      userLabel: 'Total Requests',
-      status: 'ACTIVE',
-      icon: <Smartphone className="h-4 w-4" />,
-    },
-    {
-      name: 'Organization Dashboard',
-      version: APP_CONFIG.web.version,
-      description: 'For managing responders and monitoring requests',
-      users: verifiedProviders,
-      userLabel: 'Verified Responders',
-      status: 'ACTIVE',
-      icon: <Monitor className="h-4 w-4" />,
-    },
-  ];
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
-        <Loader2 className="text-primary h-8 w-8 animate-spin dark:text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background dark:bg-background">
+    <div className="min-h-screen bg-background">
       {/* Swiss Style Header */}
-      <div className="bg-background dark:bg-background px-6 pb-4 pt-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <span className="text-xl font-bold tracking-tight text-foreground dark:text-foreground">
-              RESQ
-            </span>
-            <span className="text-xl font-bold text-primary dark:text-primary">
-              .
-            </span>
-          </div>
+      <div className="bg-background px-6 pb-4 pt-6">
+        <div className="flex items-center gap-1">
+          <span className="text-xl font-bold tracking-tight text-foreground">
+            RESQ
+          </span>
+          <span className="text-xl font-bold text-primary">.</span>
         </div>
-        <div className="mt-3 h-[2px] w-full bg-primary dark:bg-primary" />
+        <div className="mt-3 h-[2px] w-full bg-primary" />
         <div className="mt-4">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Mobile Apps
           </h1>
-          <p className="text-muted-foreground mt-1 dark:text-muted-foreground">
-            Manage and monitor your ResQ Connect mobile applications
+          <p className="text-muted-foreground mt-1">
+            Distribute and monitor ResQConnect mobile apps
           </p>
         </div>
       </div>
 
-      {/* Content */}
       <div className="px-6 pb-8 space-y-6">
-        {/* App Cards */}
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-40" />
-            ))}
+        {/* Stats */}
+        <div className="grid gap-px bg-border border border-border md:grid-cols-3">
+          <div className="bg-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Smartphone className="h-4 w-4 text-primary" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Responder App
+              </span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight">
+              {totalProviders.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Registered responders
+            </p>
           </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {apps.map(app => (
-              <Card key={app.name}>
-                <CardHeader className="border-b border-border pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-primary">{app.icon}</span>
-                      <CardTitle className="text-sm font-semibold">
-                        {app.name}
-                      </CardTitle>
-                    </div>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-green-600">
-                      {app.status}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <p className="text-muted-foreground text-xs mb-4">
-                    {app.description}
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                        Version
-                      </span>
-                      <p className="mt-1 text-sm font-medium">v{app.version}</p>
-                    </div>
-                    <div>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                        {app.userLabel}
-                      </span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight">
-                        {app.users.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="bg-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Smartphone className="h-4 w-4 text-primary" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                User App
+              </span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight">
+              {totalEmergencyRequests.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Total requests made
+            </p>
           </div>
-        )}
+          <div className="bg-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Monitor className="h-4 w-4 text-primary" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Dashboard
+              </span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight">
+              {verifiedProviders.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Verified responders
+            </p>
+          </div>
+        </div>
 
         {/* Downloads */}
         <Card>
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="text-base font-semibold">
-              Available Downloads
+            <CardTitle className="text-sm font-semibold tracking-tight">
+              Downloads
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b border-border p-4">
-              <div className="flex items-center gap-3">
-                <Apple className="text-primary h-4 w-4" />
+            {/* iOS */}
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center bg-muted">
+                  <FaApple className="h-5 w-5 text-foreground" />
+                </div>
                 <div>
-                  <p className="text-sm font-medium">iOS App Store</p>
-                  <p className="text-muted-foreground text-xs">
-                    For iPhone and iPad
+                  <p className="text-sm font-semibold">iOS App</p>
+                  <p className="text-xs text-muted-foreground">
+                    iPhone &amp; iPad · v{APP_CONFIG.ios.version}
                   </p>
                 </div>
               </div>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                v{APP_CONFIG.ios.version}
-              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-none gap-2"
+                asChild
+              >
+                <a
+                  href={APP_CONFIG.ios.storeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  App Store
+                </a>
+              </Button>
             </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <Smartphone className="text-primary h-4 w-4" />
+
+            {/* Android APK */}
+            <div className="flex items-center justify-between p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center bg-muted">
+                  <FaAndroid className="h-5 w-5 text-foreground" />
+                </div>
                 <div>
-                  <p className="text-sm font-medium">Google Play Store</p>
-                  <p className="text-muted-foreground text-xs">
-                    For Android devices
+                  <p className="text-sm font-semibold">Android App</p>
+                  <p className="text-xs text-muted-foreground">
+                    Direct APK · v{APP_CONFIG.android.version}
                   </p>
                 </div>
               </div>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                v{APP_CONFIG.android.version}
-              </span>
+              <Button
+                size="sm"
+                className="rounded-none gap-2 bg-primary hover:bg-primary/90"
+                asChild
+              >
+                <a href={APP_CONFIG.android.apkUrl} download>
+                  <Download className="h-3.5 w-3.5" />
+                  Download APK
+                </a>
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Info */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Service responders should download the ResQ Connect mobile app
-                to receive emergency requests and update their location in
-                real-time. Users can request emergency services through the user
-                app, which will automatically find and dispatch the nearest
-                available responder.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex gap-3 border border-border bg-card p-4">
+          <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Responders should install the ResQConnect app to receive emergency
+            requests and share real-time location. Users request services via
+            the user app, which dispatches the nearest available responder
+            automatically.
+          </p>
+        </div>
       </div>
     </div>
   );
