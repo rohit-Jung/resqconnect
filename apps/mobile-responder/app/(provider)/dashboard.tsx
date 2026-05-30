@@ -201,10 +201,6 @@ export default function ProviderDashboardScreen() {
     setServiceStatus,
   ]);
 
-  useEffect(() => {
-    console.log('currentRequest changed:', currentRequest);
-  }, [currentRequest]);
-
   const handleStatusChange = async (
     newStatus: 'available' | 'assigned' | 'off_duty'
   ) => {
@@ -272,9 +268,6 @@ export default function ProviderDashboardScreen() {
       Alert.alert('Current Request not found');
       return;
     }
-
-    const lat = currentRequest.location.latitude;
-    const lng = currentRequest.location.longitude;
 
     // FIX: OPEN GOOGLE MAPS
     // const url = `https://maps.google.com/?q=${lat},${lng}`;

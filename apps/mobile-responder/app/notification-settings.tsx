@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { InfoPage, SectionHeader } from '@repo/mobile/ui';
 
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -12,8 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-import { InfoPage, SectionHeader } from '@/components/InfoPage';
 
 const SIGNAL_RED = '#C44536';
 const PRIMARY = '#E63946';
@@ -92,7 +91,11 @@ export default function NotificationSettingsScreen() {
   };
 
   return (
-    <InfoPage title="NOTIFICATIONS" tagline="NOTIFICATION SETTINGS">
+    <InfoPage
+      title="NOTIFICATIONS"
+      tagline="NOTIFICATION SETTINGS"
+      onBack={() => router.back()}
+    >
       <View style={styles.notice}>
         <Ionicons
           name="information-circle-outline"

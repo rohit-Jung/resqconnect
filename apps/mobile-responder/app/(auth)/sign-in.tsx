@@ -45,6 +45,11 @@ const isLoginResponse = (
 };
 
 async function save(key: string, value: string) {
+  const existingValue = await SecureStore.getItemAsync(key);
+  if (existingValue) {
+    await SecureStore.deleteItemAsync(key);
+  }
+
   await SecureStore.setItemAsync(key, value);
 }
 
@@ -147,6 +152,11 @@ const SigninScreen: React.FC = () => {
       onError: async (error: any) => {
         const errorData = error?.response?.data?.data;
         const code = errorData?.code;
+        console.log(
+          'Login error code:',
+          code,
+          JSON.stringify(errorData, null, 2)
+        );
 
         if (code === 'DOCUMENTS_REQUIRED') {
           const token = errorData?.token;
@@ -169,6 +179,7 @@ const SigninScreen: React.FC = () => {
             },
           });
         } else {
+          console.log('Login error:', JSON.stringify(error, null, 2));
           Alert.alert(
             'Login Failed',
             error?.response?.data?.message ||

@@ -140,6 +140,7 @@ const SelectOrganizationScreen: React.FC = () => {
                       { borderColor: LIGHT_GRAY, flex: 0 },
                     ]}
                     onPress={() => {
+                      console.log('Selected org:', o.name, o.siloBaseUrl);
                       setOrgRouting({
                         siloBaseUrl: o.siloBaseUrl,
                         orgName: o.name,
