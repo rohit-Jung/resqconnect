@@ -27,6 +27,8 @@ export const requestStatusEnum = pgEnum('request_status', [
   'no_providers_available',
 ]);
 
+export const requestSourceEnum = pgEnum('request_source', ['app', 'sms']);
+
 // Custom PostGIS geometry type
 const geometry = customType<{ data: string }>({
   dataType() {
@@ -37,12 +39,14 @@ const geometry = customType<{ data: string }>({
 export const emergencyRequest = pgTable('emergency_request', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id')
-    // Platform-owned ID; in silo runtime we intentionally do not require a local user row.
+    // platform-owned id; in silo runtime we intentionally do not require a local user row.
     .notNull(),
+
   serviceType: serviceTypeEnum('service_type').notNull(),
   requestStatus: requestStatusEnum('request_status')
     .notNull()
     .default('pending'),
+  source: requestSourceEnum('source').notNull().default('app'),
 
   description: varchar({ length: 255 }),
   requestTimeout: integer().default(120), // 2 minutes default
