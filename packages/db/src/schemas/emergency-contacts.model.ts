@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import {
   boolean,
   pgTable,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -28,6 +29,7 @@ export const emergencyContact = pgTable('emergency_contact', {
     'sms'
   ), // 'sms', 'push', 'both'
   pushToken: text('push_token'), // If contact has the app installed
+  priority: smallint('priority').notNull().default(99),
 
   createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
