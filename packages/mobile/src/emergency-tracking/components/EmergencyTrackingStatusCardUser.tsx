@@ -25,6 +25,8 @@ export function EmergencyTrackingStatusCardUser({
   routeInfo,
   isLoadingRoute,
   nearbyProvidersCount,
+  locationAddress,
+  userLocation,
   assignedProvider,
   isCancelling,
   isConfirmingArrival,
@@ -39,6 +41,8 @@ export function EmergencyTrackingStatusCardUser({
   routeInfo: RouteInfo | null;
   isLoadingRoute: boolean;
   nearbyProvidersCount: number;
+  locationAddress?: string | null;
+  userLocation?: { latitude: number; longitude: number };
   assignedProvider: {
     name: string;
     vehicleNumber?: string;
@@ -55,157 +59,213 @@ export function EmergencyTrackingStatusCardUser({
       Linking.openURL(`tel:${assignedProvider.phoneNumber}`);
   };
 
+  const isPending = status === 'pending';
+
   return (
-    <View style={styles.statusCard}>
-      <View
-        style={[styles.typeBadge, { backgroundColor: emergencyInfo.color }]}
-      >
-        <MaterialCommunityIcons
-          name={emergencyInfo.icon as any}
-          size={24}
-          color="#fff"
-        />
-        <Text style={styles.typeBadgeText}>
-          {emergencyInfo.label} Emergency
-        </Text>
-      </View>
-
-      <View style={styles.statusSection}>
-        {status === 'pending' && (
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <ActivityIndicator size="small" color={statusMessage.color} />
-          </Animated.View>
-        )}
-        {status === 'accepted' && (
-          <Ionicons
-            name="checkmark-circle"
-            size={24}
-            color={statusMessage.color}
+    <View style={[styles.statusCard, isPending && styles.statusCardPending]}>
+      {/* Type badge */}
+      <View style={styles.topRow}>
+        <View
+          style={[styles.typeBadge, { backgroundColor: emergencyInfo.color }]}
+        >
+          <MaterialCommunityIcons
+            name={emergencyInfo.icon as any}
+            size={14}
+            color="#fff"
           />
-        )}
-        <Text style={[styles.statusText, { color: statusMessage.color }]}>
-          {statusMessage.message}
-        </Text>
+          <Text style={styles.typeBadgeText}>
+            {emergencyInfo.label.toUpperCase()} EMERGENCY
+          </Text>
+        </View>
+        <View style={styles.connectionPill}>
+          <View
+            style={[
+              styles.connectionDot,
+              { backgroundColor: isConnected ? COLORS.GREEN : COLORS.RED },
+            ]}
+          />
+          <Text style={styles.connectionText}>
+            {isConnected ? 'LIVE' : 'RECONNECTING'}
+          </Text>
+        </View>
       </View>
 
-      {status === 'pending' && nearbyProvidersCount > 0 && (
-        <Text style={styles.providersCount}>
-          {nearbyProvidersCount} provider{nearbyProvidersCount > 1 ? 's' : ''}{' '}
-          nearby
-        </Text>
+      {/* PENDING — search animation */}
+      {isPending && (
+        <View style={styles.pendingBody}>
+          <View style={styles.pulseWrapper}>
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                {
+                  borderColor: emergencyInfo.color,
+                  transform: [{ scale: pulseAnim }],
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.pulseIconCenter,
+                { backgroundColor: emergencyInfo.color },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={emergencyInfo.icon as any}
+                size={28}
+                color="#fff"
+              />
+            </View>
+          </View>
+
+          <Text style={[styles.pendingTitle, { color: emergencyInfo.color }]}>
+            {statusMessage.message}
+          </Text>
+
+          {nearbyProvidersCount > 0 ? (
+            <View style={styles.providersChip}>
+              <Ionicons name="people" size={14} color={COLORS.GREEN} />
+              <Text style={styles.providersChipText}>
+                {nearbyProvidersCount} RESPONDER
+                {nearbyProvidersCount > 1 ? 'S' : ''} NEARBY
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.providersChip}>
+              <ActivityIndicator size="small" color={COLORS.MID_GRAY} />
+              <Text
+                style={[styles.providersChipText, { color: COLORS.MID_GRAY }]}
+              >
+                SCANNING AREA...
+              </Text>
+            </View>
+          )}
+
+          {/* Location address strip */}
+          <View style={styles.locationStrip}>
+            <Ionicons name="location" size={13} color={COLORS.SIGNAL_RED} />
+            <View style={styles.locationStripText}>
+              {locationAddress ? (
+                <Text style={styles.locationAddressText} numberOfLines={2}>
+                  {locationAddress}
+                </Text>
+              ) : null}
+              {userLocation ? (
+                <Text style={styles.locationCoordsText}>
+                  {userLocation.latitude.toFixed(5)},{' '}
+                  {userLocation.longitude.toFixed(5)}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        </View>
       )}
 
-      {!!routeInfo && (status === 'accepted' || status === 'in_progress') && (
-        <View style={styles.routeInfoSwiss}>
-          <View style={styles.routeInfoSwissItem}>
-            <Ionicons name="time-outline" size={16} color={COLORS.MID_GRAY} />
-            <Text style={styles.routeInfoSwissText}>
-              {routeInfo.duration} min
-            </Text>
+      {/* ACCEPTED / IN_PROGRESS — status row */}
+      {!isPending && (
+        <View style={styles.statusSection}>
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={statusMessage.color}
+          />
+          <Text style={[styles.statusText, { color: statusMessage.color }]}>
+            {statusMessage.message}
+          </Text>
+        </View>
+      )}
+
+      {/* Location strip for non-pending */}
+      {!isPending && (locationAddress || userLocation) && (
+        <View style={[styles.locationStrip, { marginBottom: 10 }]}>
+          <Ionicons name="location" size={13} color={COLORS.SIGNAL_RED} />
+          <View style={styles.locationStripText}>
+            {locationAddress ? (
+              <Text style={styles.locationAddressText} numberOfLines={1}>
+                {locationAddress}
+              </Text>
+            ) : null}
+            {userLocation ? (
+              <Text style={styles.locationCoordsText}>
+                {userLocation.latitude.toFixed(5)},{' '}
+                {userLocation.longitude.toFixed(5)}
+              </Text>
+            ) : null}
           </View>
-          <View style={styles.routeInfoSwissDivider} />
-          <View style={styles.routeInfoSwissItem}>
+        </View>
+      )}
+
+      {/* Route info */}
+      {!!routeInfo && (status === 'accepted' || status === 'in_progress') && (
+        <View style={styles.routeInfoRow}>
+          <View style={styles.routeInfoItem}>
+            <Ionicons name="time-outline" size={16} color={COLORS.MID_GRAY} />
+            <Text style={styles.routeInfoValue}>{routeInfo.duration} min</Text>
+            <Text style={styles.routeInfoLabel}>ETA</Text>
+          </View>
+          <View style={styles.routeInfoDivider} />
+          <View style={styles.routeInfoItem}>
             <Ionicons
               name="navigate-outline"
               size={16}
               color={COLORS.MID_GRAY}
             />
-            <Text style={styles.routeInfoSwissText}>
-              {routeInfo.distance} km
-            </Text>
+            <Text style={styles.routeInfoValue}>{routeInfo.distance} km</Text>
+            <Text style={styles.routeInfoLabel}>AWAY</Text>
           </View>
           {isLoadingRoute && (
             <ActivityIndicator
               size="small"
               color={COLORS.MID_GRAY}
-              style={{ marginLeft: 8 }}
+              style={{ marginLeft: 12 }}
             />
           )}
         </View>
       )}
 
-      {!!routeInfo && (status === 'accepted' || status === 'in_progress') && (
-        <View style={styles.hairline} />
-      )}
-
+      {/* Assigned provider */}
       {!!assignedProvider && (
-        <View style={styles.providerInfo}>
-          <View style={styles.providerHeader}>
-            <View style={styles.providerAvatar}>
-              <MaterialCommunityIcons name="account" size={20} color="#fff" />
-            </View>
-            <View style={styles.providerDetails}>
-              <Text style={styles.providerName}>{assignedProvider.name}</Text>
-              {!!assignedProvider.vehicleNumber && (
-                <Text style={styles.providerVehicle}>
-                  {assignedProvider.vehicleNumber}
-                </Text>
-              )}
-            </View>
+        <View style={styles.providerCard}>
+          <View style={styles.providerAvatar}>
+            <MaterialCommunityIcons name="account" size={18} color="#fff" />
+          </View>
+          <View style={styles.providerDetails}>
+            <Text style={styles.providerName}>{assignedProvider.name}</Text>
+            {!!assignedProvider.vehicleNumber && (
+              <Text style={styles.providerVehicle}>
+                {assignedProvider.vehicleNumber}
+              </Text>
+            )}
           </View>
           {!!assignedProvider.phoneNumber && (
-            <TouchableOpacity
-              style={styles.callButton}
-              onPress={onCallProvider}
-            >
-              <Ionicons name="call" size={20} color="#fff" />
-              <Text style={styles.callButtonText}>Call Provider</Text>
+            <TouchableOpacity style={styles.callBtn} onPress={onCallProvider}>
+              <Ionicons name="call" size={18} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
       )}
 
+      {/* Cancel */}
       {(status === 'pending' || status === 'accepted') && (
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={onCancel}
           disabled={isCancelling}
+          activeOpacity={0.8}
         >
           {isCancelling ? (
-            <ActivityIndicator size="small" color="#EF4444" />
+            <ActivityIndicator size="small" color={COLORS.SIGNAL_RED} />
           ) : (
             <>
-              <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-              <Text style={styles.cancelButtonText}>Cancel Request</Text>
+              <Ionicons
+                name="close-circle-outline"
+                size={18}
+                color={COLORS.SIGNAL_RED}
+              />
+              <Text style={styles.cancelButtonText}>CANCEL REQUEST</Text>
             </>
           )}
         </TouchableOpacity>
       )}
-
-      {/*{status === 'accepted' && (
-        <TouchableOpacity
-          style={styles.confirmArrivalButton}
-          onPress={onConfirmArrival}
-          disabled={isConfirmingArrival}
-        >
-          {isConfirmingArrival ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={20}
-                color="#fff"
-              />
-              <Text style={styles.confirmArrivalButtonText}>
-                Confirm Provider Arrived
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )} */}
-
-      <View style={styles.connectionStatus}>
-        <View
-          style={[
-            styles.connectionDot,
-            { backgroundColor: isConnected ? '#10B981' : '#EF4444' },
-          ]}
-        />
-        <Text style={styles.connectionText}>
-          {isConnected ? 'Live Tracking Active' : 'Reconnecting...'}
-        </Text>
-      </View>
     </View>
   );
 }
