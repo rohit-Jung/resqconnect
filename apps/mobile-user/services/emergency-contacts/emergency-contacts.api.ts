@@ -12,6 +12,7 @@ export interface EmergencyContact {
   pushToken?: string;
   isCommanContact: boolean;
   userId: string;
+  priority: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +94,11 @@ export const emergencyContactsApi = {
   getCommon: async (): Promise<EmergencyContact[]> => {
     const response = await api.get(emergencyContactEndpoints.getCommon);
     return response.data.data;
+  },
+
+  // Reorder contacts by sending new priority values
+  reorder: async (order: { id: string; priority: number }[]): Promise<void> => {
+    await api.post(emergencyContactEndpoints.reorder, { order });
   },
 };
 

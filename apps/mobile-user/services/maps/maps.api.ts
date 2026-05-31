@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
@@ -78,6 +78,60 @@ export async function fetchRoute(
     return null;
   }
 }
+
+export const useReverseGeocode = (lat: number | null, lng: number | null) => {
+  return useQuery<string | null, AxiosError>({
+    queryKey: ['reverseGeocode', lat, lng],
+    queryFn: async () => {
+      const response = await api.get<ApiResponse<{ address: string }>>(
+        mapsEndpoints.reverseGeocode,
+        { params: { lat, lng } }
+      );
+      return response.data?.data?.address ?? null;
+    },
+    enabled: lat !== null && lng !== null,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+};
+
+export interface AutocompleteResult {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export function extractResultCoords(
+  result: AutocompleteResult
+): { latitude: number; longitude: number } | null {
+  const lat = Number(result.latitude);
+  const lng = Number(result.longitude);
+  if (isNaN(lat) || isNaN(lng)) return null;
+  return { latitude: lat, longitude: lng };
+}
+
+export const useAutocomplete = (
+  query: string,
+  lat: number | null,
+  lng: number | null
+) => {
+  return useQuery<AutocompleteResult[], AxiosError>({
+    queryKey: ['autocomplete', query, lat, lng],
+    queryFn: async () => {
+      const params: Record<string, any> = { q: query };
+      if (lat != null && lng != null) {
+        params.lat = lat;
+        params.lg = lng;
+      }
+      const response = await api.get(mapsEndpoints.getAutocomplete, { params });
+      return Array.isArray(response.data?.data) ? response.data.data : [];
+    },
+    enabled: query.length >= 3,
+    staleTime: 30 * 1000,
+    retry: false,
+  });
+};
 
 // Query hook for route (auto-refetch disabled - we control when to refetch)
 export const useRouteQuery = (

@@ -72,9 +72,11 @@ export const emergencyContactEndpoints = {
     `/emergency-contacts/${id}/toggle-notification`,
   updatePushToken: (id: string) => `/emergency-contacts/${id}/push-token`,
   getCommon: `/emergency-contacts/common/all`,
+  reorder: `/emergency-contacts/reorder`,
 };
 
 export const mapsEndpoints = {
   getRoute: `/maps/optimal-route`,
   getAutocomplete: `/maps/autocomplete`,
+  reverseGeocode: `/maps/reverse-geocode`,
 };
