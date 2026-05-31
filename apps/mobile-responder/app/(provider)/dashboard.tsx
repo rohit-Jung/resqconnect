@@ -22,9 +22,11 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SocketEvents } from '@/constants/socket.constants';
 import { newEmergencyEventPayloadSchema } from '@/lib/validations/socket';
+import { useReverseGeocode } from '@/services/maps/maps.api';
 import { serviceProviderApi } from '@/services/provider/provider.api';
 import { socketManager } from '@/socket/socket-manager';
 import { IncomingRequest, useProviderStore } from '@/store/providerStore';
@@ -50,6 +52,40 @@ const STATUS_LABELS = {
   off_duty: 'OFF DUTY',
 };
 
+function RequestLocationLabel({
+  latitude,
+  longitude,
+}: {
+  latitude: number;
+  longitude: number;
+}) {
+  const { data: address, isFetching } = useReverseGeocode(latitude, longitude);
+  if (isFetching)
+    return (
+      <ActivityIndicator
+        size="small"
+        color={MID_GRAY}
+        style={{ alignSelf: 'flex-start', marginTop: 4 }}
+      />
+    );
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+      <Ionicons
+        name="location-outline"
+        size={12}
+        color={SIGNAL_RED}
+        style={{ marginRight: 4 }}
+      />
+      <Text
+        style={{ fontSize: 11, color: MID_GRAY, letterSpacing: 0.5, flex: 1 }}
+        numberOfLines={2}
+      >
+        {address ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`}
+      </Text>
+    </View>
+  );
+}
+
 const EMERGENCY_TYPES = ['ambulance', 'police', 'fire_truck', 'rescue_team'];
 
 interface LocationCoords {
@@ -58,6 +94,7 @@ interface LocationCoords {
 }
 
 export default function ProviderDashboardScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const {
@@ -77,7 +114,19 @@ export default function ProviderDashboardScreen() {
     null
   );
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [debouncedLocation, setDebouncedLocation] =
+    useState<LocationCoords | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLocation(currentLocation), 800);
+    return () => clearTimeout(t);
+  }, [currentLocation]);
+
+  const { data: resolvedAddress } = useReverseGeocode(
+    debouncedLocation?.latitude ?? null,
+    debouncedLocation?.longitude ?? null
+  );
 
   useEffect(() => {
     (async () => {
@@ -321,7 +370,7 @@ export default function ProviderDashboardScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerTop}>
           <View>
             <View style={styles.brandRow}>
@@ -408,9 +457,10 @@ export default function ProviderDashboardScreen() {
 
           {currentLocation && (
             <View style={styles.locationRow}>
-              <Text style={styles.locationText}>
-                {currentLocation.latitude.toFixed(6)},{' '}
-                {currentLocation.longitude.toFixed(6)}
+              <Text style={styles.locationText} numberOfLines={2}>
+                {resolvedAddress
+                  ? resolvedAddress
+                  : `${currentLocation.latitude.toFixed(5)}, ${currentLocation.longitude.toFixed(5)}`}
               </Text>
               <TouchableOpacity
                 style={styles.refreshLocationButton}
@@ -519,6 +569,10 @@ export default function ProviderDashboardScreen() {
                     {currentRequest.description}
                   </Text>
                 )}
+                <RequestLocationLabel
+                  latitude={currentRequest.location.latitude}
+                  longitude={currentRequest.location.longitude}
+                />
               </View>
 
               <View style={styles.assignmentActions}>
@@ -589,6 +643,11 @@ export default function ProviderDashboardScreen() {
                     {request.description}
                   </Text>
                 )}
+
+                <RequestLocationLabel
+                  latitude={request.location.latitude}
+                  longitude={request.location.longitude}
+                />
 
                 <View style={styles.requestActions}>
                   <TouchableOpacity
@@ -687,7 +746,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: OFF_WHITE,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 0,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: LIGHT_GRAY,

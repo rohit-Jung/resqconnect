@@ -79,6 +79,22 @@ export async function fetchRoute(
   }
 }
 
+export const useReverseGeocode = (lat: number | null, lng: number | null) => {
+  return useQuery<string | null, AxiosError>({
+    queryKey: ['reverseGeocode', lat, lng],
+    queryFn: async () => {
+      const response = await api.get<ApiResponse<{ address: string }>>(
+        mapsEndpoints.reverseGeocode,
+        { params: { lat, lng } }
+      );
+      return response.data?.data?.address ?? null;
+    },
+    enabled: lat !== null && lng !== null,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+};
+
 // Query hook for route (auto-refetch disabled - we control when to refetch)
 export const useRouteQuery = (
   origin: Coordinates | null,

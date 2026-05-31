@@ -37,7 +37,7 @@ import {
   useGetEmergencyRequest,
   useGetNearbyProviders,
 } from '@/services/emergency/emergency.api';
-import { fetchRoute } from '@/services/maps/maps.api';
+import { fetchRoute, useReverseGeocode } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
 import { useSocketStore } from '@/store/socketStore';
 import { EmergencyStatus, IAssignedProvider } from '@/types/emergency.types';
@@ -62,10 +62,18 @@ const socketEvents = {
 
 export default function UserEmergencyTrackingScreen() {
   const router = useRouter();
-  const { requestId, emergencyType } = useLocalSearchParams<{
-    requestId: string;
-    emergencyType: string;
-  }>();
+  const { requestId, emergencyType, latitude, longitude } =
+    useLocalSearchParams<{
+      requestId: string;
+      emergencyType: string;
+      latitude: string;
+      longitude: string;
+    }>();
+
+  const paramCoords: LocationCoords | null =
+    latitude && longitude
+      ? { latitude: parseFloat(latitude), longitude: parseFloat(longitude) }
+      : null;
 
   const mapRef = useRef<MapView>(null);
   const locationBroadcastTimer = useRef<ReturnType<typeof setInterval> | null>(
@@ -79,9 +87,11 @@ export default function UserEmergencyTrackingScreen() {
 
   const isProvider = false;
 
-  const [userLocation, setUserLocation] = useState<LocationCoords>(TEST_CORDS);
+  const [userLocation, setUserLocation] = useState<LocationCoords>(
+    paramCoords ?? TEST_CORDS
+  );
   const [myLocation, setMyLocation] = useState<LocationCoords | null>(
-    TEST_CORDS
+    paramCoords ?? TEST_CORDS
   );
   const [assignedProvider, setAssignedProvider] =
     useState<IAssignedProvider | null>(null);
@@ -107,6 +117,11 @@ export default function UserEmergencyTrackingScreen() {
   const { socket, isConnected } = useSocketStore();
   const pulseAnim = usePulseAnimation(localStatus);
   const currentStatus = localStatus;
+
+  const { data: userLocationAddress } = useReverseGeocode(
+    userLocation.latitude,
+    userLocation.longitude
+  );
 
   //  fetch request
   const { data: requestData, isLoading: isLoadingRequest } =
@@ -454,6 +469,8 @@ export default function UserEmergencyTrackingScreen() {
         nearbyProvidersCount={
           currentStatus === EmergencyStatus.PENDING ? nearbyProviders.length : 0
         }
+        locationAddress={userLocationAddress ?? null}
+        userLocation={userLocation}
         assignedProvider={
           assignedProvider
             ? {
@@ -489,14 +506,20 @@ const styles = StyleSheet.create({
   },
   recenterButton: {
     position: 'absolute',
-    top: 60,
+    // sits below header (~56px) + 12px gap
+    top: 68,
     right: 16,
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     backgroundColor: COLORS.OFF_WHITE,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.LIGHT_GRAY,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

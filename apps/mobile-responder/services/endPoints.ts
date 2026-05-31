@@ -74,4 +74,5 @@ export const emergencyContactEndpoints = {
 export const mapsEndpoints = {
   getRoute: `/maps/optimal-route`,
   getAutocomplete: `/maps/autocomplete`,
+  reverseGeocode: `/maps/reverse-geocode`,
 };
