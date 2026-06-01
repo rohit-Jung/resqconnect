@@ -332,3 +332,5 @@ bun run lint         # Lint all apps
 bun run check-types  # TypeScript checks
 bun run format       # Prettier formatting
 ```
+
+**Note: currently victim location is pinned for testing. later when we want live victim tracking, restore onUserLocationUpdate: setUserLocation (and the setUserLocation setter).**
