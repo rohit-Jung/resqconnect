@@ -63,9 +63,14 @@ const forgotPasswordEmailContent = (
   },
 });
 
-const transportOptions: SMTPPool.Options = {
+const transportOptions = {
   service: 'gmail',
-  pool: true,
+  host: 'smtp.gmail.com',
+  tls: {
+    ciphers: 'SSLv3',
+  },
+  port: 587,
+  secure: false,
   auth: {
     user: envConfig.google_mail,
     pass: envConfig.google_pass,
@@ -101,9 +106,19 @@ export const sendOTPEmail = async (
 
     const emailBody = mailGenerator.generate(emailContent);
     const emailText = mailGenerator.generatePlaintext(emailContent);
+    const mailData = {
+      from: `"Resqconnect" <${envConfig.google_mail}>`,
+      to: email,
+      subject:
+        purpose === 'forgotPassword'
+          ? 'Reset Your Password'
+          : 'Welcome to Resqconnect',
+      html: emailBody,
+      text: emailText,
+    };
 
-    // const info = await transporter.sendMail({
-    //   from: `"Resqconnect" <${envConfig.google_mail}>`,
+    // const { error } = await resend.emails.send({
+    //   from: 'Resqconnect <onboarding@resend.dev>',
     //   to: email,
     //   subject:
     //     purpose === 'forgotPassword'
@@ -113,21 +128,21 @@ export const sendOTPEmail = async (
     //   text: emailText,
     // });
 
-    const { error } = await resend.emails.send({
-      from: 'Resqconnect <onboarding@resend.dev>',
-      to: email,
-      subject:
-        purpose === 'forgotPassword'
-          ? 'Reset Your Password'
-          : 'Welcome to Resqconnect',
-      html: emailBody,
-      text: emailText,
-    });
+    // if (error) {
+    //   console.error('Resend error:', error);
+    //   return false;
+    // }
 
-    if (error) {
-      console.error('Resend error:', error);
-      return false;
-    }
+    await new Promise((resolve, reject) => {
+      transporter.sendMail(mailData, (error, info) => {
+        if (error) {
+          console.error('Error sending email:', error);
+          reject(error);
+        }
+        console.log('Email sent:', info.response);
+        resolve(info);
+      });
+    });
 
     console.log('Email sent to', email);
     return true;
