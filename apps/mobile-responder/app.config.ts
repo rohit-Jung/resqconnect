@@ -1,0 +1,53 @@
+import { ExpoConfig } from 'expo/config';
+
+const config: ExpoConfig = {
+  name: 'Resq Responder',
+  slug: 'resq-responder',
+  version: '1.0.0',
+  scheme: 'resq-responder',
+  web: {
+    favicon: './assets/favicon.png',
+    bundler: 'metro',
+  },
+  experiments: {
+    tsconfigPaths: true,
+  },
+  plugins: ['expo-router', 'expo-location', 'expo-font', 'expo-secure-store'],
+  orientation: 'portrait',
+  icon: './assets/icon.png',
+  userInterfaceStyle: 'light',
+  splash: {
+    image: './assets/splash.png',
+    resizeMode: 'contain',
+    backgroundColor: '#ffffff',
+  },
+  assetBundlePatterns: ['**/*'],
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: 'com.anonymous.resq.responder',
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: './assets/icon.png',
+      backgroundColor: '#ffffff',
+    },
+    permissions: [
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.ACCESS_FINE_LOCATION',
+    ],
+    package: 'com.anonymous.resq.responder',
+    config: {
+      googleMaps: {
+        apiKey: process.env.GOOGLE_MAPS_API_KEY,
+      },
+    },
+  },
+  extra: {
+    router: {},
+    eas: {
+      projectId: '0405dd63-98a0-40ec-8d49-dd75b86b28b9',
+    },
+  },
+};
+
+export default config;
