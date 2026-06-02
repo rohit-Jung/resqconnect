@@ -2,10 +2,13 @@ import nodemailer from 'nodemailer';
 import SMTPPool from 'nodemailer/lib/smtp-pool';
 
 import Mailgen from 'mailgen';
+import { Resend } from 'resend';
 
 import { envConfig } from '@/config';
 
 import { generateOtpToken } from '../tokens/otpTokens';
+
+const resend = new Resend(envConfig.resend_api_key);
 
 const mailGenerator = new Mailgen({
   theme: 'default',
@@ -87,13 +90,11 @@ export const sendOTPEmail = async (
   try {
     let emailContent: Mailgen.Content;
     switch (purpose) {
-      case 'welcome':
-      case 'welcomeVerification':
-        emailContent = welcomeEmailContent(name, otpToken);
-        break;
       case 'forgotPassword':
         emailContent = forgotPasswordEmailContent(name, otpToken);
         break;
+      case 'welcome':
+      case 'welcomeVerification':
       default:
         emailContent = welcomeEmailContent(name, otpToken);
     }
@@ -101,8 +102,19 @@ export const sendOTPEmail = async (
     const emailBody = mailGenerator.generate(emailContent);
     const emailText = mailGenerator.generatePlaintext(emailContent);
 
-    const info = await transporter.sendMail({
-      from: `"Resqconnect" <${envConfig.google_mail}>`,
+    // const info = await transporter.sendMail({
+    //   from: `"Resqconnect" <${envConfig.google_mail}>`,
+    //   to: email,
+    //   subject:
+    //     purpose === 'forgotPassword'
+    //       ? 'Reset Your Password'
+    //       : 'Welcome to Resqconnect',
+    //   html: emailBody,
+    //   text: emailText,
+    // });
+
+    const { error } = await resend.emails.send({
+      from: 'Resqconnect <onboarding@resend.dev>',
       to: email,
       subject:
         purpose === 'forgotPassword'
@@ -112,10 +124,15 @@ export const sendOTPEmail = async (
       text: emailText,
     });
 
-    console.log('Email sent:', info.messageId, info);
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+
+    console.log('Email sent to', email);
     return true;
   } catch (error) {
-    console.log('Error sending email:', error);
+    console.error('Error sending email:', error);
     return false;
   }
 };

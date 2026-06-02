@@ -73,6 +73,7 @@ userRouter
     validateRequestBody(forgotPasswordSchema),
     userController.forgotPassword
   );
+
 userRouter
   .route('/reset-password')
   .post(
