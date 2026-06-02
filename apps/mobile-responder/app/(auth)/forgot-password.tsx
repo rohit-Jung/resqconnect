@@ -49,7 +49,12 @@ const ForgotPasswordScreen: React.FC = () => {
   const onSubmit = (data: TForgotPassword) => {
     forgotPassword(data, {
       onSuccess: response => {
-        const providerId = response.data?.data.serviceProviderId;
+        const userId = response.data?.data.userId;
+        console.log(
+          'Forgot password successful, userId:',
+          userId,
+          response.data
+        );
         Alert.alert(
           'SUCCESS',
           'Password reset instructions have been sent to your email address.',
@@ -59,7 +64,7 @@ const ForgotPasswordScreen: React.FC = () => {
               onPress: () =>
                 router.push({
                   pathname: '/(auth)/reset-password',
-                  params: { providerId, email: data.email },
+                  params: { userId, email: data.email },
                 }),
             },
           ]
@@ -92,7 +97,6 @@ const ForgotPasswordScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Title Section */}
           <View style={styles.titleSection}>
             <Text style={styles.title}>FORGOT PASSWORD</Text>
             <Text style={styles.subtitle}>
@@ -100,7 +104,6 @@ const ForgotPasswordScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Form */}
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>EMAIL</Text>
@@ -111,14 +114,22 @@ const ForgotPasswordScreen: React.FC = () => {
                   color={MID_GRAY}
                   style={styles.inputIcon}
                 />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="name@email.com"
-                  placeholderTextColor={MID_GRAY}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!isPending}
-                  {...control.register('email')}
+                <Controller
+                  control={control}
+                  name="email"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="name@email.com"
+                      placeholderTextColor={MID_GRAY}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                    />
+                  )}
                 />
               </View>
               {errors.email && (
@@ -126,7 +137,6 @@ const ForgotPasswordScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Submit Button */}
             <TouchableOpacity
               style={[styles.button, isPending && styles.buttonDisabled]}
               onPress={handleSubmit(onSubmit)}
@@ -140,7 +150,6 @@ const ForgotPasswordScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
-            {/* Back to Login */}
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
