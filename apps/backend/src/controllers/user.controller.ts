@@ -571,10 +571,11 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const tokenExpiry = new Date(existingUser.resetPasswordTokenExpiry);
-  const currentTime = new Date(Date.now()).toISOString();
+  const tokenExpiryStr = existingUser.resetPasswordTokenExpiry;
+  const tokenExpiry = new Date(tokenExpiryStr + 'Z');
+  const currentTime = new Date();
 
-  if (new Date(currentTime) < tokenExpiry) {
+  if (currentTime.getTime() > tokenExpiry.getTime()) {
     console.log('Verification token expired');
     throw ApiError.badRequest('Verification token expired');
   }
