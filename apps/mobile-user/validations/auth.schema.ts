@@ -17,7 +17,7 @@ const passwordSchema = z
   );
 
 export const loginUserSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
+  email: z.email('Please enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -26,7 +26,7 @@ export const userRegisterFormSchema = z
   .object({
     name: z.string().min(1, 'Name is required'),
     username: z.string().min(3, 'Username must be at least 3 characters'),
-    email: z.string().email('Please enter a valid email'),
+    email: z.email('Please enter a valid email'),
     phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits'),
     age: z.string().min(1, 'Age is required'),
     primaryAddress: z.string().min(1, 'Primary address is required'),
@@ -51,10 +51,10 @@ export const userRegisterSchema = z.object({
     .int()
     .min(1, 'Age must be at least 1')
     .max(120, 'Invalid age'),
-  email: z.string().email('Please enter a valid email'),
+  email: z.email('Please enter a valid email'),
   password: passwordSchema,
   primaryAddress: z.string().min(1, 'Primary address is required'),
-  role: z.nativeEnum(UserRoles).default(UserRoles.USER),
+  role: z.enum(UserRoles).default(UserRoles.USER),
   termsAccepted: z.literal(true, {
     message: 'You must accept the terms and conditions',
   }),
@@ -68,7 +68,7 @@ export const verifyUserSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
+  email: z.email('Please enter a valid email'),
 });
 
 export const resetPasswordFormSchema = z
