@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import SMTPPool from 'nodemailer/lib/smtp-pool';
 
 import Mailgen from 'mailgen';
 import { Resend } from 'resend';
@@ -65,7 +64,6 @@ const forgotPasswordEmailContent = (
 
 const transportOptions = {
   service: 'gmail',
-  host: 'smtp.gmail.com',
   tls: {
     ciphers: 'SSLv3',
   },
@@ -117,32 +115,34 @@ export const sendOTPEmail = async (
       text: emailText,
     };
 
-    // const { error } = await resend.emails.send({
-    //   from: 'Resqconnect <onboarding@resend.dev>',
-    //   to: email,
-    //   subject:
-    //     purpose === 'forgotPassword'
-    //       ? 'Reset Your Password'
-    //       : 'Welcome to Resqconnect',
-    //   html: emailBody,
-    //   text: emailText,
-    // });
-
-    // if (error) {
-    //   console.error('Resend error:', error);
-    //   return false;
-    // }
-
-    await new Promise((resolve, reject) => {
-      transporter.sendMail(mailData, (error, info) => {
-        if (error) {
-          console.error('Error sending email:', error);
-          reject(error);
-        }
-        console.log('Email sent:', info.response);
-        resolve(info);
-      });
+    const { error } = await resend.emails.send({
+      from: 'Resqconnect <onboarding@resend.dev>',
+      to: email,
+      subject:
+        purpose === 'forgotPassword'
+          ? 'Reset Your Password'
+          : 'Welcome to Resqconnect',
+      html: emailBody,
+      text: emailText,
     });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+
+    // Digital Ocean blocks the port for smtp so we are using resend for now,
+    //  but keeping the nodemailer code for future reference when we move to a different hosting provider
+    // await new Promise((resolve, reject) => {
+    //   transporter.sendMail(mailData, (error, info) => {
+    //     if (error) {
+    //       console.error('Error sending email:', error);
+    //       reject(error);
+    //     }
+    //     console.log('Email sent:', info.response);
+    //     resolve(info);
+    //   });
+    // });
 
     console.log('Email sent to', email);
     return true;
