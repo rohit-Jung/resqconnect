@@ -60,6 +60,24 @@ const forgotPasswordEmailContent = (
   },
 });
 
+const transportOptions: SMTPPool.Options = {
+  service: 'gmail',
+  pool: true,
+  auth: {
+    user: envConfig.google_mail,
+    pass: envConfig.google_pass,
+  },
+};
+
+const transporter = nodemailer.createTransport(transportOptions);
+transporter.verify(error => {
+  if (error) {
+    console.error('Mail transporter error:', error.message);
+  } else {
+    console.log('Mail transporter ready');
+  }
+});
+
 export const sendOTPEmail = async (
   email: string,
   name: string,
@@ -83,19 +101,8 @@ export const sendOTPEmail = async (
     const emailBody = mailGenerator.generate(emailContent);
     const emailText = mailGenerator.generatePlaintext(emailContent);
 
-    const transportOptions: SMTPPool.Options = {
-      service: 'gmail',
-      pool: true,
-      auth: {
-        user: envConfig.google_mail,
-        pass: envConfig.google_pass,
-      },
-    };
-
-    const transporter = nodemailer.createTransport(transportOptions);
-
     const info = await transporter.sendMail({
-      from: envConfig.google_mail,
+      from: `"Resqconnect" <${envConfig.google_mail}>`,
       to: email,
       subject:
         purpose === 'forgotPassword'
