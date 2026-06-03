@@ -32,6 +32,7 @@ const envSchema = z.object({
   GOOGLE_MAIL: z.string(),
   GOOGLE_PASS: z.string(),
   RESEND_API_KEY: z.string(),
+  FROM_EMAIL: z.string(),
 
   TO_NUMBER: z.string(),
   EMERGENCY_PHONE_NUMBER: z.string().default('112'),

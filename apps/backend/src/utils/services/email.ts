@@ -104,8 +104,9 @@ export const sendOTPEmail = async (
 
     const emailBody = mailGenerator.generate(emailContent);
     const emailText = mailGenerator.generatePlaintext(emailContent);
+
     const mailData = {
-      from: `"Resqconnect" <${envConfig.google_mail}>`,
+      from: `"Resqconnect" <${envConfig.from_email}>`,
       to: email,
       subject:
         purpose === 'forgotPassword'
@@ -115,16 +116,7 @@ export const sendOTPEmail = async (
       text: emailText,
     };
 
-    const { error } = await resend.emails.send({
-      from: 'Resqconnect <onboarding@resend.dev>',
-      to: email,
-      subject:
-        purpose === 'forgotPassword'
-          ? 'Reset Your Password'
-          : 'Welcome to Resqconnect',
-      html: emailBody,
-      text: emailText,
-    });
+    const { error } = await resend.emails.send(mailData);
 
     if (error) {
       console.error('Resend error:', error);
