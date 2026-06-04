@@ -18,7 +18,7 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur print:hidden">
       <div className="flex h-14 items-center justify-between px-8">
         <div>
           <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">

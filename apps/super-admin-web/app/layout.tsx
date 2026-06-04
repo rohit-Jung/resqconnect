@@ -18,8 +18,38 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'ResQConnect Admin',
-  description: 'Super Admin Management Portal',
+  title: {
+    default: 'Control Plane | Resqconnect',
+    template: '%s | Resqconnect',
+  },
+  description:
+    'Resqconnect Super Admin Control Plane | provision and manage organizations, monitor platform health, configure entitlements, and oversee billing across all silos.',
+  applicationName: 'Resqconnect Admin',
+  keywords: [
+    'resqconnect admin',
+    'control plane',
+    'organization management',
+    'emergency platform',
+    'super admin',
+  ],
+  authors: [{ name: 'Resqconnect' }],
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
+  openGraph: {
+    title: 'Control Plane | Resqconnect',
+    description:
+      'Super admin control plane for managing organizations and platform operations.',
+    siteName: 'Resqconnect Admin',
+    locale: 'en_US',
+    type: 'website',
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({

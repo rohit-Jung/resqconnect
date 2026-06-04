@@ -9,7 +9,7 @@ export function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        'transition-all duration-200',
+        'transition-all duration-200 print:!pl-0',
         isCollapsed ? 'pl-16' : 'pl-56'
       )}
     >

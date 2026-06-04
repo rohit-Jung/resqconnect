@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CreditCard,
   FileCheck,
+  FileText,
   LayoutDashboard,
   Navigation,
   Settings,
@@ -44,6 +45,11 @@ const navigation = [
     href: '/dashboard/plans',
     icon: CreditCard,
   },
+  {
+    name: 'Invoices',
+    href: '/dashboard/invoices',
+    icon: FileText,
+  },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
@@ -54,7 +60,7 @@ export function DashboardSidebar() {
   return (
     <aside
       className={cn(
-        'fixed top-0 left-0 z-40 h-screen border-r border-sidebar-border bg-sidebar transition-all duration-200',
+        'fixed top-0 left-0 z-40 h-screen border-r border-sidebar-border bg-sidebar transition-all duration-200 print:hidden',
         isCollapsed ? 'w-16' : 'w-56'
       )}
     >
