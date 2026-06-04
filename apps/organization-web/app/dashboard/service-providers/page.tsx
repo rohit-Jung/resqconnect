@@ -276,13 +276,13 @@ export default function ServiceProvidersPage() {
                 No responders found
               </h3>
               <p className="text-muted-foreground mb-4 dark:text-muted-foreground">
-                {searchQuery || filterStatus !== 'all' || filterType !== 'all'
+                {searchQuery || filterStatus !== 'all'
                   ? 'Try adjusting your filters'
                   : 'Get started by adding your first responder'}
               </p>
               {!searchQuery &&
                 filterStatus === 'all' &&
-                filterType === 'all' && (
+                filterStatus === 'all' && (
                   <Link href="/dashboard/service-providers/new">
                     <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-none">
                       <Plus className="mr-2 h-4 w-4" />
