@@ -3,6 +3,7 @@ import { getRouteDataSchema } from '@repo/types/validations';
 import { HttpStatusCode } from 'axios';
 import { type Request, type Response } from 'express';
 
+import { RoutingProfiles } from '@/constants/mapbox.constants';
 import {
   forwardGeocode,
   getRouteFromMapbox,
@@ -54,7 +55,11 @@ const getRoute = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const { origin, dest, profile } = parsedData.data;
-  const routeResult = await getRouteFromMapbox(origin, dest, profile as any);
+  const routeResult = await getRouteFromMapbox(
+    origin,
+    dest,
+    profile as RoutingProfiles
+  );
 
   if (!routeResult.success) {
     return res.status(HttpStatusCode.InternalServerError).json({

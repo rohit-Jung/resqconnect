@@ -206,6 +206,7 @@ export interface MockRequest {
 export interface MockResponse {
   status: Mock<(code: number) => MockResponse>;
   json: Mock<(data: unknown) => MockResponse>;
+  redirect: Mock<(url: string) => void>;
   cookie: Mock<
     (name: string, value: string, options?: unknown) => MockResponse
   >;
@@ -236,6 +237,7 @@ export const createMockResponse = (): MockResponse => {
     res.data = data;
     return res;
   });
+  res.redirect = vi.fn((_url: string) => undefined);
   res.cookie = vi.fn(
     (_name: string, _value: string, _options?: unknown) => res
   );

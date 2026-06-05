@@ -9,6 +9,7 @@ import adminRouter from './admin.routes';
 import emergencyContactsRouter from './emergency-contacts.routes';
 import emergencyRequestRouter from './emergency-request.routes';
 import emergencyResponseRouter from './emergency-response.routes';
+import feedbackRouter from './feedback.routes';
 import internalRouter from './internal.routes';
 import mapsRouter from './maps.routes';
 import mfaRouter from './mfa.routes';
@@ -36,6 +37,7 @@ if (envConfig.mode === 'platform') {
   v1Router.use('/maps', mapsRouter);
   v1Router.use('/mfa', mfaRouter);
   v1Router.use('/upload', uploadRouter);
+  v1Router.use('/feedback', feedbackRouter);
   v1Router.use('/webhooks', webHookRouter);
 } else {
   // silo mode needs emergency-request routes for accept/reject/complete

@@ -161,7 +161,7 @@ async function notifyIncidentUpdate({
     `${baseUrl}/api/v1/internal/incidents/${requestId}/update`,
     {
       headers: {
-        'x-internal-api-key': envConfig.internal_api_key as string,
+        'x-internal-api-key': envConfig.internal_api_key!,
       },
       body,
       timeoutMs: 1000,

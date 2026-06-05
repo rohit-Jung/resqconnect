@@ -1,62 +1,31 @@
-import {
-  emergencyRequest,
-  emergencyResponse,
-  requestEvents,
-  serviceProvider,
-  user,
-} from '@repo/db/schemas';
-
-import { and, eq } from 'drizzle-orm';
-import { latLngToCell } from 'h3-js';
 import type { Server, Socket } from 'socket.io';
 
 import { envConfig } from '@/config';
 import { logger } from '@/config/logger/winston.config';
-import { MUST_CONNECT_TIMEOUT_MS } from '@/constants';
-import { KAFKA_TOPICS } from '@/constants/kafka.constants';
 import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
-import db from '@/db';
-import { publishWithRetry } from '@/services/kafka/kafka.utils';
-import { sendLocalSMS } from '@/services/local-sms.service';
-import { getRouteFromMapbox } from '@/services/mapbox.service';
-import {
-  acquireLock,
-  cacheProviderLocation,
-  getEmergencyProviders,
-  releaseLock,
-} from '@/services/redis.service';
-import type { RouteResult } from '@/types/maps.types';
+import { acceptRequest } from '@/services/emergency/accept-request.service';
+import { cancelRequest } from '@/services/emergency/cancel-request.service';
+import { confirmArrival } from '@/services/emergency/confirm-arrival.service';
+import { providerConnect } from '@/services/emergency/provider-connect.service';
+import { rejectRequest } from '@/services/emergency/reject-request.service';
+import { userJoinRoom } from '@/services/emergency/user-join-room.service';
+import { cacheProviderLocation } from '@/services/redis.service';
 import type { TEntityRole } from '@/utils/tokens/jwtTokens';
-import { SMS_TEMPLATES } from '@/workers/messaging.worker';
 
-const SERVICE_TYPE_TOPIC: Record<string, KAFKA_TOPICS> = {
-  ambulance: KAFKA_TOPICS.MEDICAL_EVENTS,
-  police: KAFKA_TOPICS.POLICE_EVENTS,
-  fire_truck: KAFKA_TOPICS.FIRE_EVENTS,
-  rescue_team: KAFKA_TOPICS.RESCUE_EVENTS,
-};
-
-// Register all emergency-related socket handlers according to role TODO:
 export function registerEmergencyHandlers(
   io: Server,
   socket: Socket,
   role: TEntityRole
 ): void {
-  // Handle provider connecting and joining their personal provider room
-  // This allows backend to send NEW_EMERGENCY events to the provider
-  console.log('Reigstering handlers for', role);
+  logger.debug('Registering handlers for', role);
+
   socket.on(
     SocketEvents.PROVIDER_CONNECT,
     async (data: { providerId?: string; requestId?: string }) => {
-      // If it's just providerId (new connection), join provider room
       if (data.providerId && !data.requestId) {
-        const roomName = SocketRoom.PROVIDER(data.providerId);
-        socket.join(roomName);
-        logger.info(
-          `[ROOM_JOIN] Provider ${data.providerId} joined room ${roomName}`
-        );
+        socket.join(SocketRoom.PROVIDER(data.providerId));
+        logger.info(`[ROOM_JOIN] Provider ${data.providerId} joined room`);
       } else if (data.requestId && data.providerId) {
-        // If both are provided, it's the old flow - connect to emergency room
         await handleProviderConnect(io, socket, {
           requestId: data.requestId,
           providerId: data.providerId,
@@ -65,7 +34,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle provider accepting a request
   socket.on(
     SocketEvents.ACCEPT_REQUEST,
     async (data: { requestId: string; providerId: string }) => {
@@ -73,7 +41,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle provider rejecting a request
   socket.on(
     'reject-request',
     async (data: { requestId: string; providerId: string }) => {
@@ -81,7 +48,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle user joining emergency room
   socket.on(
     SocketEvents.USER_JOIN_ROOM,
     async (data: { requestId: string; userId: string }) => {
@@ -89,7 +55,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle location updates from provider or user
   socket.on(
     SocketEvents.LOCATION_UPDATE,
     async (data: {
@@ -104,7 +69,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle arrival confirmation
   socket.on(
     SocketEvents.CONFIRM_ARRIVAL,
     async (
@@ -115,7 +79,6 @@ export function registerEmergencyHandlers(
     }
   );
 
-  // Handle cancel request
   socket.on(
     SocketEvents.CANCEL_REQUEST_SOCKET,
     async (
@@ -133,494 +96,131 @@ async function handleAcceptRequest(
   data: { requestId: string; providerId: string }
 ): Promise<void> {
   const { requestId, providerId } = data;
+  logger.info(`[ACCEPT_ATTEMPT] Provider ${providerId} → request ${requestId}`);
 
-  try {
-    logger.info(
-      `[ACCEPT_ATTEMPT] Provider ${providerId} attempting to accept request ${requestId}`
-    );
+  const result = await acceptRequest({ requestId, providerId });
 
-    const acquired = await acquireLock(requestId, providerId);
-
-    if (!acquired) {
-      logger.debug(
-        `[LOST_RACE] Provider ${providerId} lost race for request ${requestId}`
-      );
-
-      socket.emit(SocketEvents.REQUEST_ALREADY_TAKEN, {
-        requestId,
-        message: 'Another provider accepted this request',
-      });
-      return;
-    }
-
-    // 3. Lock acquired! Update DB atomically
-    const mustConnectBy = new Date(Date.now() + MUST_CONNECT_TIMEOUT_MS);
-
-    const result = await db
-      .update(emergencyRequest)
-      .set({
-        requestStatus: 'accepted',
-        mustConnectBy: mustConnectBy.toISOString(),
-      })
-      .where(
-        and(
-          eq(emergencyRequest.id, requestId),
-          eq(emergencyRequest.requestStatus, 'pending') // Critical: only if still pending
-        )
-      )
-      .returning({
-        id: emergencyRequest.id,
-        userId: emergencyRequest.userId,
-        serviceType: emergencyRequest.serviceType,
-        description: emergencyRequest.description,
-        location: emergencyRequest.location,
-        source: emergencyRequest.source,
-      });
-
-    if (result.length === 0) {
-      logger.debug(
-        `Request ${requestId} already accepted by someone else (DB check)`
-      );
-
-      // Release lock
-      await releaseLock(requestId);
-
-      socket.emit(SocketEvents.REQUEST_ALREADY_TAKEN, {
-        requestId,
-        message: 'Request was just accepted by another provider',
-      });
-      return;
-    }
-
-    const request = result[0];
-
-    if (!request) {
-      logger.error(`[ERROR] Request ${requestId} not found after update`);
-      await releaseLock(requestId);
-      socket.emit(SocketEvents.ACCEPT_FAILED, {
-        requestId,
-        message: 'Request not found. Please try again.',
-      });
-      return;
-    }
-
-    logger.info(
-      `[ACCEPT_SUCCESS] Provider ${providerId} successfully accepted request ${requestId}`
-    );
-
-    await db.insert(requestEvents).values({
+  if (result.outcome === 'already_taken') {
+    socket.emit(SocketEvents.REQUEST_ALREADY_TAKEN, {
       requestId,
-      eventType: 'accepted',
-      providerId,
-      metadata: { acceptedAt: new Date().toISOString() },
+      message: result.message,
     });
+    return;
+  }
 
-    // Create emergency response record
-    const providerData = await db.query.serviceProvider.findFirst({
-      where: eq(serviceProvider.id, providerId),
-    });
-
-    await db.insert(emergencyResponse).values({
-      emergencyRequestId: requestId,
-      serviceProviderId: providerId,
-      originLocation: {
-        latitude: providerData?.currentLocation?.latitude || '0',
-        longitude: providerData?.currentLocation?.longitude || '0',
-      },
-      destinationLocation: {
-        latitude: request.location?.latitude.toString() || '0',
-        longitude: request.location?.longitude.toString() || '0',
-      },
-      assignedAt: new Date(),
-    });
-
-    // Get list of providers who received this request
-    const providerIds = await getEmergencyProviders(requestId);
-
-    // Notify ALL providers (including this one).
-    // Use provider rooms consistently (provider:${id}) so every socket receives it.
-    for (const pId of providerIds) {
-      io.to(SocketRoom.PROVIDER(pId)).emit(SocketEvents.REQUEST_TAKEN, {
-        requestId,
-        providerId,
-        takenBy: providerId,
-        message:
-          pId === providerId
-            ? 'You accepted this request!'
-            : 'This request was accepted by another provider',
-      });
-    }
-
-    // Get provider info
-    const providerInfo = await db
-      .select({
-        id: serviceProvider.id,
-        name: serviceProvider.name,
-        phoneNumber: serviceProvider.phoneNumber,
-        serviceType: serviceProvider.serviceType,
-        vehicleInformation: serviceProvider.vehicleInformation,
-        currentLocation: serviceProvider.currentLocation,
-      })
-      .from(serviceProvider)
-      .where(eq(serviceProvider.id, providerId))
-      .limit(1);
-
-    const provider = providerInfo[0];
-
-    // Calculate route from provider to user using Mapbox
-    let routeData: RouteResult['route'] | null = null;
-    if (provider?.currentLocation && request.location) {
-      const providerLoc = provider.currentLocation;
-      const userLoc = request.location;
-
-      // Only calculate route if provider has valid location
-      if (providerLoc.latitude && providerLoc.longitude) {
-        const routeResult = await getRouteFromMapbox(
-          {
-            lat: parseFloat(providerLoc.latitude),
-            lng: parseFloat(providerLoc.longitude),
-          },
-          {
-            lat: userLoc.latitude,
-            lng: userLoc.longitude,
-          }
-        );
-
-        if (routeResult.success && routeResult.route) {
-          routeData = routeResult.route;
-          logger.debug(
-            `Route calculated: ${routeData.distance}km, ${routeData.duration}min`
-          );
-        }
-      }
-    }
-
-    // Notify the requestor
-    io.to(`user:${request.userId}`).emit(SocketEvents.REQUEST_ACCEPTED, {
-      requestId,
-      provider: {
-        id: provider?.id,
-        name: provider?.name,
-        phone: provider?.phoneNumber?.toString(),
-        serviceType: provider?.serviceType,
-        vehicleNumber: provider?.vehicleInformation?.number,
-        location: provider?.currentLocation,
-      },
-      route: routeData,
-      message: 'Help is on the way!',
-    });
-
-    // Confirm to this provider
-    // socket.emit(SocketEvents.ACCEPT_CONFIRMED, {
-    //   requestId,
-    //   request: {
-    //     id: request.id,
-    //     emergencyType: request.serviceType,
-    //     location: request.location,
-    //     description: request.description,
-    //     requestorId: request.userId,
-    //   },
-    //   route: routeData,
-    //   message: 'Request accepted! Please connect to start navigation.',
-    // });
-
-    const emergencyType = request.serviceType;
-    const source = request.source || 'app';
-
-    const userInfo = await db.query.user.findFirst({
-      where: eq(user.id, request.userId),
-    });
-
-    if (source === 'sms' && userInfo?.phoneNumber) {
-      const emergencyTypeLabel =
-        emergencyType === 'ambulance'
-          ? 'Medical/Ambulance'
-          : emergencyType === 'fire_truck'
-            ? 'Fire'
-            : emergencyType === 'rescue_team'
-              ? 'Rescue'
-              : 'Police';
-      await sendLocalSMS(
-        userInfo.phoneNumber.toString(),
-        SMS_TEMPLATES.PROVIDER_ASSIGNED(
-          emergencyTypeLabel,
-          providerData?.name || 'Responder'
-        )
-      );
-    }
-
-    // Release Redis lock after 2 seconds (safety buffer)
-    setTimeout(async () => {
-      await releaseLock(requestId);
-    }, 2000);
-
-    // Notify platform asynchronously when provider accepts
-    if (envConfig.platform_base_url && request.userId) {
-      const userId = request.userId;
-      const reqId = requestId;
-      const providerInfo = provider;
-      const routeInfo = routeData;
-      (async () => {
-        try {
-          const { postJsonWithRetry } =
-            await import('@/services/internal-http.service');
-          await postJsonWithRetry(
-            `${envConfig.platform_base_url}/api/v1/internal/incidents/${reqId}/update`,
-            {
-              headers: {
-                'x-internal-api-key': envConfig.internal_api_key as string,
-              },
-              body: {
-                userId,
-                eventType: SocketEvents.REQUEST_ACCEPTED,
-                requestStatus: 'accepted',
-                provider: {
-                  id: providerInfo?.id,
-                  name: providerInfo?.name,
-                  phone: providerInfo?.phoneNumber?.toString(),
-                  serviceType: providerInfo?.serviceType,
-                  vehicleNumber: providerInfo?.vehicleInformation?.number,
-                  location: providerInfo?.currentLocation,
-                },
-                route: routeInfo,
-              },
-              timeoutMs: 2000,
-              retries: 1,
-              backoffMs: 500,
-            }
-          );
-        } catch (e) {
-          logger.warn(`[ACCEPT] Failed to notify platform: ${e}`);
-        }
-      })();
-    }
-  } catch (error) {
-    logger.error(`Error handling accept from provider ${providerId}:`, error);
-
+  if (result.outcome === 'failed') {
     socket.emit(SocketEvents.ACCEPT_FAILED, {
       requestId,
-      message: 'Failed to accept request. Please try again.',
+      message: result.message,
     });
+    return;
+  }
+
+  // outcome === 'accepted'
+  const { request, provider, route, providerIds } = result;
+
+  // Notify all providers in the race
+  for (const pId of providerIds) {
+    io.to(SocketRoom.PROVIDER(pId)).emit(SocketEvents.REQUEST_TAKEN, {
+      requestId,
+      providerId,
+      takenBy: providerId,
+      message:
+        pId === providerId
+          ? 'You accepted this request!'
+          : 'This request was accepted by another provider',
+    });
+  }
+
+  // Notify the requestor
+  io.to(`user:${request.userId}`).emit(SocketEvents.REQUEST_ACCEPTED, {
+    requestId,
+    provider: {
+      id: provider?.id,
+      name: provider?.name,
+      phone: provider?.phoneNumber?.toString(),
+      serviceType: provider?.serviceType,
+      vehicleNumber: provider?.vehicleInformation?.number,
+      location: provider?.currentLocation,
+    },
+    route: route,
+    message: 'Help is on the way!',
+  });
+
+  // Notify platform if in silo mode
+  if (envConfig.platform_base_url && request.userId) {
+    notifyPlatform(request.userId, requestId, provider, route);
   }
 }
 
-/**
- * Handle provider rejecting an emergency request
- */
 async function handleRejectRequest(
   io: Server,
   socket: Socket,
   data: { requestId: string; providerId: string }
 ): Promise<void> {
   const { requestId, providerId } = data;
+  logger.info(`[REJECT] Provider ${providerId} rejected request ${requestId}`);
 
-  try {
-    logger.info(
-      `[REJECT] Provider ${providerId} rejected request ${requestId}`
-    );
+  const result = await rejectRequest({ requestId, providerId });
 
-    const req = await db.query.emergencyRequest.findFirst({
-      where: eq(emergencyRequest.id, requestId),
-    });
-
-    if (!req) {
-      logger.warn(`[REJECT] Request ${requestId} not found`);
-      socket.emit('reject-confirmed', {
-        requestId,
-        message: 'Request rejected.',
-      });
-      return;
-    }
-
-    const topic = SERVICE_TYPE_TOPIC[req.serviceType];
-
-    await Promise.all([
-      db.insert(requestEvents).values({
-        requestId,
-        eventType: 'rejected',
-        providerId,
-        metadata: { rejectedAt: new Date().toISOString() },
-      }),
-      // Reset to pending so the next consumer can claim it
-      db
-        .update(emergencyRequest)
-        .set({ requestStatus: 'pending' })
-        .where(eq(emergencyRequest.id, requestId)),
-    ]);
-
-    // Republish to Kafka so other silo orgs can consume the request
-    if (topic && req.location) {
-      const h3Index = latLngToCell(
-        req.location.latitude,
-        req.location.longitude,
-        8
-      );
-      const payload = JSON.stringify({
-        requestId: req.id,
-        userId: req.userId,
-        emergencyType: req.serviceType,
-        emergencyLocation: {
-          latitude: req.location.latitude,
-          longitude: req.location.longitude,
-        },
-        status: 'pending',
-        h3Index,
-        emergencyDescription: req.description ?? undefined,
-        expiresAt: req.expiresAt ?? undefined,
-      });
-
-      const published = await publishWithRetry(topic, {
-        key: requestId,
-        value: payload,
-      });
-      if (published) {
-        logger.info(
-          `[REJECT] Republished request ${requestId} to topic ${topic}`
-        );
-      } else {
-        logger.error(
-          `[REJECT] Failed to republish request ${requestId} to Kafka after retries`
-        );
-      }
-    }
-
-    socket.emit('reject-confirmed', {
-      requestId,
-      message: 'Request rejected.',
-    });
-  } catch (error) {
-    logger.error(
-      `[REJECT] Error handling reject from provider ${providerId}:`,
-      error
-    );
-  }
+  socket.emit('reject-confirmed', {
+    requestId,
+    message:
+      result.outcome === 'not_found'
+        ? 'Request not found.'
+        : 'Request rejected.',
+  });
 }
 
-/**
- * Handle provider connecting to emergency room after accepting
- */
 async function handleProviderConnect(
   io: Server,
   socket: Socket,
   data: { requestId: string; providerId: string }
 ): Promise<void> {
   const { requestId, providerId } = data;
+  logger.info(
+    `[CONNECTED] Provider ${providerId} connecting to request ${requestId}`
+  );
 
-  try {
-    logger.info(
-      `[CONNECTED] Provider ${providerId} connecting to request ${requestId}`
-    );
+  const result = await providerConnect({ requestId, providerId });
 
-    const response = await db
-      .select({
-        id: emergencyResponse.id,
-        requestId: emergencyResponse.emergencyRequestId,
-        providerId: emergencyResponse.serviceProviderId,
-      })
-      .from(emergencyResponse)
-      .where(
-        and(
-          eq(emergencyResponse.emergencyRequestId, requestId),
-          eq(emergencyResponse.serviceProviderId, providerId)
-        )
-      )
-      .limit(1);
-
-    // Also get the request details
-    const request = await db
-      .select({
-        id: emergencyRequest.id,
-        userId: emergencyRequest.userId,
-        serviceType: emergencyRequest.serviceType,
-        location: emergencyRequest.location,
-        requestStatus: emergencyRequest.requestStatus,
-      })
-      .from(emergencyRequest)
-      .where(eq(emergencyRequest.id, requestId))
-      .limit(1);
-
-    if (response.length === 0 || request.length === 0) {
-      logger.error(
-        `[ERROR] Provider ${providerId} not assigned to request ${requestId}`
-      );
-
-      socket.emit(SocketEvents.CONNECTION_REJECTED, {
-        requestId,
-        reason: 'not-assigned',
-        message: 'You are not assigned to this request',
-      });
-      return;
-    }
-
-    const req = request[0];
-    if (!req) {
-      socket.emit(SocketEvents.CONNECTION_REJECTED, {
-        requestId,
-        reason: 'not-found',
-        message: 'Request not found',
-      });
-      return;
-    }
-
-    await db
-      .update(emergencyRequest)
-      .set({
-        providerConnectedAt: new Date().toISOString(),
-        requestStatus: 'in_progress',
-      })
-      .where(eq(emergencyRequest.id, requestId));
-
-    const roomName = SocketRoom.EMERGENCY(requestId);
-    socket.join(roomName);
-    logger.debug(`[ROOM] Provider ${providerId} joined room ${roomName}`);
-
-    await db.insert(requestEvents).values({
+  if (result.outcome === 'not_assigned') {
+    socket.emit(SocketEvents.CONNECTION_REJECTED, {
       requestId,
-      eventType: 'provider-connected',
-      providerId,
-      metadata: { connectedAt: new Date().toISOString() },
+      reason: 'not-assigned',
+      message: result.message,
     });
-
-    await cacheProviderLocation(providerId, {
-      lat: 0,
-      lng: 0,
-      timestamp: Date.now(),
-      requestId,
-    });
-
-    // 6. Tell requestor to join the same room
-    io.to(`user:${req.userId}`).emit(SocketEvents.JOIN_ROOM, {
-      room: roomName,
-      requestId,
-      message: 'Provider connected. Join room for tracking.',
-    });
-
-    // 7. Confirm connection to provider
-    socket.emit(SocketEvents.CONNECTION_CONFIRMED, {
-      requestId,
-      message: 'Connected successfully. You can now start navigation.',
-      roomId: roomName,
-    });
-
-    logger.debug(
-      `[SUCCESS] Provider ${providerId} successfully connected to request ${requestId}`
-    );
-  } catch (error) {
-    logger.error(
-      `[ERROR] Error connecting provider ${providerId} to request ${requestId}:`,
-      error
-    );
-
-    socket.emit(SocketEvents.CONNECTION_FAILED, {
-      requestId,
-      message: 'Failed to establish connection. Please try again.',
-    });
+    return;
   }
+
+  if (result.outcome === 'not_found') {
+    socket.emit(SocketEvents.CONNECTION_REJECTED, {
+      requestId,
+      reason: 'not-found',
+      message: result.message,
+    });
+    return;
+  }
+
+  // outcome === 'connected'
+  socket.join(result.roomName);
+  logger.debug(`[ROOM] Provider ${providerId} joined room ${result.roomName}`);
+
+  // Tell requestor to join the same room
+  io.to(`user:${result.userId}`).emit(SocketEvents.JOIN_ROOM, {
+    room: result.roomName,
+    requestId,
+    message: 'Provider connected. Join room for tracking.',
+  });
+
+  // Confirm connection to provider
+  socket.emit(SocketEvents.CONNECTION_CONFIRMED, {
+    requestId,
+    message: 'Connected successfully. You can now start navigation.',
+    roomId: result.roomName,
+  });
 }
 
-/**
- * Handle user (requestor) joining emergency room
- */
 async function handleUserJoinRoom(
   io: Server,
   socket: Socket,
@@ -628,100 +228,36 @@ async function handleUserJoinRoom(
 ): Promise<void> {
   const { requestId, userId } = data;
 
-  try {
-    // Verify user is requestor
-    const request = await db
-      .select({
-        id: emergencyRequest.id,
-        userId: emergencyRequest.userId,
-        serviceType: emergencyRequest.serviceType,
-        location: emergencyRequest.location,
-        status: emergencyRequest.requestStatus,
-      })
-      .from(emergencyRequest)
-      .where(eq(emergencyRequest.id, requestId))
-      .limit(1);
+  const result = await userJoinRoom({ requestId, userId });
 
-    if (request.length === 0) {
-      socket.emit(SocketEvents.JOIN_REJECTED, {
-        requestId,
-        reason: 'not-found',
-        message: 'Emergency request not found',
-      });
-      return;
-    }
+  if (result.outcome === 'not_found') {
+    socket.emit('join-failed', { requestId, message: result.message });
+    return;
+  }
 
-    const req = request[0];
+  const roomName = SocketRoom.EMERGENCY(requestId);
+  socket.join(roomName);
+  logger.debug(`[ROOM] User ${userId} joined room ${roomName}`);
 
-    // Join user to room
-    const roomName = SocketRoom.EMERGENCY(requestId);
-    socket.join(roomName);
-    logger.info(`[USER] User ${userId} joined room ${roomName}`);
+  socket.emit(SocketEvents.JOINED_EMERGENCY_ROOM, {
+    requestId,
+    emergencyLocation: result.emergencyLocation,
+    emergencyType: result.emergencyType,
+    providerId: result.providerId,
+    providerLocation: result.providerLocation,
+    status: result.requestStatus,
+    userId,
+  });
 
-    // Get assigned provider from emergency response table
-    const response = await db
-      .select({
-        providerId: emergencyResponse.serviceProviderId,
-      })
-      .from(emergencyResponse)
-      .where(eq(emergencyResponse.emergencyRequestId, requestId))
-      .limit(1);
-
-    const providerId = response[0]?.providerId;
-
-    if (providerId) {
-      const provider = await db
-        .select({
-          id: serviceProvider.id,
-          name: serviceProvider.name,
-          phoneNumber: serviceProvider.phoneNumber,
-          serviceType: serviceProvider.serviceType,
-          vehicleInformation: serviceProvider.vehicleInformation,
-        })
-        .from(serviceProvider)
-        .where(eq(serviceProvider.id, providerId))
-        .limit(1);
-
-      const providerData = provider[0];
-      if (providerData) {
-        // Emit to entire room that connection is established
-        io.to(roomName).emit(SocketEvents.CONNECTION_ESTABLISHED, {
-          requestId,
-          provider: {
-            id: providerData.id,
-            name: providerData.name,
-            phone: providerData.phoneNumber?.toString(),
-            serviceType: providerData.serviceType,
-            vehicleNumber: providerData.vehicleInformation?.number,
-          },
-          requestor: {
-            id: userId,
-          },
-          message: 'Connection established. Tracking has begun.',
-        });
-      }
-    }
-
-    // Emit joined confirmation to user
-    socket.emit(SocketEvents.JOINED_EMERGENCY_ROOM, {
+  // Notify provider that user joined
+  if (result.providerId) {
+    io.to(SocketRoom.PROVIDER(result.providerId)).emit('user-joined-room', {
       requestId,
-      roomName,
-      status: req?.status || 'pending',
-    });
-  } catch (error) {
-    logger.error(`[ERROR] Error joining user ${userId} to room:`, error);
-
-    socket.emit(SocketEvents.JOIN_REJECTED, {
-      requestId,
-      reason: 'error',
-      message: 'Failed to join room. Please try again.',
+      userId,
     });
   }
 }
 
-/**
- * Handle location updates from provider or user
- */
 async function handleLocationUpdate(
   io: Server,
   socket: Socket,
@@ -736,74 +272,59 @@ async function handleLocationUpdate(
 ): Promise<void> {
   const { requestId, providerId, userId, location, timestamp, isProvider } =
     data;
+  const senderId = isProvider ? providerId : userId;
+  const senderType = isProvider ? 'Provider' : 'User';
 
-  try {
-    // Determine who is sending the update
-    const senderId = isProvider ? providerId : userId;
-    const senderType = isProvider ? 'Provider' : 'User';
+  const roomName = SocketRoom.EMERGENCY(requestId);
+  const rooms = Array.from(socket.rooms);
 
-    const roomName = SocketRoom.EMERGENCY(requestId);
-    const rooms = Array.from(socket.rooms);
-
-    if (!rooms.includes(roomName)) {
-      logger.warn(
-        `[WARN] ${senderType} ${senderId} not in room for request ${requestId}`
-      );
-      return;
-    }
-
-    if (
-      !location ||
-      typeof location.lat !== 'number' ||
-      typeof location.lng !== 'number' ||
-      location.lat < -90 ||
-      location.lat > 90 ||
-      location.lng < -180 ||
-      location.lng > 180
-    ) {
-      logger.warn(
-        `[WARN] Invalid coordinates from ${senderType} ${senderId}:`,
-        location
-      );
-      return;
-    }
-
-    if (isProvider && providerId) {
-      cacheProviderLocation(providerId, {
-        lat: location.lat,
-        lng: location.lng,
-        timestamp: timestamp || Date.now(),
-        requestId,
-      }).catch(error => {
-        logger.error('Redis unavailable for location cache:', error);
-      });
-    }
-
-    const eventName = isProvider
-      ? SocketEvents.PROVIDER_LOCATION_UPDATED
-      : SocketEvents.USER_LOCATION_UPDATED;
-
-    io.to(roomName).emit(eventName, {
-      location: {
-        latitude: location.lat.toString(),
-        longitude: location.lng.toString(),
-      },
-      timestamp: timestamp || Date.now(),
-      providerId: isProvider ? providerId : undefined,
-      userId: !isProvider ? userId : undefined,
-    });
-
-    logger.debug(
-      `[LOCATION] ${senderType} location broadcasted for request ${requestId}`
-    );
-  } catch (error) {
-    logger.error('[ERROR] Error handling location update:', error);
+  if (!rooms.includes(roomName)) {
+    logger.warn(`[WARN] ${senderType} ${senderId} not in room ${roomName}`);
+    return;
   }
+
+  if (
+    !location ||
+    typeof location.lat !== 'number' ||
+    typeof location.lng !== 'number' ||
+    location.lat < -90 ||
+    location.lat > 90 ||
+    location.lng < -180 ||
+    location.lng > 180
+  ) {
+    logger.warn(
+      `[WARN] Invalid coordinates from ${senderType} ${senderId}:`,
+      location
+    );
+    return;
+  }
+
+  if (isProvider && providerId) {
+    cacheProviderLocation(providerId, {
+      lat: location.lat,
+      lng: location.lng,
+      timestamp: timestamp || Date.now(),
+      requestId,
+    }).catch(error => {
+      logger.error('Redis unavailable for location cache:', error);
+    });
+  }
+
+  const eventName = isProvider
+    ? SocketEvents.PROVIDER_LOCATION_UPDATED
+    : SocketEvents.USER_LOCATION_UPDATED;
+
+  io.to(roomName).emit(eventName, {
+    location: {
+      latitude: location.lat.toString(),
+      longitude: location.lng.toString(),
+    },
+    timestamp: timestamp || Date.now(),
+    providerId: isProvider ? providerId : undefined,
+    userId: !isProvider ? userId : undefined,
+  });
 }
 
-/**
- * Handle arrival confirmation - mark request and response as completed
- */
 async function handleConfirmArrival(
   io: Server,
   socket: Socket,
@@ -812,169 +333,81 @@ async function handleConfirmArrival(
 ): Promise<void> {
   const { requestId, role } = data;
 
-  try {
-    logger.debug(
-      `[SUCCESS] ${role} confirming arrival for request ${requestId}`
-    );
+  const result = await confirmArrival({ requestId, role });
 
-    const request = await db
-      .select()
-      .from(emergencyRequest)
-      .where(eq(emergencyRequest.id, requestId))
-      .limit(1);
-
-    if (request.length === 0) {
-      callback?.({ error: 'Emergency request not found' });
-      socket.emit(SocketEvents.ACCEPT_FAILED, {
-        requestId,
-        message: 'Emergency request not found',
-      });
-      return;
-    }
-
-    const emergReq = request[0]!;
-
-    const response = await db
-      .select()
-      .from(emergencyResponse)
-      .where(eq(emergencyResponse.emergencyRequestId, requestId))
-      .limit(1);
-
-    if (response.length === 0) {
-      callback?.({ error: 'No provider assigned to this request' });
-      socket.emit(SocketEvents.ACCEPT_FAILED, {
-        requestId,
-        message: 'No provider assigned to this request',
-      });
-      return;
-    }
-
-    const emergResp = response[0]!;
-    const completedAt = new Date().toISOString();
-
-    await db.transaction(async tx => {
-      // Update emergency request
-      await tx
-        .update(emergencyRequest)
-        .set({
-          requestStatus: 'completed',
-          updatedAt: completedAt,
-        })
-        .where(eq(emergencyRequest.id, requestId));
-
-      // Update emergency response
-      await tx
-        .update(emergencyResponse)
-        .set({
-          statusUpdate: 'accepted', // Keep status as accepted, use completion timestamp
-          updatedAt: completedAt,
-        })
-        .where(eq(emergencyResponse.id, emergResp.id));
-
-      // Mark provider as available
-      if (emergResp.serviceProviderId) {
-        await tx
-          .update(serviceProvider)
-          .set({
-            serviceStatus: 'available',
-          })
-          .where(eq(serviceProvider.id, emergResp.serviceProviderId));
-      }
-
-      await tx.insert(requestEvents).values({
-        requestId,
-        eventType: 'completed',
-        providerId: emergResp.serviceProviderId,
-        metadata: {
-          completedAt,
-          completedBy: role,
-        },
-      });
-    });
-
-    logger.info(
-      `[COMPLETED] Request ${requestId} marked as completed by ${role}`
-    );
-
-    // Send acknowledgment to client
-    callback?.();
-
-    io.to(SocketRoom.EMERGENCY(requestId)).emit(
-      SocketEvents.REQUEST_COMPLETED,
-      {
-        requestId,
-        completedBy: role,
-        completedAt,
-        message: 'Emergency has been marked as complete.',
-      }
-    );
-
-    // forward completion to platform
-    if (envConfig.platform_base_url && emergReq.userId) {
-      const { postJsonWithRetry } =
-        await import('@/services/internal-http.service');
-
-      postJsonWithRetry(
-        `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
-        {
-          headers: {
-            'x-internal-api-key': envConfig.internal_api_key as string,
-          },
-          body: {
-            userId: emergReq.userId,
-            eventType: SocketEvents.REQUEST_COMPLETED,
-            requestStatus: 'completed',
-            payload: { completedBy: role, completedAt },
-          },
-          timeoutMs: 1000,
-          backoffMs: 500,
-          retries: 1,
-        }
-      ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
-    }
-
-    // Also emit to user and provider rooms
-    if (emergReq.userId) {
-      io.to(SocketRoom.USER(emergReq.userId)).emit(
-        SocketEvents.REQUEST_COMPLETED,
-        {
-          requestId,
-          completedBy: role,
-          completedAt,
-          message: 'Emergency has been marked as complete.',
-        }
-      );
-    }
-
-    if (emergResp.serviceProviderId) {
-      io.to(SocketRoom.PROVIDER(emergResp.serviceProviderId)).emit(
-        SocketEvents.REQUEST_COMPLETED,
-        {
-          requestId,
-          completedBy: role,
-          completedAt,
-          message: 'Emergency has been marked as complete.',
-        }
-      );
-    }
-  } catch (error) {
-    logger.error(
-      `[ERROR] Error confirming arrival for request ${requestId}:`,
-      error
-    );
-
-    callback?.({ error: 'Failed to confirm arrival' });
-
+  if (result.outcome === 'not_found') {
+    callback?.({ error: result.message });
     socket.emit(SocketEvents.ACCEPT_FAILED, {
       requestId,
-      message: 'Failed to confirm arrival. Please try again.',
+      message: result.message,
     });
+    return;
+  }
+
+  if (result.outcome === 'no_provider') {
+    callback?.({ error: result.message });
+    socket.emit(SocketEvents.ACCEPT_FAILED, {
+      requestId,
+      message: result.message,
+    });
+    return;
+  }
+
+  // outcome === 'completed'
+  callback?.();
+
+  logger.info(
+    `[COMPLETED] Request ${requestId} marked as completed by ${role}`
+  );
+
+  const completionPayload = {
+    requestId,
+    completedBy: role,
+    completedAt: result.completedAt,
+    message: 'Emergency has been marked as complete.',
+  };
+
+  io.to(SocketRoom.EMERGENCY(requestId)).emit(
+    SocketEvents.REQUEST_COMPLETED,
+    completionPayload
+  );
+
+  if (result.userId) {
+    io.to(SocketRoom.USER(result.userId)).emit(
+      SocketEvents.REQUEST_COMPLETED,
+      completionPayload
+    );
+  }
+
+  if (result.serviceProviderId) {
+    io.to(SocketRoom.PROVIDER(result.serviceProviderId)).emit(
+      SocketEvents.REQUEST_COMPLETED,
+      completionPayload
+    );
+  }
+
+  // Forward completion to platform
+  if (envConfig.platform_base_url && result.userId) {
+    const { postJsonWithRetry } =
+      await import('@/services/internal-http.service');
+    postJsonWithRetry(
+      `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
+      {
+        headers: { 'x-internal-api-key': envConfig.internal_api_key! },
+        body: {
+          userId: result.userId,
+          eventType: SocketEvents.REQUEST_COMPLETED,
+          requestStatus: 'completed',
+          payload: { completedBy: role, completedAt: result.completedAt },
+        },
+        timeoutMs: 1000,
+        backoffMs: 500,
+        retries: 1,
+      }
+    ).catch(e => logger.warn(`[COMPLETE] Failed to notify platform: ${e}`));
   }
 }
 
-/**
- * Handle cancel request from user or provider via socket
- */
 async function handleCancelRequestSocket(
   io: Server,
   socket: Socket,
@@ -982,120 +415,95 @@ async function handleCancelRequestSocket(
   callback?: (ack?: any) => void
 ): Promise<void> {
   const { requestId, role } = data;
+  logger.debug(`[CANCEL] ${role} cancelling request ${requestId}`);
 
-  try {
-    logger.debug(`[ERROR] ${role} cancelling request ${requestId}`);
+  const result = await cancelRequest({ requestId, role });
 
-    const request = await db
-      .select()
-      .from(emergencyRequest)
-      .where(eq(emergencyRequest.id, requestId))
-      .limit(1);
-
-    if (request.length === 0) {
-      callback?.({ error: 'Emergency request not found' });
-      socket.emit(SocketEvents.ACCEPT_FAILED, {
-        requestId,
-        message: 'Emergency request not found',
-      });
-      return;
-    }
-
-    const emergReq = request[0]!;
-
-    // Check if already cancelled
-    if (emergReq.requestStatus === 'cancelled') {
-      callback?.({ error: 'Request is already cancelled' });
-      socket.emit(SocketEvents.ACCEPT_FAILED, {
-        requestId,
-        message: 'Request is already cancelled',
-      });
-      return;
-    }
-
-    const cancelledAt = new Date().toISOString();
-
-    await db.transaction(async tx => {
-      // Update emergency request
-      await tx
-        .update(emergencyRequest)
-        .set({
-          requestStatus: 'cancelled',
-          updatedAt: cancelledAt,
-        })
-        .where(eq(emergencyRequest.id, requestId));
-
-      await tx.insert(requestEvents).values({
-        requestId,
-        eventType: 'request_cancelled',
-        providerId: undefined,
-        metadata: {
-          cancelledAt,
-          cancelledBy: role,
-        },
-      });
-    });
-
-    logger.info(`[SUCCESS] Request ${requestId} cancelled by ${role}`);
-
-    // Send acknowledgment to client
-    callback?.();
-
-    const otherPartyRole = role === 'user' ? 'provider' : 'user';
-    const messageText =
-      role === 'user'
-        ? 'The user has cancelled this emergency request.'
-        : 'The service provider has cancelled this emergency request.';
-
-    io.to(SocketRoom.EMERGENCY(requestId)).emit(
-      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-      {
-        requestId,
-        cancelledBy: role,
-        cancelledAt,
-        message: messageText,
-      }
-    );
-
-    // Also emit to specific user and provider rooms
-    if (emergReq.userId) {
-      io.to(SocketRoom.USER(emergReq.userId)).emit(
-        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-        {
-          requestId,
-          cancelledBy: role,
-          cancelledAt,
-          message: messageText,
-        }
-      );
-    }
-
-    // Get provider ID from emergency response
-    const response = await db
-      .select()
-      .from(emergencyResponse)
-      .where(eq(emergencyResponse.emergencyRequestId, requestId))
-      .limit(1);
-
-    if (response.length > 0 && response[0]?.serviceProviderId) {
-      io.to(SocketRoom.PROVIDER(response[0].serviceProviderId)).emit(
-        SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
-        {
-          requestId,
-          cancelledBy: role,
-          cancelledAt,
-          message: messageText,
-        }
-      );
-    }
-  } catch (error) {
-    logger.error(`[ERROR] Error cancelling request ${requestId}:`, error);
-
-    callback?.({ error: 'Failed to cancel request' });
-
+  if (result.outcome === 'not_found') {
+    callback?.({ error: result.message });
     socket.emit(SocketEvents.ACCEPT_FAILED, {
       requestId,
-      message: 'Failed to cancel request. Please try again.',
+      message: result.message,
     });
+    return;
+  }
+
+  if (result.outcome === 'already_cancelled') {
+    callback?.({ error: result.message });
+    socket.emit(SocketEvents.ACCEPT_FAILED, {
+      requestId,
+      message: result.message,
+    });
+    return;
+  }
+
+  callback?.();
+
+  const messageText =
+    role === 'user'
+      ? 'The user has cancelled this emergency request.'
+      : 'The service provider has cancelled this emergency request.';
+
+  const cancelPayload = {
+    requestId,
+    cancelledBy: role,
+    cancelledAt: result.cancelledAt,
+    message: messageText,
+  };
+
+  io.to(SocketRoom.EMERGENCY(requestId)).emit(
+    SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+    cancelPayload
+  );
+
+  if (result.userId) {
+    io.to(SocketRoom.USER(result.userId)).emit(
+      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+      cancelPayload
+    );
+  }
+
+  if (result.serviceProviderId) {
+    io.to(SocketRoom.PROVIDER(result.serviceProviderId)).emit(
+      SocketEvents.REQUEST_CANCELLED_NOTIFICATION,
+      cancelPayload
+    );
+  }
+}
+
+async function notifyPlatform(
+  userId: string,
+  requestId: string,
+  provider: any,
+  route: any
+): Promise<void> {
+  try {
+    const { postJsonWithRetry } =
+      await import('@/services/internal-http.service');
+    await postJsonWithRetry(
+      `${envConfig.platform_base_url}/api/v1/internal/incidents/${requestId}/update`,
+      {
+        headers: { 'x-internal-api-key': envConfig.internal_api_key! },
+        body: {
+          userId,
+          eventType: SocketEvents.REQUEST_ACCEPTED,
+          requestStatus: 'accepted',
+          provider: {
+            id: provider?.id,
+            name: provider?.name,
+            phone: provider?.phoneNumber?.toString(),
+            serviceType: provider?.serviceType,
+            vehicleNumber: provider?.vehicleInformation?.number,
+            location: provider?.currentLocation,
+          },
+          route,
+        },
+        timeoutMs: 2000,
+        retries: 1,
+        backoffMs: 500,
+      }
+    );
+  } catch (e) {
+    logger.warn(`[ACCEPT] Failed to notify platform: ${e}`);
   }
 }

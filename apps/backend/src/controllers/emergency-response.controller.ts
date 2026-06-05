@@ -59,6 +59,10 @@ const createEmergencyResponse = asyncHandler(
       destLocation = loggedInUser.currentLocation;
     }
 
+    if (!destLocation) {
+      throw ApiError.badRequest('No destination location provided');
+    }
+
     const emergencyRequestDetails = await db.query.emergencyRequest.findFirst({
       where: eq(emergencyRequest.id, emergencyRequestId),
     });
@@ -91,6 +95,10 @@ const createEmergencyResponse = asyncHandler(
         )
       )
       .returning();
+
+    if (selectedServiceProvider.length === 0) {
+      throw ApiError.notFound('No available service provider found');
+    }
 
     const serviceProviderId = selectedServiceProvider[0]!.id;
 
@@ -137,11 +145,11 @@ const createEmergencyResponse = asyncHandler(
       })
       .returning();
 
-    if (!newEmergencyResponse) {
+    if (!newEmergencyResponse || newEmergencyResponse.length === 0) {
       throw ApiError.internalServerError('Error creating emergency response');
     }
 
-    const updatedStatus = Promise.all([
+    const updatedStatus = await Promise.all([
       db
         .update(emergencyRequest)
         .set({
@@ -206,7 +214,11 @@ const getEmergencyResponse = asyncHandler(
     res
       .status(200)
       .json(
-        new ApiResponse(200, 'Emergency response found', emergencyResponse)
+        new ApiResponse(
+          200,
+          'Emergency response found',
+          existingEmergencyResponse
+        )
       );
   }
 );
@@ -355,7 +367,7 @@ const deleteEmergencyResponse = asyncHandler(
         updateDescription: emergencyResponse.updateDescription,
       });
 
-    if (!deletedEmergencyResponse) {
+    if (!deletedEmergencyResponse || deletedEmergencyResponse.length === 0) {
       logger.debug('Error deleting emergency response');
       throw ApiError.internalServerError('Error deleting emergency response');
     }

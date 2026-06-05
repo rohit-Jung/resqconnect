@@ -25,7 +25,7 @@ const platformIncidentUpdate = asyncHandler(
     //   throw ApiError.notFound('Not found');
     // }
 
-    const platformIncidentId = String(req.params.platformIncidentId || '');
+    const platformIncidentId = String(req.params.platformIncidentId ?? '');
     if (!platformIncidentId) {
       throw ApiError.badRequest('platformIncidentId is required');
     }
@@ -103,7 +103,7 @@ const platformIncidentUpdate = asyncHandler(
         case SocketEvents.CANCEL_REQUEST_SOCKET:
         case SocketEvents.PROVIDER_CONFIRM_ARRIVAL:
         case SocketEvents.PROVIDER_ARRIVAL_CONFIRMED:
-          io.to(room).emit(eventType as any, {
+          io.to(room).emit(eventType, {
             requestId: platformIncidentId,
             ...(payload ?? {}),
           });

@@ -23,11 +23,11 @@ import {
   testUsers,
 } from './setup';
 
-vi.mock('@/utils/maps/galli-maps', () => ({
-  getOptimalRoute: vi
-    .fn()
-    .mockResolvedValue({ distance: 1000, duration: 300, steps: [] }),
-  compeletAutoSearch: vi.fn().mockResolvedValue([]),
+vi.mock('@/services/mapbox.service', () => ({
+  getRouteFromMapbox: vi.fn().mockResolvedValue({
+    success: true,
+    route: { distance: 1000, duration: 300, steps: [] },
+  }),
 }));
 
 describe('Emergency Response Controller Tests', () => {
@@ -184,7 +184,7 @@ describe('Emergency Response Controller Tests', () => {
     });
 
     it('should compute optimal path to destination', async () => {
-      const { getOptimalRoute } = await import('@/utils/maps/galli-maps');
+      const { getRouteFromMapbox } = await import('@/services/mapbox.service');
       mockDb.query.emergencyResponse.findFirst.mockResolvedValue(
         undefined as never
       );
@@ -216,7 +216,7 @@ describe('Emergency Response Controller Tests', () => {
 
       await createEmergencyResponse(mockReq as any, mockRes as any, mockNext);
 
-      expect(getOptimalRoute).toHaveBeenCalled();
+      expect(getRouteFromMapbox).toHaveBeenCalled();
     });
 
     it('should update emergency request status to assigned', async () => {

@@ -71,12 +71,12 @@ const handleEmergencyRequest = asyncHandler(
         'app'
       );
 
-    if (!success) {
-      throw ApiError.badRequest(`${error}`);
+    if (!success || !requestInfo) {
+      throw ApiError.badRequest(`${error || 'Failed to create request'}`);
     }
 
     notifyEmergencyContacts({
-      requestId: requestInfo!.id,
+      requestId: requestInfo.id,
       userId: loggedInUser.id,
       userName: loggedInUser.name || 'User',
       emergencyType,
@@ -307,8 +307,8 @@ const acceptEmergencyRequest = asyncHandler(
             emergencyRequestId: requestId,
             serviceProviderId: providerId,
             originLocation: {
-              latitude: providerData?.currentLocation?.latitude || '0',
-              longitude: providerData?.currentLocation?.longitude || '0',
+              latitude: providerData?.currentLocation?.latitude ?? '0',
+              longitude: providerData?.currentLocation?.longitude ?? '0',
             },
             destinationLocation: {
               latitude: existingRequest.location?.latitude.toString() || '0',
@@ -521,7 +521,7 @@ const confirmArrival = asyncHandler(async (req: Request, res: Response) => {
   const requestId = req.params.id as string;
 
   const userId = req.user?.id;
-  const role = (req.user?.role as 'user' | 'service_provider') || 'user';
+  const role = (req.user?.role as 'user' | 'service_provider') ?? 'user';
 
   if (!userId) {
     throw ApiError.unauthorized('Unauthorized');
@@ -561,7 +561,7 @@ const confirmArrival = asyncHandler(async (req: Request, res: Response) => {
 
     await tx
       .update(emergencyResponse)
-      .set({ statusUpdate: 'accepted', updatedAt: completedAt })
+      .set({ statusUpdate: 'arrived', updatedAt: completedAt })
       .where(eq(emergencyResponse.id, existingResponse.id));
 
     if (existingResponse.serviceProviderId) {
@@ -632,7 +632,7 @@ const cancelEmergencyRequest = asyncHandler(
     const requestId = req.params.id as string;
     const userId = req.user?.id;
 
-    const role = (req.user?.role as 'user' | 'service_provider') || 'user';
+    const role = (req.user?.role as 'user' | 'service_provider') ?? 'user';
 
     if (!userId) {
       throw ApiError.unauthorized('Unauthorized');
@@ -788,6 +788,10 @@ const cancelEmergencyRequest = asyncHandler(
 const getUserEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInUser = req.user;
+    if (!loggedInUser?.id) {
+      throw ApiError.unauthorized('Unauthorized');
+    }
+    const userId = loggedInUser.id;
     const { page, limit, sortBy, status } =
       req.validatedQuery as IValidatedQuery;
 
@@ -797,10 +801,10 @@ const getUserEmergencyHistory = asyncHandler(
 
     const whereConditions = status
       ? and(
-          eq(emergencyRequest.userId, loggedInUser!.id),
+          eq(emergencyRequest.userId, userId),
           eq(emergencyRequest.requestStatus, status)
         )
-      : eq(emergencyRequest.userId, loggedInUser!.id);
+      : eq(emergencyRequest.userId, userId);
 
     const emergencyRequests = await db.query.emergencyRequest.findMany({
       where: whereConditions,
@@ -825,7 +829,7 @@ const getUserEmergencyHistory = asyncHandler(
         .from(emergencyRequest)
         .where(
           and(
-            eq(emergencyRequest.userId, loggedInUser!.id),
+            eq(emergencyRequest.userId, userId),
             eq(emergencyRequest.requestStatus, 'completed')
           )
         ),
@@ -834,7 +838,7 @@ const getUserEmergencyHistory = asyncHandler(
         .from(emergencyRequest)
         .where(
           and(
-            eq(emergencyRequest.userId, loggedInUser!.id),
+            eq(emergencyRequest.userId, userId),
             eq(emergencyRequest.requestStatus, 'cancelled')
           )
         ),
@@ -843,7 +847,7 @@ const getUserEmergencyHistory = asyncHandler(
     const [totalResult] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(emergencyRequest)
-      .where(eq(emergencyRequest.userId, loggedInUser!.id));
+      .where(eq(emergencyRequest.userId, userId));
 
     const history = emergencyRequests.map(request => ({
       id: request.id,
@@ -879,6 +883,10 @@ const getUserEmergencyHistory = asyncHandler(
 const getProviderEmergencyHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInProvider = req.user;
+    if (!loggedInProvider?.id) {
+      throw ApiError.unauthorized('Unauthorized');
+    }
+    const providerId = loggedInProvider.id;
     const { page, limit, sortBy, status } = req.validatedQuery as {
       page: number;
       limit: number;
@@ -888,10 +896,7 @@ const getProviderEmergencyHistory = asyncHandler(
 
     const offset = (page - 1) * limit;
 
-    const baseCondition = eq(
-      emergencyResponse.serviceProviderId,
-      loggedInProvider!.id
-    );
+    const baseCondition = eq(emergencyResponse.serviceProviderId, providerId);
 
     let queryConditions: ReturnType<typeof eq> = baseCondition;
     if (status) {
@@ -936,7 +941,7 @@ const getProviderEmergencyHistory = asyncHandler(
       )
       .where(
         and(
-          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyResponse.serviceProviderId, providerId),
           eq(emergencyRequest.requestStatus, 'completed')
         )
       );
@@ -950,7 +955,7 @@ const getProviderEmergencyHistory = asyncHandler(
       )
       .where(
         and(
-          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyResponse.serviceProviderId, providerId),
           eq(emergencyRequest.requestStatus, 'cancelled')
         )
       );
@@ -966,7 +971,7 @@ const getProviderEmergencyHistory = asyncHandler(
       )
       .where(
         and(
-          eq(emergencyResponse.serviceProviderId, loggedInProvider!.id),
+          eq(emergencyResponse.serviceProviderId, providerId),
           eq(emergencyRequest.requestStatus, 'completed'),
           sql`${emergencyResponse.respondedAt} IS NOT NULL`
         )

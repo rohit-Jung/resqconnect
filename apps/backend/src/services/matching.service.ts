@@ -125,7 +125,7 @@ export async function getBatchETAs(
       coordinates: allCoords,
     });
 
-    console.log('Matrix API URL:', url);
+    logger.debug('Matrix API URL:', url);
 
     // Add timeout to prevent hanging on slow API responses
     const controller = new AbortController();
