@@ -22,6 +22,7 @@ import {
   isLoginLocked,
   recordLoginFailure,
 } from '@/services/failed-login-lockout.service';
+import { routeParamAsUnknown } from '@/utils/api';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -112,7 +113,7 @@ const getOrganizationById = asyncHandler(
       throw ApiError.unauthorized('Unauthorized to perform this action');
     }
 
-    const rawOrganizationId = (req.params as any)?.id as unknown;
+    const rawOrganizationId = routeParamAsUnknown(req.params, 'id');
     const organizationId = Array.isArray(rawOrganizationId)
       ? rawOrganizationId[0]
       : rawOrganizationId;
@@ -148,7 +149,7 @@ const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
-  const rawOrganizationId = (req.params as any)?.id as unknown;
+  const rawOrganizationId = routeParamAsUnknown(req.params, 'id');
   const organizationId = Array.isArray(rawOrganizationId)
     ? rawOrganizationId[0]
     : rawOrganizationId;
@@ -193,7 +194,7 @@ const updateOrganization = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized('Unauthorized to perform this action');
   }
 
-  const rawOrganizationId = (req.params as any)?.id as unknown;
+  const rawOrganizationId = routeParamAsUnknown(req.params, 'id');
   const organizationId = Array.isArray(rawOrganizationId)
     ? rawOrganizationId[0]
     : rawOrganizationId;
@@ -373,14 +374,16 @@ const loginOrganization = asyncHandler(async (req: Request, res: Response) => {
   delete loggedInOrg.password;
 
   // Avoid leaking internal lifecycle status under the legacy `user` object.
-  delete (loggedInOrg as any).lifecycleStatus;
+  const sanitized = Object.fromEntries(
+    Object.entries(loggedInOrg).filter(([key]) => key !== 'lifecycleStatus')
+  );
 
   res
     .status(200)
     .cookie('token', token)
     .json(
       new ApiResponse(200, `Organization logged in successfully.`, {
-        user: loggedInOrg,
+        user: sanitized,
         token,
         warnings,
       })
@@ -639,7 +642,7 @@ const getOrgServiceProviders = asyncHandler(
 const getOrgServiceProviderById = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawId = (req.params as any)?.id as unknown;
+    const rawId = routeParamAsUnknown(req.params, 'id');
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
@@ -782,7 +785,7 @@ const registerOrgServiceProvider = asyncHandler(
 const updateOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawId = (req.params as any)?.id as unknown;
+    const rawId = routeParamAsUnknown(req.params, 'id');
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
@@ -838,7 +841,7 @@ const updateOrgServiceProvider = asyncHandler(
 const deleteOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawId = (req.params as any)?.id as unknown;
+    const rawId = routeParamAsUnknown(req.params, 'id');
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
@@ -872,7 +875,7 @@ const deleteOrgServiceProvider = asyncHandler(
 const verifyOrgServiceProvider = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawId = (req.params as any)?.id as unknown;
+    const rawId = routeParamAsUnknown(req.params, 'id');
     const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
     if (!loggedInOrg || !loggedInOrg.id) {
@@ -1378,7 +1381,10 @@ const bulkRegisterOrgServiceProviders = asyncHandler(
     }> = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i] as any;
+      const row: Record<string, unknown> = (rows[i] ?? {}) as Record<
+        string,
+        unknown
+      >;
       const email = String(row?.email ?? '');
       try {
         const { registerOrgServiceProviderSchema } =
@@ -1462,15 +1468,13 @@ const bulkRegisterOrgServiceProviders = asyncHandler(
     }
 
     const created = results.filter(r => r.status === 'created').length;
-    res
-      .status(207)
-      .json(
-        new ApiResponse(207, 'Bulk registration complete', {
-          created,
-          failed: results.length - created,
-          results,
-        })
-      );
+    res.status(207).json(
+      new ApiResponse(207, 'Bulk registration complete', {
+        created,
+        failed: results.length - created,
+        results,
+      })
+    );
   }
 );
 

@@ -13,6 +13,7 @@ import type { Request, Response } from 'express';
 import { envConfig } from '@/config';
 import { ServiceTypeEnum } from '@/constants';
 import db from '@/db';
+import { isValidEnum } from '@/utils/api';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
 
@@ -82,8 +83,6 @@ const provisionOrg = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, serviceCategory, generalNumber, password } = (req.body ??
     {}) as Record<string, unknown>;
 
-  // TODO: Move this validation to route level from here
-  // Minimal input validation; control plane is expected to call this.
   if (
     typeof name !== 'string' ||
     typeof email !== 'string' ||
@@ -94,10 +93,27 @@ const provisionOrg = asyncHandler(async (req: Request, res: Response) => {
     return res.status(400).json(new ApiResponse(400, 'Invalid payload', null));
   }
 
-  if (!Object.values(ServiceTypeEnum).includes(serviceCategory as any)) {
+  if (
+    !Object.values(ServiceTypeEnum).includes(serviceCategory as ServiceTypeEnum)
+  ) {
     return res
       .status(400)
       .json(new ApiResponse(400, 'Invalid serviceCategory', null));
+  }
+
+  // Idempotent: if the org already exists by email, return the existing record.
+  // This prevents orphan orgs when the control plane retries after a timeout/error.
+  const existing = await db.query.organization.findFirst({
+    where: eq(organization.email, email),
+    columns: { id: true },
+  });
+
+  if (existing?.id) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, 'Organization already exists', { id: existing.id })
+      );
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);

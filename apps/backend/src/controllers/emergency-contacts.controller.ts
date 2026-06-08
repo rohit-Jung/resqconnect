@@ -270,7 +270,7 @@ const reorderEmergencyContacts = asyncHandler(
       )
     );
 
-    res.status(200).json(new ApiResponse(200, 'Contacts reordered'));
+    res.status(200).json(new ApiResponse(200, 'Contacts reordered', null));
   }
 );
 

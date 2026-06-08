@@ -27,6 +27,7 @@ import {
   recordLoginFailure,
 } from '@/services/failed-login-lockout.service';
 import { getIo } from '@/socket';
+import { routeParamAsUnknown } from '@/utils/api';
 import ApiError from '@/utils/api/ApiError';
 import ApiResponse from '@/utils/api/ApiResponse';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -87,7 +88,9 @@ const registerServiceProvider = asyncHandler(
       throw ApiError.badRequest('Invalid phone number');
     }
 
-    if (!Object.values(ServiceTypeEnum).includes(serviceType as any)) {
+    if (
+      !Object.values(ServiceTypeEnum).includes(serviceType as ServiceTypeEnum)
+    ) {
       throw ApiError.badRequest('Invalid service type');
     }
 
@@ -798,7 +801,7 @@ const getServiceProviderProfile = asyncHandler(
 );
 
 const getServiceProvider = asyncHandler(async (req: Request, res: Response) => {
-  const rawId = (req.params as any)?.id as unknown;
+  const rawId = routeParamAsUnknown(req.params, 'id');
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const loggedInServiceProvider = req.user;
 
@@ -957,16 +960,20 @@ const getNearbyProviders = asyncHandler(async (req: Request, res: Response) => {
   };
   const withDistance = providers
     .filter(
-      p =>
-        p.currentLocation &&
-        p.currentLocation.latitude &&
-        p.currentLocation.longitude
+      (
+        p
+      ): p is typeof p & {
+        currentLocation: NonNullable<typeof p.currentLocation>;
+      } =>
+        p.currentLocation != null &&
+        !!p.currentLocation.latitude &&
+        !!p.currentLocation.longitude
     )
     .map(p => ({
       ...p,
       distance: calculateDistance(userLoc, {
-        latitude: parseFloat(p.currentLocation!.latitude),
-        longitude: parseFloat(p.currentLocation!.longitude),
+        latitude: parseFloat(p.currentLocation.latitude),
+        longitude: parseFloat(p.currentLocation.longitude),
       }),
     }))
     .sort((a, b) => a.distance - b.distance);
@@ -1441,7 +1448,7 @@ const getPendingVerifications = asyncHandler(
 const getProviderDocuments = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawProviderId = (req.params as any)?.providerId as unknown;
+    const rawProviderId = routeParamAsUnknown(req.params, 'providerId');
     const providerId = Array.isArray(rawProviderId)
       ? rawProviderId[0]
       : rawProviderId;
@@ -1492,7 +1499,7 @@ const getProviderDocuments = asyncHandler(
 const verifyProviderDocuments = asyncHandler(
   async (req: Request, res: Response) => {
     const loggedInOrg = req.user;
-    const rawProviderId = (req.params as any)?.providerId as unknown;
+    const rawProviderId = routeParamAsUnknown(req.params, 'providerId');
     const providerId = Array.isArray(rawProviderId)
       ? rawProviderId[0]
       : rawProviderId;

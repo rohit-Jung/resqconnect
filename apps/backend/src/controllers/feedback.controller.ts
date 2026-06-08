@@ -1,12 +1,11 @@
 import { feedback } from '@repo/db/schemas';
 
 import { eq } from 'drizzle-orm';
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 
 import db from '@/db';
+import { ApiResponse, asyncHandler, routeParamAsUnknown } from '@/utils/api';
 import ApiError from '@/utils/api/ApiError';
-import ApiResponse from '@/utils/api/ApiResponse';
-import { asyncHandler } from '@/utils/api/asyncHandler';
 
 const createFeedback = asyncHandler(async (req: Request, res: Response) => {
   const { serviceProviderId, message, serviceRatings } = req.body;
@@ -50,7 +49,7 @@ const createFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const rawId = (req.params as any)?.id as unknown;
+  const rawId = routeParamAsUnknown(req.params, 'id');
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
   const userId = req.user?.id;
@@ -109,7 +108,7 @@ const updateFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const rawId = (req.params as any)?.id as unknown;
+  const rawId = routeParamAsUnknown(req.params, 'id');
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const userId = req.user?.id;
   const role = req.user?.role;
@@ -151,7 +150,7 @@ const deleteFeedback = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const getFeedback = asyncHandler(async (req: Request, res: Response) => {
-  const rawId = (req.params as any)?.id as unknown;
+  const rawId = routeParamAsUnknown(req.params, 'id');
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
   if (!id || typeof id !== 'string') {
