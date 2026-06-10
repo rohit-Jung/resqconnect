@@ -1,3 +1,4 @@
+import { logger } from '@/config';
 import type { KAFKA_TOPICS } from '@/constants/kafka.constants';
 
 import { safeSend } from './kafka.service';
@@ -12,7 +13,7 @@ export async function publishWithRetry(
       await safeSend({ topic, messages: [message] });
       return true;
     } catch (error) {
-      console.error(`Kafka publish failed (attempt ${i + 1}):`, error);
+      logger.error(`Kafka publish failed (attempt ${i + 1}):`, error);
       if (i < retries - 1) {
         await new Promise(resolve =>
           setTimeout(resolve, 1000 * Math.pow(2, i))

@@ -3,6 +3,7 @@ import { organization, serviceProvider } from '@repo/db/schemas';
 import { eq } from 'drizzle-orm';
 import type { NextFunction, Request, Response } from 'express';
 
+import { logger } from '@/config';
 import db from '@/db';
 import ApiError from '@/utils/api/ApiError';
 import { asyncHandler } from '@/utils/api/asyncHandler';
@@ -17,7 +18,7 @@ export const requireActiveOrganization = asyncHandler(
       throw ApiError.unauthorized();
     }
 
-    console.log(loggedIn);
+    logger.debug(loggedIn);
 
     if (loggedIn.role !== 'organization') {
       // this guard is only for org endpoints.

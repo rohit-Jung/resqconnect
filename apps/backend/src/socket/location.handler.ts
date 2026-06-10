@@ -50,7 +50,10 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
     }
 
     const { requestId, providerId, userId, timestamp } = data;
-    console.log('Received Location update from ', userId ? 'user' : 'provider');
+    logger.debug(
+      'Received Location update from ',
+      userId ? 'user' : 'provider'
+    );
 
     logger.debug(`Location update for request ${requestId}`);
     if (!requestId || (!providerId && !userId)) {
@@ -108,7 +111,7 @@ export function setupLocationHandlers(io: Server, socket: Socket) {
           },
         };
 
-        console.log('UPDATEMSG', JSON.stringify(updateMsg));
+        logger.debug('UPDATEMSG', JSON.stringify(updateMsg));
 
         safeSend({
           topic: KAFKA_TOPICS.INCIDENT_STATUS_UPDATE,

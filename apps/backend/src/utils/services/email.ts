@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import Mailgen from 'mailgen';
 import { Resend } from 'resend';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 
 import { generateOtpToken } from '../tokens/otpTokens';
 
@@ -78,9 +78,9 @@ const transportOptions = {
 const transporter = nodemailer.createTransport(transportOptions);
 transporter.verify(error => {
   if (error) {
-    console.error('Mail transporter error:', error.message);
+    logger.error('Mail transporter error:', error.message);
   } else {
-    console.log('Mail transporter ready');
+    logger.debug('Mail transporter ready');
   }
 });
 
@@ -119,7 +119,7 @@ export const sendOTPEmail = async (
     const { error } = await resend.emails.send(mailData);
 
     if (error) {
-      console.error('Resend error:', error);
+      logger.error('Resend error:', error);
       return false;
     }
 
@@ -128,18 +128,18 @@ export const sendOTPEmail = async (
     // await new Promise((resolve, reject) => {
     //   transporter.sendMail(mailData, (error, info) => {
     //     if (error) {
-    //       console.error('Error sending email:', error);
+    //       logger.error('Error sending email:', error);
     //       reject(error);
     //     }
-    //     console.log('Email sent:', info.response);
+    //     logger.debug('Email sent:', info.response);
     //     resolve(info);
     //   });
     // });
 
-    console.log('Email sent to', email);
+    logger.debug('Email sent to', email);
     return true;
   } catch (error) {
-    console.error('Error sending email:', error);
+    logger.error('Error sending email:', error);
     return false;
   }
 };
@@ -181,13 +181,13 @@ export const sendEmergencyAlertEmail = async (
     });
 
     if (error) {
-      console.error('Resend emergency alert error:', error);
+      logger.error('Resend emergency alert error:', error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Error sending emergency alert email:', error);
+    logger.error('Error sending emergency alert email:', error);
     return false;
   }
 };
@@ -207,11 +207,11 @@ export const sendOTP = async (
         throw new Error('Error sending OTP email');
       }
 
-      console.log('Sending OTP Successful', otpToken);
+      logger.debug('Sending OTP Successful', otpToken);
     }
     return otpToken;
   } catch (error: unknown) {
-    console.log('Error Sending OTP', error);
+    logger.debug('Error Sending OTP', error);
     throw new Error('Error Sending OTP. Please try again later');
   }
 };

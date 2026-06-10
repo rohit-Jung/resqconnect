@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { type Consumer, Kafka, type Producer, logLevel } from 'kafkajs';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 import { KAFKA_CONSUMER_ID, KAFKA_TOPICS } from '@/constants/kafka.constants';
 
 export const redis = new Redis({
@@ -45,12 +45,12 @@ let isShuttingDown = false;
 async function connectKafkaOnce() {
   if (!connectPromise) {
     connectPromise = (async () => {
-      console.log('Connecting to Kafka...');
+      logger.debug('Connecting to Kafka...');
       await producer.connect();
       await notificationConsumer.connect();
       await assignResponderConsumer.connect();
       await incidentUpdateConsumer.connect();
-      console.log('Kafka connected');
+      logger.debug('Kafka connected');
     })();
   }
   return connectPromise;
@@ -80,9 +80,9 @@ export async function initInfra() {
       fromBeginning: false,
     });
 
-    console.log('Infrastructure initialized');
+    logger.debug('Infrastructure initialized');
   } catch (err) {
-    console.error('Infra init failed:', err);
+    logger.error('Infra init failed:', err);
     process.exit(1);
   }
 }
@@ -100,7 +100,7 @@ export async function safeSend(params: {
   try {
     await producer.send(params);
   } catch (err) {
-    console.error('Kafka send failed:', err);
+    logger.error('Kafka send failed:', err);
     throw err;
   }
 }
@@ -109,15 +109,15 @@ export async function shutdownInfra() {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log('Shutting down Kafka...');
+  logger.debug('Shutting down Kafka...');
   try {
     await producer.disconnect();
     await notificationConsumer.disconnect();
     await assignResponderConsumer.disconnect();
     await incidentUpdateConsumer.disconnect();
     await redis.quit();
-    console.log('Shutdown complete');
+    logger.debug('Shutdown complete');
   } catch (err) {
-    console.error('Shutdown error:', err);
+    logger.error('Shutdown error:', err);
   }
 }

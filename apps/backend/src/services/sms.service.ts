@@ -37,27 +37,10 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  // const messageSids = inboundMessages.map(m => m.sid);
-  // let processedMap: Map<string, boolean>;
-  // try {
-  //   processedMap = await batchCheckMessagesProcessed(messageSids);
-  // } catch (redisError) {
-  //   logger.error(
-  //     `[WORKER] Redis error checking processed messages:`,
-  //     redisError
-  //   );
-  //   errorCount++;
-  //   lastError =
-  //     redisError instanceof Error ? redisError.message : 'Redis error';
-  //   // Continue anyway - we might process duplicates but safety is preserved
-  //   processedMap = new Map();
-  // }
-
   logger.info(
     `[SMS WEBHOOK] Processing SMS message ${id} from ${payload.sender}`
   );
 
-  // Parse the SMS message
   const parseResult = parseSMSMessage(payload.message);
 
   if (!parseResult.success || !parseResult.data) {
@@ -65,7 +48,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       `[SMS WEBHOOK] Invalid SMS format from ${payload.sender}: ${parseResult.error}`
     );
 
-    // mark as processed with invalid status
     await markMessageProcessed(id, {
       status: 'invalid',
       error: parseResult.error,
@@ -87,7 +69,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
   let userId: string;
   const userPhone: string = payload.sender;
 
-  // Try to identify the user
   if (parsedData.userId) {
     // User ID provided in SMS - verify it matches the sender's phone
     const verification = await verifyUserIdentity(parsedData.userId, userPhone);
@@ -129,7 +110,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
         error: 'User not found',
       });
 
-      // send error sms
       await sendLocalSMS(
         payload.sender,
         SMS_TEMPLATES.USER_NOT_FOUND(EMERGENCY_PHONE_NUMBER)
@@ -145,7 +125,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
     userId = userResult.user.id;
   }
 
-  // Create the emergency request
   try {
     const result = await emergencyRequestService.default.create(
       userId,
@@ -174,7 +153,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    // Mark as successfully processed
     await markMessageProcessed(id, {
       requestId: result.requestId,
       userId,
@@ -191,7 +169,6 @@ const handleSmsWebhook = asyncHandler(async (req: Request, res: Response) => {
       return types[type] || type;
     }
 
-    // Send confirmation SMS
     const emergencyTypeDisplay = formatEmergencyType(parsedData.emergencyType);
     await sendLocalSMS(
       payload.sender,
@@ -240,7 +217,7 @@ const registerSmsWebhook = async () => {
       event: Events.SmsReceived,
     };
 
-    console.log('URL', envConfig.backend_base_path);
+    logger.debug('URL', envConfig.backend_base_path);
 
     const token = `${envConfig.sms_username}:${envConfig.sms_password}`;
     const auth_token = `Basic ${Buffer.from(token).toString('base64')}`;
@@ -257,7 +234,7 @@ const registerSmsWebhook = async () => {
       }
     );
 
-    console.log('WEBHOOK: ', response.data);
+    logger.debug('WEBHOOK: ', response.data);
     logger.info('[SMS WEBHOOK] Registered Successfully');
   } catch (error) {
     logger.error('[SMS WEBHOOK] Failed to register:', error);

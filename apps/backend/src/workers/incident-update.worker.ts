@@ -8,6 +8,7 @@ import { SocketEvents, SocketRoom } from '@/constants/socket.constants';
 import db from '@/db';
 import { incidentUpdateConsumer } from '@/services/kafka/kafka.service';
 import { getIo } from '@/socket';
+import { asEnum, parseKafkaMessage } from '@/utils/api';
 
 export type IncidentStatusUpdatePayload = {
   platformIncidentId: string;
@@ -33,9 +34,10 @@ export async function startIncidentUpdateWorker() {
     eachMessage: async ({ message }) => {
       let data: IncidentStatusUpdatePayload;
       try {
-        data = JSON.parse(
-          message.value!.toString()
-        ) as IncidentStatusUpdatePayload;
+        data =
+          parseKafkaMessage<IncidentStatusUpdatePayload>(
+            message.value?.toString()
+          ) ?? ({} as IncidentStatusUpdatePayload);
       } catch {
         logger.error('incident-update: invalid JSON in message');
         return;
@@ -58,7 +60,7 @@ export async function startIncidentUpdateWorker() {
         return;
       }
 
-      // console.log(
+      // logger.debug(
       //   `incident-update: eventType ${eventType}, ${userId}, ${JSON.stringify(provider)}, ${role}, ${JSON.stringify(payload)}`
       // );
 
@@ -77,7 +79,7 @@ export async function startIncidentUpdateWorker() {
           ? SocketRoom.PROVIDER(userId)
           : SocketRoom.USER(userId);
 
-      console.log('EMITTING to room', room);
+      logger.debug('EMITTING to room', room);
 
       switch (eventType) {
         case SocketEvents.REQUEST_ACCEPTED:
@@ -106,7 +108,7 @@ export async function startIncidentUpdateWorker() {
         case SocketEvents.CANCEL_REQUEST_SOCKET:
         case SocketEvents.PROVIDER_CONFIRM_ARRIVAL:
         case SocketEvents.PROVIDER_ARRIVAL_CONFIRMED:
-          io.to(room).emit(eventType as any, {
+          io.to(room).emit(eventType, {
             requestId: platformIncidentId,
             ...(payload ?? {}),
           });

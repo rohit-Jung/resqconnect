@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 
-import { envConfig } from '@/config';
+import { envConfig, logger } from '@/config';
 
 const cloudName =
   typeof envConfig.cloudinary_cloud_name === 'string'
@@ -66,7 +66,7 @@ export async function deleteImage(publicId: string): Promise<boolean> {
     const result = await cloudinary.uploader.destroy(publicId);
     return result.result === 'ok';
   } catch (error) {
-    console.error('Error deleting image from Cloudinary:', error);
+    logger.error('Error deleting image from Cloudinary:', error);
     return false;
   }
 }

@@ -24,7 +24,6 @@ import {
 } from '@/services/user.service';
 import { SMS_TEMPLATES, parseSMSMessage } from '@/utils/sms/sms.parser';
 
-// Health check state
 let lastPollTime: Date | null = null;
 let pollCount = 0;
 let errorCount = 0;
@@ -41,7 +40,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
 
   logger.info(`[WORKER] Processing SMS message ${sid} from ${from}`);
 
-  // Parse the SMS message
   const parseResult = parseSMSMessage(body);
 
   if (!parseResult.success || !parseResult.data) {
@@ -49,7 +47,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
       `[WORKER] Invalid SMS format from ${from}: ${parseResult.error}`
     );
 
-    // Mark as processed with invalid status
     await markMessageProcessed(sid, {
       status: 'invalid',
       error: parseResult.error,
@@ -65,7 +62,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
   const parsedData = parseResult.data;
   let userId: string;
 
-  // Try to identify the user
   if (parsedData.userId) {
     // User ID provided in SMS - verify it matches the sender's phone
     const verification = await verifyUserIdentity(parsedData.userId, from);
@@ -120,7 +116,6 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
     userId = userResult.user.id;
   }
 
-  // Create the emergency request
   try {
     const result = await emergencyRequestService.create(userId, parsedData);
 
@@ -145,14 +140,12 @@ async function processSingleMessage(message: TwilioMessage): Promise<{
       };
     }
 
-    // Mark as successfully processed
     await markMessageProcessed(sid, {
       requestId: result.requestId,
       userId,
       status: 'success',
     });
 
-    // Send confirmation SMS
     const emergencyTypeDisplay = formatEmergencyType(parsedData.emergencyType);
     await sendSMS(
       from,
@@ -251,7 +244,6 @@ async function handleIncomingMessages(toNumber: string): Promise<void> {
       `[WORKER] Processing ${inboundMessages.length} inbound messages`
     );
 
-    // batch check which messages have already been processed
     const messageSids = inboundMessages.map(m => m.sid);
     let processedMap: Map<string, boolean>;
     try {

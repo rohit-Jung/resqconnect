@@ -55,8 +55,8 @@ export async function postSMS(
       data: response.data.data,
     };
   } catch (err: any) {
-    console.log('ERROR registering webhook');
-    console.log(err);
+    logger.debug('ERROR registering webhook');
+    logger.debug(err);
     throw new Error(err);
   }
 }
@@ -81,7 +81,7 @@ export async function sendLocalSMS(
     }
 
     const response = postSMS(body, SmsRoutes.sendMessage, to);
-    console.log('[SMS WEBHOOK]: Message data', response);
+    logger.debug('[SMS WEBHOOK]: Message data', response);
 
     logger.info(`SMS sent successfully to ${formattedTo}, SID: $`);
 

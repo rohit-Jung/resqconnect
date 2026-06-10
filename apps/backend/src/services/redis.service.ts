@@ -1,3 +1,5 @@
+import { logger } from '@/config';
+
 import { redis } from './kafka/kafka.service';
 
 // request cache keys
@@ -99,7 +101,7 @@ export async function cacheEmergencyProviders(
   providerIds: string[]
 ): Promise<void> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
-  console.log('caching providers', requestId);
+  logger.debug('caching providers', requestId);
   await redis.set(
     key,
     JSON.stringify(providerIds),
@@ -123,7 +125,7 @@ export async function clearEmergencyProviders(
   requestId: string
 ): Promise<void> {
   const key = EMERGENCY_PROVIDERS_KEY(requestId);
-  console.log('clearing', key);
+  logger.debug('clearing', key);
   await redis.del(key);
 }
 
@@ -139,7 +141,7 @@ export async function cacheProviderLocation(
     lat: location.lat.toString(),
     lng: location.lng.toString(),
     timestamp: location.timestamp.toString(),
-    requestId: location.requestId || '',
+    requestId: location.requestId ?? '',
   });
   await redis.expire(key, CACHE_EXPIRY.PROVIDER_LOCATION);
 }
@@ -162,7 +164,7 @@ export async function getProviderLocation(providerId: string): Promise<{
     lat: parseFloat(data.lat),
     lng: parseFloat(data.lng),
     timestamp: parseInt(data.timestamp, 10),
-    requestId: data.requestId || '',
+    requestId: data.requestId ?? '',
   };
 }
 
@@ -208,7 +210,7 @@ export async function getAllActiveProviderLocations(): Promise<
           lat: parseFloat(data.lat),
           lng: parseFloat(data.lng),
           timestamp: parseInt(data.timestamp, 10),
-          requestId: data.requestId || '',
+          requestId: data.requestId ?? '',
         });
       }
     }
@@ -345,7 +347,7 @@ export async function cacheRoute(
     emergencyType
   );
   await redis.set(key, JSON.stringify(routeData), 'EX', CACHE_EXPIRY.ROUTE);
-  console.log(`[ROUTE_CACHE] Cached route: ${key}`);
+  logger.debug(`[ROUTE_CACHE] Cached route: ${key}`);
 }
 
 /**
@@ -369,7 +371,7 @@ export async function getCachedRoute(
   );
   const data = await redis.get(key);
   if (data) {
-    console.log(`[ROUTE_CACHE] Cache HIT: ${key}`);
+    logger.debug(`[ROUTE_CACHE] Cache HIT: ${key}`);
   }
   return data ? JSON.parse(data) : null;
 }

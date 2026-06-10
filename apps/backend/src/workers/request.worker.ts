@@ -20,6 +20,7 @@ import {
 } from '@/services/matching.service';
 import { cacheEmergencyProviders } from '@/services/redis.service';
 import { getIo } from '@/socket';
+import { parseKafkaMessage } from '@/utils/api';
 
 export async function startEmergencyRequestService() {
   logger.info('Starting Kafka consumer connection...');
@@ -45,10 +46,12 @@ export async function startEmergencyRequestService() {
     eachMessage: async ({ topic, message, partition }) => {
       const messageStartTime = Date.now();
 
-      const data = JSON.parse(message.value!.toString());
+      const data =
+        parseKafkaMessage<Record<string, unknown>>(message.value?.toString()) ??
+        {};
       const parsedData = EmergencyRequestPayload.safeParse(data);
 
-      console.log('[CONSUMER] assignResponderConsumer', parsedData.data);
+      logger.debug('[CONSUMER] assignResponderConsumer', parsedData.data);
 
       if (!parsedData.success) {
         logger.error('Invalid message format:', {

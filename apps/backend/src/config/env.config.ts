@@ -7,6 +7,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  TENANT_ID: z.string().uuid().optional(),
   CONTROL_PANE_URL: z.string(),
 
   ALLOWED_ORIGINS: z
@@ -54,13 +55,10 @@ const envSchema = z.object({
 
   BACKEND_BASE_PATH: z.string(),
 
-  // Platform <-> silo base URLs (internal docker network addresses)
+  // Platform base URL for cross-silo HTTP bridge.
   PLATFORM_BASE_URL: z.string().optional(),
-  SILO_FIRE_BASE_URL: z.string().optional(),
-  SILO_HOSPITAL_BASE_URL: z.string().optional(),
-  SILO_POLICE_BASE_URL: z.string().optional(),
 
-  // internal incident bridge routing
+  // Silo's own reachable URL (for registration).
   SILO_BASE_URL: z.string().optional(),
   SILO_NAME: z.enum(['fire', 'hospital', 'police']).optional(),
 
@@ -125,16 +123,3 @@ export const envConfigLower = envConfig as Record<
   string | number | string[] | undefined
 >;
 export type TEnvConfig = zType.infer<typeof envSchema>;
-
-const SERVICE_TYPE_TO_SILO = {
-  ambulance: 'SILO_HOSPITAL_BASE_URL',
-  fire_truck: 'SILO_FIRE_BASE_URL',
-  rescue_team: 'SILO_FIRE_BASE_URL',
-  police: 'SILO_POLICE_BASE_URL',
-} as const;
-
-export function getSiloBaseUrl(emergencyType: string): string | undefined {
-  const key =
-    SERVICE_TYPE_TO_SILO[emergencyType as keyof typeof SERVICE_TYPE_TO_SILO];
-  return key ? (envConfig[key] as string | undefined) : undefined;
-}

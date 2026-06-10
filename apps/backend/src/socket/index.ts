@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import type { Request } from 'express';
 import { Server, Socket } from 'socket.io';
 
+import { logger } from '@/config';
 import { envConfig } from '@/config';
 import { OtherRoles, UserRoles } from '@/constants';
 import {
@@ -27,11 +28,11 @@ import { setupLocationHandlers } from './location.handler';
 let io: Server | null = null;
 
 async function authenticateUser(socket: Socket, next: (err?: Error) => void) {
-  const cookies = parse(socket.handshake?.headers?.cookie || '');
+  const cookies = parse(socket.handshake?.headers?.cookie ?? '');
   let token = cookies?.accessToken;
 
   if (!token) {
-    token = socket.handshake?.auth?.token || '';
+    token = socket.handshake?.auth?.token ?? '';
   }
 
   if (!token) {
@@ -142,7 +143,7 @@ function initializeSocketServer(
 
   io.use(authenticateUser);
   io.on(SocketEvents.CONNECTION, (socket: Socket) => {
-    console.log(
+    logger.info(
       'User connected to socket',
       socket.id,
       '| User ID:',
@@ -154,20 +155,20 @@ function initializeSocketServer(
     // Join role-specific rooms based on MODE.
     if (envConfig.mode === 'platform') {
       socket.join(SocketRoom.USER(socket.user.id));
-      console.log('Joined USER room:', SocketRoom.USER(socket.user.id));
+      logger.info('Joined USER room:', SocketRoom.USER(socket.user.id));
     } else if (socket.user.role === OtherRoles.ORGANIZATION) {
       socket.join(SocketRoom.ORGANIZATION(socket.user.id));
-      console.log(
+      logger.info(
         'Joined ORGANIZATION room:',
         SocketRoom.ORGANIZATION(socket.user.id)
       );
     } else if (socket.user.role === OtherRoles.SERVICE_PROVIDER) {
       socket.join(SocketRoom.PROVIDER(socket.user.id));
-      console.log('Joined PROVIDER room:', SocketRoom.PROVIDER(socket.user.id));
+      logger.info('Joined PROVIDER room:', SocketRoom.PROVIDER(socket.user.id));
       const room = io!.sockets.adapter.rooms.get(
         SocketRoom.PROVIDER(socket.user.id)
       );
-      console.log('Provider room members:', room ? [...room] : 'none');
+      logger.info('Provider room members:', room ? [...room] : 'none');
     }
 
     // Register handlers based on MODE.
@@ -183,7 +184,7 @@ function initializeSocketServer(
     setupLocationHandlers(io!, socket);
 
     socket.on(SocketEvents.DISCONNECT, () => {
-      console.log('User disconnected from socket', socket.id);
+      logger.info('User disconnected from socket', socket.id);
     });
   });
 

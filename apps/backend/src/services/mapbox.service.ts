@@ -29,7 +29,7 @@ export async function getRouteFromMapbox(
     );
 
     if (cachedRoute) {
-      console.log('[ROUTE_CACHE] Using cached route instead of API call');
+      logger.debug('[ROUTE_CACHE] Using cached route instead of API call');
       return {
         success: true,
         route: cachedRoute,
@@ -38,7 +38,7 @@ export async function getRouteFromMapbox(
 
     const url = constructDirectionUrl({
       profile,
-      token: envConfig.mapbox_access_token as string,
+      token: envConfig.mapbox_access_token!,
       origin,
       dest: destination,
     });
@@ -97,7 +97,7 @@ export async function getRouteFromMapbox(
       route: processedRoute,
     };
   } catch (error) {
-    console.error('Error fetching route from Mapbox:', error);
+    logger.error('Error fetching route from Mapbox:', error);
     return {
       success: false,
       error: 'Failed to fetch route',
@@ -127,7 +127,7 @@ export async function getBatchETAs(
     const destinationIndex = origins.length; // Last coordinate is destination
     const sources = origins.map((_, i) => i).join(';'); // All origins
 
-    const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving-traffic/${coordinates}?sources=${sources}&destinations=${destinationIndex}&annotations=duration&access_token=${envConfig.mapbox_access_token}`;
+    const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving-traffic/${coordinates}?sources=${sources}&destinations=${destinationIndex}&annotations=duration&access_token=${envConfig.mapbox_access_token!}`;
 
     const response = await fetch(url);
 
@@ -160,7 +160,7 @@ export async function reverseGeocode(
     const params = new URLSearchParams({
       longitude: String(lng),
       latitude: String(lat),
-      access_token: envConfig.mapbox_access_token as string,
+      access_token: envConfig.mapbox_access_token!,
     });
     const response = await fetch(
       `https://api.mapbox.com/search/geocode/v6/reverse?${params}`
@@ -193,7 +193,7 @@ export async function forwardGeocode(
   try {
     const params = new URLSearchParams({
       q: query,
-      access_token: envConfig.mapbox_access_token as string,
+      access_token: envConfig.mapbox_access_token!,
       limit: '5',
       ...(lat != null && lng != null ? { proximity: `${lng},${lat}` } : {}),
     });

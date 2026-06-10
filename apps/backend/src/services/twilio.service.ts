@@ -58,9 +58,9 @@ export async function getMessages(
 
     return messages.map(msg => ({
       sid: msg.sid,
-      body: msg.body || '',
-      from: msg.from || '',
-      to: msg.to || '',
+      body: msg.body ?? '',
+      from: msg.from ?? '',
+      to: msg.to ?? '',
       dateSent: msg.dateSent,
       dateCreated: msg.dateCreated,
       status: msg.status,

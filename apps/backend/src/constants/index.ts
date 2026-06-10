@@ -1,9 +1,5 @@
 import { envConfig } from '@/config';
 
-export const getOtpMessage = (otpCode: string) => {
-  return `Welcome to Resqconnect. Your Login OTP Code is ${otpCode}`;
-};
-
 export const phoneRegex = /^[0-9]{10}$/;
 export const NEPAL_COUNTRY_CODE = '977';
 
