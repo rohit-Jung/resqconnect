@@ -1,4 +1,5 @@
 import { cpSubscriptionPlan } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { asc, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -14,7 +15,7 @@ export const listPlans = async (_req: Request, res: Response) => {
     where: eq(cpSubscriptionPlan.isActive, true),
     orderBy: [asc(cpSubscriptionPlan.price)],
   });
-  return res.status(200).json({ ok: true, plans });
+  return res.status(200).json(new ApiResponse(200, 'OK', { plans }));
 };
 
 export const createPlan = async (req: Request, res: Response) => {
@@ -38,12 +39,13 @@ export const createPlan = async (req: Request, res: Response) => {
     })
     .returning({ id: cpSubscriptionPlan.id });
 
-  return res.status(201).json({ ok: true, plan: created });
+  return res.status(201).json(new ApiResponse(201, 'OK', { plan: created }));
 };
 
 export const updatePlan = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
-  if (!id) return res.status(400).json({ ok: false, error: 'Missing plan id' });
+  if (!id)
+    return res.status(400).json(new ApiResponse(400, 'Missing plan id', null));
 
   const parsed = updatePlanSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -74,13 +76,14 @@ export const updatePlan = async (req: Request, res: Response) => {
     .returning({ id: cpSubscriptionPlan.id });
 
   if (!updated)
-    return res.status(404).json({ ok: false, error: 'Plan not found' });
-  return res.status(200).json({ ok: true, plan: updated });
+    return res.status(404).json(new ApiResponse(404, 'Plan not found', null));
+  return res.status(200).json(new ApiResponse(200, 'OK', { plan: updated }));
 };
 
 export const deletePlan = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
-  if (!id) return res.status(400).json({ ok: false, error: 'Missing plan id' });
+  if (!id)
+    return res.status(400).json(new ApiResponse(400, 'Missing plan id', null));
 
   // Soft-delete by deactivating the plan.
   const [updated] = await db
@@ -90,6 +93,6 @@ export const deletePlan = async (req: Request, res: Response) => {
     .returning({ id: cpSubscriptionPlan.id });
 
   if (!updated)
-    return res.status(404).json({ ok: false, error: 'Plan not found' });
+    return res.status(404).json(new ApiResponse(404, 'Plan not found', null));
   return res.status(200).json({ ok: true });
 };

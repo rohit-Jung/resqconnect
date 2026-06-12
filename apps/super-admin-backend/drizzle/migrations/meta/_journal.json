@@ -8,6 +8,34 @@
       "when": 1776533850097,
       "tag": "0000_dapper_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783267463125,
+      "tag": "0001_curly_tusk",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783272621996,
+      "tag": "0002_windy_swordsman",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783302655225,
+      "tag": "0003_abnormal_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783303276269,
+      "tag": "0004_blue_the_spike",
+      "breakpoints": true
     }
   ]
 }

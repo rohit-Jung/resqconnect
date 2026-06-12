@@ -1,0 +1,22 @@
+services:
+  control_plane_db:
+    image: postgres:16-alpine
+    container_name: resq_control_plane_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_DB: resq_control_plane
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - control_plane_postgres_data:/var/lib/postgresql/data
+    ports:
+      - '127.0.0.1:5550:5432'
+    networks:
+      - resq_network
+
+volumes:
+  control_plane_postgres_data:
+
+networks:
+  resq_network:
+    driver: bridge

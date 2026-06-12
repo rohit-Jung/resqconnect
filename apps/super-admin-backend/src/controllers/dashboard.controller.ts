@@ -3,6 +3,7 @@ import {
   cpOrganization,
   cpSiloMetrics,
 } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { and, asc, desc, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -477,5 +478,5 @@ export const getDashboard = async (req: Request, res: Response) => {
     } satisfies DashboardStats,
   };
 
-  return res.status(200).json({ ok: true, data: payload });
+  return res.status(200).json(new ApiResponse(200, 'OK', payload));
 };

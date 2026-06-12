@@ -6,6 +6,6 @@ import { adminLogin, adminMe } from '@/controllers/auth.controller';
 import { requireAdminAuth } from '@/middlewares/admin-auth.middleware';
 
 export const authRouter = Router();
-
 authRouter.post('/login', asyncHandler(adminLogin));
 authRouter.get('/me', requireAdminAuth, asyncHandler(adminMe));
+authRouter.get('/profile', requireAdminAuth, asyncHandler(adminMe));

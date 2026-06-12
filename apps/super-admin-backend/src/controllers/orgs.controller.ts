@@ -3,12 +3,17 @@ import {
   cpOrganization,
   cpSiloMetrics,
 } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 
 import { envConfig } from '@/config';
 import { db } from '@/db';
+import {
+  pushEntitlementsToSilo,
+  resolveEntitlements,
+} from '@/services/entitlements.service';
 import { isPgError } from '@/utils/pg-error';
 import {
   provisionOrgSchema,
@@ -27,10 +32,14 @@ export const listOrgs = async (req: Request, res: Response) => {
     'trial_expired',
   ];
   if (sector && !allowedSectors.includes(sector)) {
-    return res.status(400).json({ ok: false, error: 'Invalid sector filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid sector filter', null));
   }
   if (status && !allowedStatuses.includes(status)) {
-    return res.status(400).json({ ok: false, error: 'Invalid status filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid status filter', null));
   }
 
   const where = [] as ReturnType<typeof eq>[];
@@ -42,13 +51,13 @@ export const listOrgs = async (req: Request, res: Response) => {
     orderBy: [asc(cpOrganization.createdAt)],
   });
 
-  return res.status(200).json({ ok: true, orgs });
+  return res.status(200).json(new ApiResponse(200, 'OK', { orgs }));
 };
 
 export const getOrgById = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {
-    return res.status(400).json({ ok: false, error: 'Missing org id' });
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
   }
 
   const includeSilo =
@@ -91,7 +100,7 @@ export const getOrgById = async (req: Request, res: Response) => {
   });
 
   if (!org) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   const replica = await db.query.cpOrgReplica.findFirst({
@@ -215,7 +224,7 @@ export const getOrgById = async (req: Request, res: Response) => {
 export const deleteOrg = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {
-    return res.status(400).json({ ok: false, error: 'Missing org id' });
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
   }
 
   const existing = await db.query.cpOrganization.findFirst({
@@ -223,7 +232,7 @@ export const deleteOrg = async (req: Request, res: Response) => {
     columns: { id: true },
   });
   if (!existing) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   // Deregister from control plane; this does not delete silo data.
@@ -231,6 +240,45 @@ export const deleteOrg = async (req: Request, res: Response) => {
   await db.delete(cpOrganization).where(eq(cpOrganization.id, id));
 
   return res.status(200).json({ ok: true });
+};
+
+export const updateOrg = async (req: Request, res: Response) => {
+  const id = typeof req.params?.id === 'string' ? req.params.id : '';
+  if (!id)
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
+
+  const allowedFields = [
+    'databaseUrl',
+    'planId',
+    'name',
+    'siloBaseUrl',
+  ] as const;
+  const updates: Record<string, unknown> = {};
+
+  for (const key of allowedFields) {
+    if (req.body[key] !== undefined) {
+      updates[key] = req.body[key];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'No valid fields to update', null));
+  }
+
+  const [updated] = await db
+    .update(cpOrganization)
+    .set(updates as any)
+    .where(eq(cpOrganization.id, id))
+    .returning({ id: cpOrganization.id });
+
+  if (!updated)
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Organization updated', { id }));
 };
 
 export const provisionOrg = async (req: Request, res: Response) => {
@@ -413,9 +461,40 @@ export const provisionOrg = async (req: Request, res: Response) => {
   });
 
   const siloBodyText = await siloRes.text().catch(() => '');
+
+  // Try to extract org id even from error responses — the silo may have
+  // created the record before hitting a non-critical error, or may be
+  // returning 200 for an idempotent match.
+  let siloJson: any = null;
+  try {
+    siloJson = JSON.parse(siloBodyText);
+  } catch {
+    /* ignore */
+  }
+
+  const siloOrgId = siloJson?.data?.id ?? siloJson?.id;
+
   if (!siloRes.ok) {
-    // If we failed to create the org in the silo, roll back the control-plane registry
-    // so the org doesn't show up in the super-admin panel.
+    if (siloOrgId) {
+      // The silo created the org despite the error status.
+      // Save the reference instead of rolling back.
+      await db
+        .update(cpOrganization)
+        .set({ siloOrgId })
+        .where(eq(cpOrganization.id, createdCp.id));
+
+      return res.status(201).json({
+        ok: true,
+        org: {
+          id: createdCp.id,
+          siloBaseUrl: createdCp.siloBaseUrl,
+          siloOrgId,
+        },
+        note: 'Silo responded with error but org was created',
+      });
+    }
+
+    // Genuine failure — roll back.
     await db
       .delete(cpOrgReplica)
       .where(eq(cpOrgReplica.cpOrgId, createdCp.id as any));
@@ -436,16 +515,9 @@ export const provisionOrg = async (req: Request, res: Response) => {
     });
   }
 
-  let siloJson: any = null;
-  try {
-    siloJson = JSON.parse(siloBodyText);
-  } catch {
-    // ignore
-  }
-
-  const siloOrgId = siloJson?.data?.id ?? siloJson?.id;
   if (!siloOrgId) {
-    // Roll back the control-plane registry if silo didn't return a usable org id.
+    // Silo returned 2xx but no org id in body — unexpected.
+    // Roll back to avoid orphan.
     await db
       .delete(cpOrgReplica)
       .where(eq(cpOrgReplica.cpOrgId, createdCp.id as any));
@@ -470,6 +542,15 @@ export const provisionOrg = async (req: Request, res: Response) => {
     .update(cpOrganization)
     .set({ siloOrgId })
     .where(eq(cpOrganization.id, createdCp.id));
+
+  // Auto-resolve entitlements from the org's plan (fire-and-forget).
+  resolveEntitlements(createdCp.id)
+    .then(snapshot => {
+      if (snapshot && createdCp.siloBaseUrl && siloOrgId) {
+        pushEntitlementsToSilo(createdCp.id, createdCp.siloBaseUrl, siloOrgId);
+      }
+    })
+    .catch(err => console.error('Entitlements auto-resolve failed:', err));
 
   return res.status(201).json({
     ok: true,
@@ -609,7 +690,7 @@ async function provisionOrgCore(
 export const bulkProvisionOrgs = async (req: Request, res: Response) => {
   const rows: unknown[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
   if (rows.length === 0) {
-    return res.status(400).json({ ok: false, error: 'No rows provided' });
+    return res.status(400).json(new ApiResponse(400, 'No rows provided', null));
   }
   if (rows.length > 500) {
     return res
@@ -672,7 +753,7 @@ export const bulkProvisionOrgs = async (req: Request, res: Response) => {
 export const updateOrgStatus = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {
-    return res.status(400).json({ ok: false, error: 'Missing org id' });
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
   }
   const parsed = updateOrgStatusSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -694,7 +775,7 @@ export const updateOrgStatus = async (req: Request, res: Response) => {
   });
 
   if (!org) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   if (!org.siloBaseUrl || !org.siloOrgId) {

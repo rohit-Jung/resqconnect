@@ -4,6 +4,7 @@ import {
   cpPaymentIntent,
   cpSubscriptionPlan,
 } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -59,7 +60,7 @@ export const initiateCheckout = async (req: Request, res: Response) => {
   });
 
   if (!org) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   if (!org.siloOrgId) {
@@ -77,7 +78,7 @@ export const initiateCheckout = async (req: Request, res: Response) => {
   });
 
   if (!plan) {
-    return res.status(404).json({ ok: false, error: 'Plan not found' });
+    return res.status(404).json(new ApiResponse(404, 'Plan not found', null));
   }
 
   const resolvedReturnUrl = returnUrl ?? envConfig.khalti_return_url;
@@ -131,14 +132,14 @@ export const initiateCheckout = async (req: Request, res: Response) => {
     }
   }
 
-  return res.status(200).json({ ok: true, data });
+  return res.status(200).json(new ApiResponse(200, 'OK', { data }));
 };
 
 export const initiateCheckoutMy = async (req: Request, res: Response) => {
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const orgId = auth?.org?.cpOrgId;
   if (!orgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   // Reuse existing schema but omit orgId in request body.
@@ -281,7 +282,10 @@ export const khaltiWebhook = async (req: Request, res: Response) => {
     await db.insert(cpOrgEntitlements).values({
       cpOrgId: org.id,
       version: nextVersion,
-      entitlements,
+      entitlements: entitlements as unknown as Record<
+        string,
+        string | number | boolean | null
+      >,
     });
 
     await db
@@ -332,7 +336,9 @@ export const khaltiWebhook = async (req: Request, res: Response) => {
     }
   }
 
-  return res.status(200).json({ ok: true, lookup, activated: paid });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'OK', { lookup, activated: paid }));
 };
 
 // Local-dev friendly: frontend calls this on the success page.
@@ -341,12 +347,12 @@ export const verifyMyPayment = async (req: Request, res: Response) => {
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const cpOrgId = auth?.org?.cpOrgId;
   if (!cpOrgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   const parsed = khaltiVerifySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ ok: false, error: 'Invalid payload' });
+    return res.status(400).json(new ApiResponse(400, 'Invalid payload', null));
   }
 
   const { pidx } = parsed.data;
@@ -379,7 +385,9 @@ export const listPaymentsAdmin = async (req: Request, res: Response) => {
 
   const allowed = ['pending', 'completed', 'failed', 'refunded'];
   if (status && !allowed.includes(status)) {
-    return res.status(400).json({ ok: false, error: 'Invalid status filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid status filter', null));
   }
 
   const where = status ? eq(cpPaymentIntent.khaltiStatus, status) : undefined;
@@ -453,7 +461,8 @@ export const listPaymentsAdmin = async (req: Request, res: Response) => {
 
 export const getPaymentByIdAdmin = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
-  if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
+  if (!id)
+    return res.status(400).json(new ApiResponse(400, 'Missing id', null));
 
   const row = await db.query.cpPaymentIntent.findFirst({
     where: eq(cpPaymentIntent.id, id),
@@ -485,7 +494,8 @@ export const getPaymentByIdAdmin = async (req: Request, res: Response) => {
     },
   });
 
-  if (!row) return res.status(404).json({ ok: false, error: 'Not found' });
+  if (!row)
+    return res.status(404).json(new ApiResponse(404, 'Not found', null));
 
   return res.status(200).json({
     ok: true,
@@ -520,13 +530,15 @@ export const listMyPayments = async (req: Request, res: Response) => {
 
   const allowed = ['pending', 'completed', 'failed', 'refunded'];
   if (status && !allowed.includes(status)) {
-    return res.status(400).json({ ok: false, error: 'Invalid status filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid status filter', null));
   }
 
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const cpOrgId = auth?.org?.cpOrgId;
   if (!cpOrgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   const where = status
@@ -601,12 +613,13 @@ export const listMyPayments = async (req: Request, res: Response) => {
 
 export const getMyPaymentById = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
-  if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
+  if (!id)
+    return res.status(400).json(new ApiResponse(400, 'Missing id', null));
 
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const cpOrgId = auth?.org?.cpOrgId;
   if (!cpOrgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   const row = await db.query.cpPaymentIntent.findFirst({
@@ -641,7 +654,8 @@ export const getMyPaymentById = async (req: Request, res: Response) => {
     },
   });
 
-  if (!row) return res.status(404).json({ ok: false, error: 'Not found' });
+  if (!row)
+    return res.status(404).json(new ApiResponse(404, 'Not found', null));
 
   return res.status(200).json({
     ok: true,
@@ -664,12 +678,13 @@ export const getMyPaymentById = async (req: Request, res: Response) => {
 
 export const getMyPaymentByPidx = async (req: Request, res: Response) => {
   const pidx = typeof req.params?.pidx === 'string' ? req.params.pidx : '';
-  if (!pidx) return res.status(400).json({ ok: false, error: 'Missing pidx' });
+  if (!pidx)
+    return res.status(400).json(new ApiResponse(400, 'Missing pidx', null));
 
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const cpOrgId = auth?.org?.cpOrgId;
   if (!cpOrgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   const row = await db.query.cpPaymentIntent.findFirst({
@@ -704,7 +719,8 @@ export const getMyPaymentByPidx = async (req: Request, res: Response) => {
     },
   });
 
-  if (!row) return res.status(404).json({ ok: false, error: 'Not found' });
+  if (!row)
+    return res.status(404).json(new ApiResponse(404, 'Not found', null));
 
   return res.status(200).json({
     ok: true,
@@ -729,7 +745,7 @@ export const getMyActiveSubscription = async (req: Request, res: Response) => {
   const auth = (req as any).auth as { org?: { cpOrgId: string } };
   const cpOrgId = auth?.org?.cpOrgId;
   if (!cpOrgId) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    return res.status(401).json(new ApiResponse(401, 'Unauthorized', null));
   }
 
   // Minimal: infer from latest completed payment intent.
@@ -761,7 +777,9 @@ export const getMyActiveSubscription = async (req: Request, res: Response) => {
   });
 
   if (!latestPaid?.plan) {
-    return res.status(200).json({ ok: true, subscription: null });
+    return res
+      .status(200)
+      .json(new ApiResponse(200, 'OK', { subscription: null }));
   }
 
   const startDate = latestPaid.updatedAt;

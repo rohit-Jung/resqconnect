@@ -1,5 +1,6 @@
 import { cpOrgEntitlements } from '@repo/db/control-plane';
 import { cpOrganization } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { desc, eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -10,7 +11,7 @@ import { db } from '@/db';
 export const getLatestEntitlements = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {
-    return res.status(400).json({ ok: false, error: 'Missing org id' });
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
   }
 
   const latest = await db.query.cpOrgEntitlements.findFirst({
@@ -25,7 +26,7 @@ export const getLatestEntitlements = async (req: Request, res: Response) => {
       .json({ ok: false, error: 'No entitlements snapshot found' });
   }
 
-  return res.status(200).json({ ok: true, snapshot: latest });
+  return res.status(200).json(new ApiResponse(200, 'OK', { snapshot: latest }));
 };
 
 function parseBoolean(raw: unknown): boolean | null {
@@ -74,7 +75,7 @@ function normalizeEntitlements(input: unknown) {
 export const setEntitlementsOverride = async (req: Request, res: Response) => {
   const id = typeof req.params?.id === 'string' ? req.params.id : '';
   if (!id) {
-    return res.status(400).json({ ok: false, error: 'Missing org id' });
+    return res.status(400).json(new ApiResponse(400, 'Missing org id', null));
   }
 
   const entitlements = normalizeEntitlements((req.body ?? {}).entitlements);
@@ -95,7 +96,7 @@ export const setEntitlementsOverride = async (req: Request, res: Response) => {
   });
 
   if (!org) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   const latest = await db.query.cpOrgEntitlements.findFirst({

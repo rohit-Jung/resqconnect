@@ -1,4 +1,5 @@
 import { cpOrganization } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import { and, asc, eq, or } from 'drizzle-orm';
 import type { Request, Response } from 'express';
@@ -11,7 +12,9 @@ export const lookupOrgByNameOrId = async (req: Request, res: Response) => {
   const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
 
   if (!name && !id) {
-    return res.status(400).json({ ok: false, error: 'Missing name or id' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Missing name or id', null));
   }
 
   const org = await db.query.cpOrganization.findFirst({
@@ -29,7 +32,7 @@ export const lookupOrgByNameOrId = async (req: Request, res: Response) => {
   });
 
   if (!org) {
-    return res.status(404).json({ ok: false, error: 'Org not found' });
+    return res.status(404).json(new ApiResponse(404, 'Org not found', null));
   }
 
   return res.status(200).json({
@@ -63,10 +66,14 @@ export const listOrgsForLookup = async (req: Request, res: Response) => {
   ];
 
   if (sector && !allowedSectors.includes(sector)) {
-    return res.status(400).json({ ok: false, error: 'Invalid sector filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid sector filter', null));
   }
   if (status && !allowedStatuses.includes(status)) {
-    return res.status(400).json({ ok: false, error: 'Invalid status filter' });
+    return res
+      .status(400)
+      .json(new ApiResponse(400, 'Invalid status filter', null));
   }
 
   const where = [] as ReturnType<typeof eq>[];
@@ -95,5 +102,7 @@ export const listOrgsForLookup = async (req: Request, res: Response) => {
       }))
     : orgs;
 
-  return res.status(200).json({ ok: true, orgs: normalizedOrgs });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'OK', { orgs: normalizedOrgs }));
 };

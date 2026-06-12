@@ -1,4 +1,5 @@
 import { cpOrganization } from '@repo/db/control-plane';
+import { ApiResponse } from '@repo/utils/api';
 
 import type { Request, Response } from 'express';
 
@@ -65,7 +66,9 @@ export const listUsers = async (req: Request, res: Response) => {
   );
 
   if (uniqueUrls.length === 0) {
-    return res.status(200).json({ ok: true, total: 0, page, limit, users: [] });
+    return res
+      .status(200)
+      .json(new ApiResponse(200, 'OK', { total: 0, page, limit, users: [] }));
   }
 
   // Fetch enough rows from each silo to cover global pagination
@@ -115,5 +118,7 @@ export const listUsers = async (req: Request, res: Response) => {
   const offset = (page - 1) * limit;
   const users = allUsers.slice(offset, offset + limit);
 
-  return res.status(200).json({ ok: true, total, page, limit, users });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'OK', { total, page, limit, users }));
 };

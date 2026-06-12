@@ -1,0 +1,1 @@
+ALTER TABLE "cp_organization" ADD COLUMN "plan_id" uuid;

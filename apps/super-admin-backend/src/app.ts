@@ -1,3 +1,5 @@
+import { ApiResponse } from '@repo/utils/api';
+
 import cors from 'cors';
 import express from 'express';
 
@@ -10,59 +12,66 @@ import { healthRouter } from '@/routes/health.routes';
 import { lookupRouter } from '@/routes/lookup.routes';
 import { orgsRouter } from '@/routes/orgs.routes';
 import { plansRouter } from '@/routes/plans.routes';
+import { silosRouter } from '@/routes/silos.routes';
+import { tenantsRouter } from '@/routes/tenants.routes';
 import { usersRouter } from '@/routes/users.routes';
-import { buildErrorCauseChain, unwrapPgError } from '@/utils/pg-error';
+import { AppError } from '@/utils/errors';
 
 const app = express();
 
-const allowedorigins = process.env.ALLOWED_ORIGINS
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['*'];
 
-app.use(
-  cors({
-    origin: allowedorigins,
-    credentials: true,
-  })
-);
-
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
-// Surface the real Postgres error that Drizzle wraps (helps debug “Failed query”).
-app.use((req, _res, next) => {
-  (req as any)._reqId =
-    typeof globalThis.crypto?.randomUUID === 'function'
-      ? globalThis.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  next();
-});
-
-app.use('/auth', authRouter);
+// Health
 app.use('/health', healthRouter);
+
+// Auth
+app.use('/auth', authRouter);
+
+// Admin dashboard
 app.use('/admin', adminRouter);
-app.use('/billing', billingRouter);
-app.use('/plans', plansRouter);
-app.use('/orgs', orgsRouter);
-app.use('/users', usersRouter);
 app.use('/dashboard', dashboardRouter);
+
+// Orgs
+app.use('/orgs', orgsRouter);
+
+// Users
+app.use('/users', usersRouter);
+
+// Plans
+app.use('/plans', plansRouter);
+
+// Billing
+app.use('/billing', billingRouter);
+
+// Lookup
 app.use('/lookup', lookupRouter);
+
+// Silo registry & sync
+app.use('/internal/silos', silosRouter);
+app.use('/internal/tenants', tenantsRouter);
+
+// Entitlements (mounted at root since routes have /orgs/:id prefix)
 app.use('/', entitlementsRouter);
 
-// Last: centralized error handler.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// 404
+app.use((_req, res) => {
+  res.status(404).json(new ApiResponse(404, 'Not found', null));
+});
+
+// Error handler
 app.use((err: unknown, req: any, res: any, _next: any) => {
-  const reqId = req?._reqId;
-  const pg = unwrapPgError(err);
-
-  console.error('Unhandled error', {
-    reqId,
-    method: req?.method,
-    path: req?.originalUrl,
-    pg,
-    causes: buildErrorCauseChain(err),
-  });
-
-  res.status(500).json({ ok: false, error: 'Internal server error', reqId });
+  if (err instanceof AppError) {
+    return res
+      .status(err.statusCode)
+      .json(new ApiResponse(err.statusCode, err.message, null));
+  }
+  console.error('Unhandled error', err);
+  res.status(500).json(new ApiResponse(500, 'Internal server error', null));
 });
 
 export { app };

@@ -1,0 +1,64 @@
+# Parameterized silo deployment.
+# Only the database is per-silo.
+# Redis and Kafka are shared infrastructure
+# (distributed locks, rate limiting, and event
+#  dispatch require shared instances).
+#
+# Usage:
+#   SILO_NAME=city-fire SILO_SECTOR=fire SILO_PORT=7401 \
+#     docker compose -f deploy/templates/silo.yml up -d
+#
+# Required vars:
+#   SILO_NAME       — short identifier (e.g. city-fire, hospital-east)
+#   SILO_SECTOR     — fire | hospital | police
+#   SILO_PORT       — host port (e.g. 7401)
+#
+# Optional vars:
+#   TENANT_ID       — CP tenant UUID for auto-registration
+#   CONTROL_PANE_URL — CP URL (default: http://control-plane:7500)
+
+services:
+  ${SILO_NAME}_db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resq_${SILO_NAME}
+    ports:
+      - '127.0.0.1::5432'
+    volumes:
+      - ${SILO_NAME}_postgres_data:/var/lib/postgresql/data
+
+  ${SILO_NAME}_backend:
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      TENANT_ID: ${TENANT_ID:-}
+      SECTOR: ${SILO_SECTOR}
+      MODE: silo
+      PORT: 3000
+      DEV_IP: 0.0.0.0
+      DATABASE_URL: postgresql://root:admin123@${SILO_NAME}_db:5432/resq_${SILO_NAME}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY required}
+      CONTROL_PANE_URL: ${CONTROL_PANE_URL:-http://control-plane:7500}
+
+      # Shared Redis — used for distributed locks, rate limiting, caching.
+      REDIS_HOST: ${SHARED_REDIS_HOST:-redis}
+      REDIS_PORT: ${SHARED_REDIS_PORT:-6379}
+
+      # Shared Kafka — used for platform↔silo event dispatch.
+      KAFKA_BROKERS: ${SHARED_KAFKA_BROKERS:-kafka:29092}
+
+      SILO_BASE_URL: http://${SILO_NAME}:${SILO_PORT}
+    env_file:
+      - ./silo.env
+    depends_on:
+      - ${SILO_NAME}_db
+    ports:
+      - '127.0.0.1:${SILO_PORT}:3000'
+
+volumes:
+  ${SILO_NAME}_postgres_data:
