@@ -1,26 +1,21 @@
+import type { ApiResponse } from '@repo/types/api/responses';
 import { useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import { IOrgDashboardAnalytics } from '@/types/auth.types';
-
 import api from '../axiosInstance';
-import { orgEndpoints } from '../endPoints';
 
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
+interface DashboardAnalytics {
+  totalRequests: number;
+  activeProviders: number;
+  completedToday: number;
+  avgResponseTime: number | null;
 }
 
-// Get organization dashboard analytics
-export const useOrgDashboardAnalytics = (enabled: boolean = true) => {
-  return useQuery<
-    AxiosResponse<ApiResponse<IOrgDashboardAnalytics>>,
-    AxiosError
-  >({
+export const useGetDashboardAnalytics = (enabled: boolean = true) => {
+  return useQuery<AxiosResponse<ApiResponse<DashboardAnalytics>>, AxiosError>({
     queryKey: ['orgDashboardAnalytics'],
-    queryFn: () => api.get(orgEndpoints.dashboardAnalytics),
+    queryFn: () => api.get('/organization/dashboard/analytics'),
     enabled,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 };

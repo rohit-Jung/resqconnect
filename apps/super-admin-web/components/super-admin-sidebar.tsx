@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CreditCard,
   LayoutDashboard,
+  Server,
   Settings,
   Smartphone,
   Users,
@@ -21,6 +22,7 @@ import { useSidebar } from '@/providers/sidebar-provider';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Organizations', href: '/dashboard/organizations', icon: Building2 },
+  { name: 'Silos', href: '/dashboard/silos', icon: Server },
   { name: 'Users', href: '/dashboard/users', icon: Users },
   {
     name: 'Responders',

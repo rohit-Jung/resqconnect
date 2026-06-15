@@ -1,14 +1,14 @@
+import type { EmergencyEndpoints } from '@repo/types/api/endpoints';
+import type { ApiResponse } from '@repo/types/api/responses';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import {
-  ICreateEmergencyResponse,
-  IEmergencyHistoryResponse,
+import type {
   IEmergencyRequest,
   INearbyProvider,
 } from '@/types/emergency.types';
-import { TCreateEmergencyRequest } from '@/validations/emergency.schema';
+import type { TCreateEmergencyRequest } from '@/validations/emergency.schema';
 
 import api from '../axiosInstance';
 import {
@@ -16,14 +16,9 @@ import {
   serviceProviderEndpoints,
 } from '../endPoints';
 
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-}
-
 export const useCreateEmergencyRequest = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<ICreateEmergencyResponse>>,
+    AxiosResponse<ApiResponse<EmergencyEndpoints.CreateResponse>>,
     AxiosError,
     TCreateEmergencyRequest
   >({
@@ -41,7 +36,7 @@ export const useGetEmergencyRequest = (
     queryKey: ['emergencyRequest', requestId],
     queryFn: () => api.get(emergencyRequestEndpoints.getById(requestId)),
     enabled: enabled && !!requestId,
-    refetchInterval: 5000, // Refetch every 5 seconds to check status
+    refetchInterval: 5000,
   });
 };
 
@@ -76,10 +71,6 @@ export const useProviderConfirmArrival = () => {
     string
   >({
     mutationFn: requestId => {
-      console.log(
-        '[API REQUEST]',
-        emergencyRequestEndpoints.providerConfirmArrival(requestId)
-      );
       return api.patch(
         emergencyRequestEndpoints.providerConfirmArrival(requestId)
       );
@@ -129,11 +120,11 @@ export const useGetNearbyProviders = (
       !!params.latitude &&
       !!params.longitude &&
       !!params.serviceType,
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: 10000,
   });
 };
 
-// History hooks
+// History
 interface HistoryParams {
   page?: number;
   limit?: number;
@@ -144,7 +135,10 @@ export const useGetUserEmergencyHistory = (
   params: HistoryParams = {},
   enabled: boolean = true
 ) => {
-  return useQuery<AxiosResponse<IEmergencyHistoryResponse>, AxiosError>({
+  return useQuery<
+    AxiosResponse<ApiResponse<EmergencyEndpoints.HistoryResponse>>,
+    AxiosError
+  >({
     queryKey: [
       'userEmergencyHistory',
       params.page,
@@ -159,7 +153,6 @@ export const useGetUserEmergencyHistory = (
           ...(params.status && { status: params.status }),
         },
       });
-
       return response?.data || {};
     },
     enabled,
@@ -170,7 +163,10 @@ export const useGetProviderEmergencyHistory = (
   params: HistoryParams = {},
   enabled: boolean = true
 ) => {
-  return useQuery<AxiosResponse<IEmergencyHistoryResponse>, AxiosError>({
+  return useQuery<
+    AxiosResponse<ApiResponse<EmergencyEndpoints.HistoryResponse>>,
+    AxiosError
+  >({
     queryKey: [
       'providerEmergencyHistory',
       params.page,
@@ -188,7 +184,6 @@ export const useGetProviderEmergencyHistory = (
           },
         }
       );
-
       return response?.data || {};
     },
     enabled,

@@ -80,3 +80,11 @@ export const mapsEndpoints = {
   getAutocomplete: `/maps/autocomplete`,
   reverseGeocode: `/maps/reverse-geocode`,
 };
+
+export const feedbackEndpoints = {
+  create: `/feedback`,
+  getAll: `/feedback`,
+  getById: (id: string) => `/feedback/${id}`,
+  update: (id: string) => `/feedback/${id}`,
+  delete: (id: string) => `/feedback/${id}`,
+};

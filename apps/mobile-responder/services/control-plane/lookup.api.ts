@@ -1,38 +1,23 @@
+import type { ApiResponse } from '@repo/types/api/responses';
 import { useQuery } from '@tanstack/react-query';
 
-import { controlPlaneApi } from '@/services/controlPlaneAxiosInstance';
+import { AxiosError, AxiosResponse } from 'axios';
 
-export type Sector = 'hospital' | 'police' | 'fire';
+import controlPlaneApi from '../controlPlaneAxiosInstance';
 
-export type LookupOrg = {
+interface OrgLookupResponse {
   id: string;
   name: string;
-  sector: Sector;
-  status: 'pending_approval' | 'active' | 'suspended' | 'trial_expired';
-  siloBaseUrl: string;
-};
-
-export function useLookupOrgs(params: { sector?: Sector; status?: string }) {
-  const sector = params.sector;
-  const status = params.status;
-  const clientHost =
-    typeof process.env.EXPO_PUBLIC_CONTROL_PLANE_URL === 'string'
-      ? process.env.EXPO_PUBLIC_CONTROL_PLANE_URL
-      : undefined;
-
-  return useQuery({
-    queryKey: ['cp', 'lookup', 'orgs', sector || '', status || ''],
-    enabled: !!sector,
-    queryFn: async () => {
-      const res = await controlPlaneApi.get('/lookup/orgs', {
-        params: {
-          sector,
-          status,
-          clientHost,
-        },
-      });
-      console.log('Lookup orgs response:', res.data);
-      return (res.data?.orgs ?? []) as LookupOrg[];
-    },
-  });
+  serviceCategory: string;
 }
+
+export const useLookupOrganization = (
+  orgId: string,
+  enabled: boolean = true
+) => {
+  return useQuery<AxiosResponse<ApiResponse<OrgLookupResponse>>, AxiosError>({
+    queryKey: ['orgLookup', orgId],
+    queryFn: () => controlPlaneApi.get(`/orgs/${orgId}`),
+    enabled: !!orgId && enabled,
+  });
+};

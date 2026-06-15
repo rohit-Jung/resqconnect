@@ -1,78 +1,47 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ApiResponse } from '@repo/types/api/responses';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import { removeTokenFromStorage } from '@/lib/hooks/useLocalStorage';
-import type {
-  CpLoginResponse,
-  CpMeResponse,
-} from '@/types/control-plane.types';
-import type { TSuperAdminLogin } from '@/validations/super-admin.schema';
-
 import api from '../axiosInstance';
-import { authEndpoints } from '../endPoints';
 
-// Login mutation - uses /user/login endpoint
-// Admin users are regular users with role='admin'
-// Returns either IAdminLoginResponse (if verified) or IOtpResponse (if needs verification)
-export const useSuperAdminLogin = () => {
+interface AdminProfile {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface LoginResponse {
+  token: string;
+  admin: { id: string; name: string; email: string };
+}
+
+export const useLoginAdmin = () => {
   return useMutation<
-    AxiosResponse<CpLoginResponse>,
+    AxiosResponse<ApiResponse<LoginResponse>>,
     AxiosError,
-    TSuperAdminLogin
+    { email: string; password: string }
   >({
-    mutationFn: loginData => {
-      return api.post(authEndpoints.login, {
-        email: loginData.email,
-        password: loginData.password,
-      });
-    },
+    mutationFn: data => api.post('/auth/login', data),
   });
 };
+export const useSuperAdminLogin = useLoginAdmin;
 
-// Me query - uses /auth/me endpoint
-export const useSuperAdminProfile = (enabled: boolean = true) => {
-  return useQuery<AxiosResponse<CpMeResponse>, AxiosError>({
+export const useAdminProfile = (options?: { enabled?: boolean }) => {
+  return useQuery<AxiosResponse<ApiResponse<AdminProfile>>, AxiosError>({
     queryKey: ['adminProfile'],
-    queryFn: () => api.get(authEndpoints.me),
-    enabled,
+    queryFn: () => api.get('/auth/me'),
+    enabled: options?.enabled,
     retry: false,
   });
 };
 
-// Alias for consistency
-export const useAdminProfile = (options: { enabled?: boolean } = {}) => {
-  return useSuperAdminProfile(options.enabled ?? true);
-};
-
-// Logout mutation
-export const useAdminLogout = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<AxiosResponse<{ ok: true }>, AxiosError>({
-    mutationFn: async () =>
-      ({ data: { ok: true } }) as AxiosResponse<{ ok: true }>,
-    onSuccess: () => {
-      removeTokenFromStorage('adminToken');
-      queryClient.clear();
-    },
-  });
-};
-
-// Update admin profile
 export const useAdminUpdateProfile = () => {
-  const queryClient = useQueryClient();
-
   return useMutation<
-    AxiosResponse,
+    AxiosResponse<ApiResponse<AdminProfile>>,
     AxiosError,
     { name?: string; email?: string }
   >({
-    mutationFn: async () => {
-      throw new Error('Not implemented');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
-    },
+    mutationFn: data => api.put('/auth/profile', data),
   });
 };

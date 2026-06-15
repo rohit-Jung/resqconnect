@@ -3,6 +3,7 @@ import {
   EmergencyTrackingHeader,
   EmergencyTrackingMap,
   EmergencyTrackingStatusCardUser,
+  FeedbackCard,
 } from '@repo/mobile/emergency-tracking/components';
 import {
   COLORS,
@@ -37,6 +38,7 @@ import {
   useGetEmergencyRequest,
   useGetNearbyProviders,
 } from '@/services/emergency/emergency.api';
+import { useCreateFeedback } from '@/services/feedback/feedback.api';
 import { fetchRoute, useReverseGeocode } from '@/services/maps/maps.api';
 import { socketManager } from '@/socket/socket-manager';
 import { useSocketStore } from '@/store/socketStore';
@@ -113,6 +115,8 @@ export default function UserEmergencyTrackingScreen() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isConfirmingArrival, setIsConfirmingArrival] = useState(false);
   const [, setIsProcessingConfirmation] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const { socket, isConnected } = useSocketStore();
   const pulseAnim = usePulseAnimation(localStatus);
@@ -149,6 +153,17 @@ export default function UserEmergencyTrackingScreen() {
       setLocalStatus(emergencyRequest.status as EmergencyStatus);
     }
   }, [emergencyRequest?.status]);
+
+  // show feedback card when emergency is completed
+  useEffect(() => {
+    if (
+      localStatus === EmergencyStatus.COMPLETED &&
+      !!assignedProvider &&
+      !feedbackSubmitted
+    ) {
+      setShowFeedback(true);
+    }
+  }, [localStatus, assignedProvider, feedbackSubmitted]);
 
   //  route origin / destination
   const routeOrigin = useMemo(() => {
@@ -325,6 +340,7 @@ export default function UserEmergencyTrackingScreen() {
   }, [currentStatus]);
 
   const { cancelRequest, confirmArrival } = useEmergencyActions();
+  const feedbackMutation = useCreateFeedback();
 
   const handleCancelRequest = () => {
     Alert.alert(
@@ -414,6 +430,24 @@ export default function UserEmergencyTrackingScreen() {
     }
   };
 
+  const handleFeedbackSubmit = useCallback(
+    async (data: { message: string; serviceRatings: number }) => {
+      if (!assignedProvider?.id || !requestId) return;
+      await feedbackMutation.mutateAsync({
+        serviceProviderId: assignedProvider.id,
+        message: data.message,
+        serviceRatings: data.serviceRatings,
+      });
+      setFeedbackSubmitted(true);
+    },
+    [assignedProvider, requestId, feedbackMutation]
+  );
+
+  const handleFeedbackSkip = useCallback(() => {
+    setShowFeedback(false);
+    router.replace('/(tabs)');
+  }, [router]);
+
   //  render
   if (isLoadingRequest) {
     return (
@@ -459,33 +493,44 @@ export default function UserEmergencyTrackingScreen() {
         <Ionicons name="locate" size={24} color="#374151" />
       </TouchableOpacity>
 
-      <EmergencyTrackingStatusCardUser
-        emergencyInfo={emergencyInfo}
-        statusMessage={getStatusMessage()}
-        status={currentStatus}
-        pulseAnim={pulseAnim}
-        routeInfo={routeInfo ?? null}
-        isLoadingRoute={isLoadingRoute}
-        nearbyProvidersCount={
-          currentStatus === EmergencyStatus.PENDING ? nearbyProviders.length : 0
-        }
-        locationAddress={userLocationAddress ?? null}
-        userLocation={userLocation}
-        assignedProvider={
-          assignedProvider
-            ? {
-                name: assignedProvider.name,
-                vehicleNumber: assignedProvider.vehicleNumber,
-                phoneNumber: assignedProvider.phoneNumber,
-              }
-            : null
-        }
-        isCancelling={isCancelling}
-        isConfirmingArrival={isConfirmingArrival}
-        isConnected={isConnected}
-        onCancel={handleCancelRequest}
-        onConfirmArrival={handleConfirmArrival}
-      />
+      {showFeedback && assignedProvider ? (
+        <FeedbackCard
+          providerName={assignedProvider.name}
+          emergencyType={emergencyType || 'ambulance'}
+          onSubmit={handleFeedbackSubmit}
+          onSkip={handleFeedbackSkip}
+        />
+      ) : (
+        <EmergencyTrackingStatusCardUser
+          emergencyInfo={emergencyInfo}
+          statusMessage={getStatusMessage()}
+          status={currentStatus}
+          pulseAnim={pulseAnim}
+          routeInfo={routeInfo ?? null}
+          isLoadingRoute={isLoadingRoute}
+          nearbyProvidersCount={
+            currentStatus === EmergencyStatus.PENDING
+              ? nearbyProviders.length
+              : 0
+          }
+          locationAddress={userLocationAddress ?? null}
+          userLocation={userLocation}
+          assignedProvider={
+            assignedProvider
+              ? {
+                  name: assignedProvider.name,
+                  vehicleNumber: assignedProvider.vehicleNumber,
+                  phoneNumber: assignedProvider.phoneNumber,
+                }
+              : null
+          }
+          isCancelling={isCancelling}
+          isConfirmingArrival={isConfirmingArrival}
+          isConnected={isConnected}
+          onCancel={handleCancelRequest}
+          onConfirmArrival={handleConfirmArrival}
+        />
+      )}
     </SafeAreaView>
   );
 }

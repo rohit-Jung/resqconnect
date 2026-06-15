@@ -56,15 +56,16 @@ export default function SuperAdminLoginPage() {
   const onSubmit = (data: TSuperAdminLogin) => {
     loginMutation.mutate(data, {
       onSuccess: response => {
-        if (response.data.token) {
-          setTokenToStorage('adminToken', response.data.token);
+        const payload = response.data.data;
+        if (payload?.token) {
+          setTokenToStorage('adminToken', payload.token);
         }
         toast.success('Welcome back');
         router.push('/dashboard');
       },
       onError: error => {
         console.log('ERROR', parseApiError(error));
-        // toast.error(parseApiError(error));
+        toast.error(parseApiError(error));
       },
     });
   };

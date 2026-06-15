@@ -73,10 +73,9 @@ export default function RootLayout({
                   borderRadius: '2px',
                   fontFamily: "'Geist', sans-serif",
                   fontSize: '13px',
-                  border: '1px solid #e5e5e5',
-                  background: '#ffffff',
-                  color: '#171717',
-                  opacity: '1',
+                  border: '1px solid hsl(var(--border))',
+                  background: 'hsl(var(--background))',
+                  color: 'hsl(var(--foreground))',
                 },
               }}
             />

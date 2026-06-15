@@ -1,46 +1,28 @@
+import type { ApiResponse } from '@repo/types/api/responses';
 import { useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import type { IDashboardAnalytics } from '@/types/auth.types';
-
 import api from '../axiosInstance';
-import { adminEndpoints } from '../endPoints';
 
-// Query keys for cache management
-export const dashboardKeys = {
-  all: ['dashboard'] as const,
-  analytics: () => [...dashboardKeys.all, 'analytics'] as const,
-  analyticsWithParams: (params: IDashboardQueryParams) =>
-    [...dashboardKeys.analytics(), params] as const,
-};
-
-// Query parameters for dashboard analytics
-export interface IDashboardQueryParams {
-  page?: number;
-  limit?: number;
-  sortBy?: 'asc' | 'desc';
-  sortField?: 'createdAt' | 'name' | 'email';
+interface DashboardStats {
+  totalOrganizations: number;
+  totalUsers: number;
+  totalProviders: number;
+  monthlyComparisons: { month: string; count: number }[];
 }
 
-// Get dashboard analytics (admin only)
-export const useDashboardAnalytics = (
-  params: IDashboardQueryParams = {},
-  enabled: boolean = true
-) => {
-  const queryParams = {
-    page: params.page || 1,
-    limit: params.limit || 5,
-    sortBy: params.sortBy || 'desc',
-    sortField: params.sortField || 'createdAt',
-  };
+export const useGetDashboardStats = () => {
+  return useQuery<AxiosResponse<ApiResponse<DashboardStats>>, AxiosError>({
+    queryKey: ['adminDashboardStats'],
+    queryFn: () => api.get('/admin/dashboard-analytics'),
+  });
+};
 
-  return useQuery<
-    AxiosResponse<{ ok: true; data: IDashboardAnalytics }>,
-    AxiosError
-  >({
-    queryKey: dashboardKeys.analyticsWithParams(queryParams),
-    queryFn: () => api.get(adminEndpoints.dashboard, { params: queryParams }),
-    enabled,
+export const useDashboardAnalytics = (options?: { enabled?: boolean }) => {
+  return useQuery<AxiosResponse<ApiResponse<DashboardStats>>, AxiosError>({
+    queryKey: ['adminDashboardAnalytics'],
+    queryFn: () => api.get('/admin/dashboard-analytics'),
+    enabled: options?.enabled,
   });
 };

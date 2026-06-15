@@ -1,199 +1,90 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ApiResponse } from '@repo/types/api/responses';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
-import type {
-  CpOrgEntitlementsGetResponse,
-  CpOrgEntitlementsSetResponse,
-  CpOrgGetResponse,
-  CpOrgsListResponse,
-} from '@/types/control-plane.types';
-
 import api from '../axiosInstance';
-import { organizationEndpoints } from '../endPoints';
 
-// Query keys for cache management
-export const organizationKeys = {
-  all: ['organizations'] as const,
-  lists: () => [...organizationKeys.all, 'list'] as const,
-  list: (filters: Record<string, unknown>) =>
-    [...organizationKeys.lists(), filters] as const,
-  details: () => [...organizationKeys.all, 'detail'] as const,
-  detail: (id: string) => [...organizationKeys.details(), id] as const,
-  entitlements: (id: string) =>
-    [...organizationKeys.detail(id), 'entitlements'] as const,
-};
-
-// Types for organization operations
-export interface IUpdateOrganizationPayload {
-  status: 'pending_approval' | 'active' | 'suspended' | 'trial_expired';
-}
-
-export interface ICreateOrganizationPayload {
+interface Organization {
+  id: string;
   name: string;
   email: string;
-  password: string;
-  generalNumber: number;
-  serviceCategory: 'ambulance' | 'police' | 'rescue_team' | 'fire_truck';
-  sector: 'hospital' | 'police' | 'fire';
-  siloBaseUrl: string;
+  serviceCategory: string;
+  isVerified: boolean;
+  lifecycleStatus: string;
+  createdAt: string;
 }
 
-// Get all organizations (admin only)
-export const useGetAllOrganizations = (enabled: boolean = true) => {
-  return useQuery<AxiosResponse<CpOrgsListResponse>, AxiosError>({
-    queryKey: organizationKeys.lists(),
-    queryFn: () => api.get(organizationEndpoints.getAll),
-    enabled,
-  });
-};
+interface EntitlementsSnapshot {
+  version: number;
+  entitlements: Record<string, unknown>;
+}
 
-// Get organization by ID (admin only)
-export const useGetOrganizationById = (
-  id: string,
-  opts?: { enabled?: boolean; includeSilo?: boolean }
+export const useGetOrganizations = (
+  params: { page?: number; limit?: number } = {}
 ) => {
-  const enabled = opts?.enabled ?? true;
-  const includeSilo = opts?.includeSilo ?? false;
-
-  return useQuery<AxiosResponse<CpOrgGetResponse>, AxiosError>({
-    queryKey: [...organizationKeys.detail(id), { includeSilo }],
+  return useQuery<AxiosResponse<ApiResponse<Organization[]>>, AxiosError>({
+    queryKey: ['adminOrganizations', params.page, params.limit],
     queryFn: () =>
-      api.get(organizationEndpoints.getById(id), {
-        params: includeSilo ? { includeSilo: 'true' } : undefined,
+      api.get('/orgs', {
+        params: { page: params.page || 1, limit: params.limit || 20 },
       }),
-    enabled: enabled && !!id,
   });
 };
+export const useGetAllOrganizations = useGetOrganizations;
 
-// Update organization
-export const useUpdateOrganization = () => {
-  const queryClient = useQueryClient();
-
+export const useUpdateOrganizationStatus = () => {
   return useMutation<
-    AxiosResponse,
+    AxiosResponse<ApiResponse<Organization>>,
     AxiosError,
-    { id: string; data: IUpdateOrganizationPayload }
+    { orgId: string; lifecycleStatus: string }
   >({
-    mutationFn: ({ id, data }) =>
-      api.post(organizationEndpoints.updateStatus(id), data),
-    onSuccess: (_, variables) => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: organizationKeys.lists() });
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.detail(variables.id),
-      });
-    },
+    mutationFn: ({ orgId, lifecycleStatus }) =>
+      api.post(`/orgs/${orgId}/status`, { lifecycleStatus }),
+  });
+};
+export const useUpdateOrganization = useUpdateOrganizationStatus;
+
+export const useGetOrganizationById = (orgId: string) => {
+  return useQuery<AxiosResponse<ApiResponse<Organization>>, AxiosError>({
+    queryKey: ['adminOrganization', orgId],
+    queryFn: () => api.get(`/orgs/${orgId}`),
+    enabled: !!orgId,
   });
 };
 
-// delete organization
-export const useDeleteOrganization = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<AxiosResponse, AxiosError, string>({
-    mutationFn: id => api.delete(organizationEndpoints.deleteById(id)),
-    onSuccess: (_res, id) => {
-      // invalidate and refetch the list
-      queryClient.invalidateQueries({ queryKey: organizationKeys.lists() });
-      queryClient.removeQueries({ queryKey: organizationKeys.detail(id) });
-    },
-  });
+export const useGetOrganizationEntitlements = (orgId: string) => {
+  return useQuery<AxiosResponse<ApiResponse<EntitlementsSnapshot>>, AxiosError>(
+    {
+      queryKey: ['adminOrgEntitlements', orgId],
+      queryFn: () => api.get(`/orgs/${orgId}/entitlements`),
+      enabled: !!orgId,
+    }
+  );
 };
 
-// Create organization
 export const useCreateOrganization = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<AxiosResponse, AxiosError, ICreateOrganizationPayload>({
-    mutationFn: data => api.post(organizationEndpoints.provision, data),
-    onSuccess: () => {
-      // Invalidate and refetch the list
-      queryClient.invalidateQueries({ queryKey: organizationKeys.lists() });
-    },
+  return useMutation<
+    AxiosResponse<ApiResponse<Organization>>,
+    AxiosError,
+    Record<string, unknown>
+  >({
+    mutationFn: data => api.post('/orgs/provision', data),
   });
 };
-
-export const useGetOrganizationEntitlements = (
-  id: string,
-  opts?: { enabled?: boolean }
-) => {
-  const enabled = opts?.enabled ?? true;
-
-  return useQuery<AxiosResponse<CpOrgEntitlementsGetResponse>, AxiosError>({
-    queryKey: organizationKeys.entitlements(id),
-    queryFn: () => api.get(organizationEndpoints.entitlements(id)),
-    enabled: enabled && !!id,
-    retry: false,
-  });
-};
-
-export interface IBulkProvisionRow {
-  name: string;
-  email: string;
-  serviceCategory: 'ambulance' | 'police' | 'rescue_team' | 'fire_truck';
-  generalNumber: number;
-  password: string;
-  sector: 'hospital' | 'police' | 'fire';
-  siloBaseUrl: string;
-}
-
-export interface IBulkProvisionResult {
-  row: number;
-  email: string;
-  status: 'created' | 'failed';
-  error?: string;
-  orgId?: string;
-}
-
-export interface IBulkProvisionResponse {
-  ok: boolean;
-  created: number;
-  failed: number;
-  results: IBulkProvisionResult[];
-}
 
 export const useBulkProvisionOrgs = () => {
-  const queryClient = useQueryClient();
   return useMutation<
-    AxiosResponse<IBulkProvisionResponse>,
+    AxiosResponse<ApiResponse<{ created: number }>>,
     AxiosError,
-    { rows: IBulkProvisionRow[] }
+    { organizations: Record<string, unknown>[] }
   >({
-    mutationFn: ({ rows }) =>
-      api.post(organizationEndpoints.bulkProvision, { rows }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.lists() });
-    },
+    mutationFn: data => api.post('/orgs/bulk-provision', data),
   });
 };
 
-export const useSetOrganizationEntitlements = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    AxiosResponse<CpOrgEntitlementsSetResponse>,
-    AxiosError,
-    {
-      id: string;
-      entitlements: {
-        provider_count_limit: number;
-        api_rate_limit_tier: number;
-        notification_fallback_quota: number;
-        analytics_enabled: boolean;
-      };
-      pushToSilo?: boolean;
-    }
-  >({
-    mutationFn: ({ id, entitlements, pushToSilo }) =>
-      api.post(organizationEndpoints.entitlements(id), {
-        entitlements,
-        pushToSilo: !!pushToSilo,
-      }),
-    onSuccess: (_res, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.entitlements(variables.id),
-      });
-    },
+export const useDeleteOrganization = () => {
+  return useMutation<AxiosResponse<ApiResponse<void>>, AxiosError, string>({
+    mutationFn: orgId => api.delete(`/orgs/${orgId}`),
   });
 };

@@ -97,10 +97,8 @@ const syncSingleRequest = async (
         ? String(axiosError.response.data.message)
         : axiosError.message || 'Unknown error occurred';
 
-    // Increment retry count
     store.incrementRetry(item.id);
 
-    // Check if max retries exceeded
     const updatedItem = store.queue.find(q => q.id === item.id);
     if (updatedItem && updatedItem.retryCount >= SYNC_CONFIG.maxRetries) {
       store.markAsFailed(item.id, errorMessage);
@@ -127,9 +125,7 @@ const syncWithRetry = async (
     return result;
   }
 
-  // Check if we should retry
   if (retryCount < SYNC_CONFIG.maxRetries - 1) {
-    // Wait before retrying
     await new Promise(resolve =>
       setTimeout(resolve, SYNC_CONFIG.retryDelayMs * (retryCount + 1))
     );
@@ -172,11 +168,9 @@ export const syncOfflineQueue = async (): Promise<SyncSummary> => {
 
     const results: SyncResult[] = [];
 
-    // Process in batches
     for (let i = 0; i < pendingItems.length; i += SYNC_CONFIG.batchSize) {
       const batch = pendingItems.slice(i, i + SYNC_CONFIG.batchSize);
 
-      // Process batch concurrently
       const batchResults = await Promise.all(
         batch.map(item => syncWithRetry(item))
       );

@@ -30,14 +30,12 @@ const AUTH_ERROR_MESSAGES = [
   'invalid or expired token',
 ];
 
-// Check if error message indicates an authentication/JWT issue
 const isAuthError = (errorMessage?: string): boolean => {
   if (!errorMessage) return false;
   const lowerMessage = errorMessage.toLowerCase();
   return AUTH_ERROR_MESSAGES.some(msg => lowerMessage.includes(msg));
 };
 
-// clear tokens and reset stores
 const handleLogout = async () => {
   console.log('[AxiosInstance] Logging out due to auth error');
   try {
@@ -45,12 +43,10 @@ const handleLogout = async () => {
   } catch (e) {
     console.error('[AxiosInstance] Failed to delete token:', e);
   }
-  // Reset both stores
   useAuthStore.getState().setUser(null);
   useProviderStore.getState().setProvider(null);
 };
 
-// Add auth token to requests
 const addAuthToken = async (config: any) => {
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
   if (token) {
@@ -65,7 +61,6 @@ apiWithoutAuthLogout.interceptors.request.use(addAuthToken, error =>
   Promise.reject(error)
 );
 
-// Handle response errors for main api
 api.interceptors.response.use(
   response => response,
   async (error: AxiosError<{ message?: string; error?: string }>) => {
@@ -106,7 +101,6 @@ api.interceptors.response.use(
   }
 );
 
-// Handle response errors for apiWithoutAuthLogout - just reject, don't logout
 apiWithoutAuthLogout.interceptors.response.use(
   response => response,
   (error: AxiosError) => Promise.reject(error)

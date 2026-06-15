@@ -23,7 +23,7 @@ export default function SettingsPage() {
   const { data: profileData, isLoading } = useAdminProfile();
   const updateProfileMutation = useAdminUpdateProfile();
 
-  const profile = profileData?.data?.admin;
+  const profile = profileData?.data?.data?.admin ?? null;
 
   const [email, setEmail] = useState(profile?.email ?? '');
   const [saveSuccess, setSaveSuccess] = useState(false);
