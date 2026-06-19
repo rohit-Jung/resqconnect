@@ -1,8 +1,11 @@
 import z from 'zod';
 
-import { serviceTypes } from '../constants/service-types';
-
-const serviceTypeSchema = z.enum(serviceTypes);
+const serviceTypeSchema = z.enum([
+  'ambulance',
+  'police',
+  'rescue_team',
+  'fire_truck',
+]);
 
 export const CreateNewRequestSchema = z.object({
   emergencyType: serviceTypeSchema,

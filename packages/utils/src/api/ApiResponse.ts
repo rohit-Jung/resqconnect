@@ -1,13 +1,13 @@
-export default class ApiResponse {
+export default class ApiResponse<T = unknown> {
   private statusCode: number;
   private message: string;
-  private data: unknown;
+  private data: T;
   private success: boolean;
 
-  constructor(statusCode: number, message: string = 'success', data: unknown) {
+  constructor(statusCode: number, message: string = 'success', data: T) {
     this.statusCode = statusCode;
     this.message = message;
-    this.data = this.handleBigInt(data);
+    this.data = this.handleBigInt(data) as T;
     this.success = statusCode < 400;
   }
 

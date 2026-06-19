@@ -1,15 +1,13 @@
 import z from 'zod';
 import { type z as zType } from 'zod';
 
-import { serviceTypes } from '../constants/service-types';
-
 export const messageSchema = z.object({
   userId: z.string().uuid(),
   location: z.object({
     latitude: z.number(),
     longitude: z.number(),
   }),
-  serviceType: z.enum(serviceTypes),
+  serviceType: z.enum(['ambulance', 'police', 'rescue_team', 'fire_truck']),
   description: z.string().optional(),
 });
 

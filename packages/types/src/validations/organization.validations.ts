@@ -1,9 +1,13 @@
 import z from 'zod';
 
-import { serviceTypes } from '../constants/service-types';
 import { passwordSchema } from './password.validations';
 
-const serviceTypeSchema = z.enum(serviceTypes);
+const serviceTypeSchema = z.enum([
+  'ambulance',
+  'police',
+  'rescue_team',
+  'fire_truck',
+]);
 
 export const registerOrganizationSchema = z.object({
   name: z.string().min(1, 'Organization name is required').max(255),

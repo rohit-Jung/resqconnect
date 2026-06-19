@@ -5,3 +5,5 @@ export * from './org-replica.model';
 export * from './silo-metrics.model';
 export * from './sanitized-audit-aggregate.model';
 export * from './entitlements.model';
+export * from './silo-registry.model';
+export * from './compliance-config.model';

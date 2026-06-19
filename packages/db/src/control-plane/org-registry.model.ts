@@ -1,4 +1,11 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const cpSectorEnum = pgEnum('cp_sector', ['hospital', 'police', 'fire']);
 
@@ -18,6 +25,8 @@ export const cpOrganization = pgTable('cp_organization', {
   siloBaseUrl: text('silo_base_url').notNull(),
   // the org uuid inside the silo db (created via internal provision endpoint).
   siloOrgId: uuid('silo_org_id'),
+  planId: uuid('plan_id'),
+  databaseUrl: text('database_url'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
