@@ -42,4 +42,5 @@ yarn-error.log*
 *.pem
 
 apps/backend/docker/postgres_data/
+./apps/super-admin-backend/docker/control_plane_postgres_data/
 logs/

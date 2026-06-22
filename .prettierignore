@@ -21,3 +21,6 @@ build/
 *.dbml
 *.tsbuildinfo
 *.yml
+
+./apps/backend/docker/
+./apps/super-admin-backend/docker/
