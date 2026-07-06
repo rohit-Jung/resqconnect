@@ -88,13 +88,11 @@ export const updateOrgLogo = asyncHandler(
       throw ApiError.internalServerError('Failed to update logo');
     }
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Logo updated successfully', {
-          organization: updated[0],
-        })
-      );
+    res.status(200).json(
+      new ApiResponse(200, 'Logo updated successfully', {
+        organization: updated[0],
+      })
+    );
   }
 );
 
@@ -139,13 +137,11 @@ export const deleteOrgLogo = asyncHandler(
       throw ApiError.internalServerError('Failed to delete logo');
     }
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(200, 'Logo deleted successfully', {
-          organization: updated[0],
-        })
-      );
+    res.status(200).json(
+      new ApiResponse(200, 'Logo deleted successfully', {
+        organization: updated[0],
+      })
+    );
   }
 );
 
