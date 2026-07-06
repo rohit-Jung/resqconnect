@@ -1,29 +1,38 @@
-import type { ApiResponse } from '@repo/types/api/responses';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
 
+import type {
+  CpOrgEntitlementsGetResponse,
+  CpOrgEntitlementsSetResponse,
+  CpOrgGetResponse,
+  CpOrgsListResponse,
+} from '@/types/control-plane.types';
+
 import api from '../axiosInstance';
 
-interface Organization {
-  id: string;
+export interface OrgBulkProvisionRow {
   name: string;
   email: string;
   serviceCategory: string;
-  isVerified: boolean;
-  lifecycleStatus: string;
-  createdAt: string;
+  generalNumber: number;
+  password: string;
+  sector: string;
+  siloBaseUrl: string;
 }
 
-interface EntitlementsSnapshot {
-  version: number;
-  entitlements: Record<string, unknown>;
+export interface OrgBulkProvisionResult {
+  row: number;
+  name: string;
+  email: string;
+  status: 'created' | 'failed';
+  error?: string;
 }
 
 export const useGetOrganizations = (
   params: { page?: number; limit?: number } = {}
 ) => {
-  return useQuery<AxiosResponse<ApiResponse<Organization[]>>, AxiosError>({
+  return useQuery<AxiosResponse<CpOrgsListResponse>, AxiosError>({
     queryKey: ['adminOrganizations', params.page, params.limit],
     queryFn: () =>
       api.get('/orgs', {
@@ -35,7 +44,7 @@ export const useGetAllOrganizations = useGetOrganizations;
 
 export const useUpdateOrganizationStatus = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<Organization>>,
+    AxiosResponse<CpOrgGetResponse>,
     AxiosError,
     { orgId: string; lifecycleStatus: string }
   >({
@@ -45,27 +54,31 @@ export const useUpdateOrganizationStatus = () => {
 };
 export const useUpdateOrganization = useUpdateOrganizationStatus;
 
-export const useGetOrganizationById = (orgId: string) => {
-  return useQuery<AxiosResponse<ApiResponse<Organization>>, AxiosError>({
+export const useGetOrganizationById = (
+  orgId: string,
+  options?: { enabled?: boolean; includeSilo?: boolean }
+) => {
+  return useQuery<AxiosResponse<CpOrgGetResponse>, AxiosError>({
     queryKey: ['adminOrganization', orgId],
     queryFn: () => api.get(`/orgs/${orgId}`),
-    enabled: !!orgId,
+    enabled: options?.enabled ?? !!orgId,
   });
 };
 
-export const useGetOrganizationEntitlements = (orgId: string) => {
-  return useQuery<AxiosResponse<ApiResponse<EntitlementsSnapshot>>, AxiosError>(
-    {
-      queryKey: ['adminOrgEntitlements', orgId],
-      queryFn: () => api.get(`/orgs/${orgId}/entitlements`),
-      enabled: !!orgId,
-    }
-  );
+export const useGetOrganizationEntitlements = (
+  orgId: string,
+  options?: { enabled?: boolean }
+) => {
+  return useQuery<AxiosResponse<CpOrgEntitlementsGetResponse>, AxiosError>({
+    queryKey: ['adminOrgEntitlements', orgId],
+    queryFn: () => api.get(`/orgs/${orgId}/entitlements`),
+    enabled: options?.enabled ?? !!orgId,
+  });
 };
 
 export const useCreateOrganization = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<Organization>>,
+    AxiosResponse<CpOrgGetResponse>,
     AxiosError,
     Record<string, unknown>
   >({
@@ -75,16 +88,32 @@ export const useCreateOrganization = () => {
 
 export const useBulkProvisionOrgs = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<{ created: number }>>,
+    AxiosResponse<{
+      ok: true;
+      results: OrgBulkProvisionResult[];
+      created: number;
+      failed: number;
+    }>,
     AxiosError,
-    { organizations: Record<string, unknown>[] }
+    { rows: OrgBulkProvisionRow[] }
   >({
     mutationFn: data => api.post('/orgs/bulk-provision', data),
   });
 };
 
 export const useDeleteOrganization = () => {
-  return useMutation<AxiosResponse<ApiResponse<void>>, AxiosError, string>({
+  return useMutation<AxiosResponse<{ ok: true }>, AxiosError, string>({
     mutationFn: orgId => api.delete(`/orgs/${orgId}`),
+  });
+};
+
+export const useSetOrganizationEntitlements = () => {
+  return useMutation<
+    AxiosResponse<CpOrgEntitlementsSetResponse>,
+    AxiosError,
+    { id: string; entitlements: Record<string, unknown>; pushToSilo: boolean }
+  >({
+    mutationFn: ({ id, entitlements, pushToSilo }) =>
+      api.put(`/orgs/${id}/entitlements`, { entitlements, pushToSilo }),
   });
 };

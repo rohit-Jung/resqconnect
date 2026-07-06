@@ -14,10 +14,10 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-import {
-  IBulkProvisionResult,
-  IBulkProvisionRow,
-  useBulkProvisionOrgs,
+import { useBulkProvisionOrgs } from '@/services/super-admin/organizations.api';
+import type {
+  OrgBulkProvisionResult,
+  OrgBulkProvisionRow,
 } from '@/services/super-admin/organizations.api';
 
 const EXPECTED_COLUMNS = [
@@ -30,7 +30,7 @@ const EXPECTED_COLUMNS = [
   'siloBaseUrl',
 ] as const;
 
-const SAMPLE_DATA: IBulkProvisionRow[] = [
+const SAMPLE_DATA: OrgBulkProvisionRow[] = [
   {
     name: 'Nepal Red Cross',
     email: 'redcross@example.com',
@@ -79,9 +79,9 @@ interface Props {
 
 export function BulkUploadOrgsModal({ onClose }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<IBulkProvisionRow[]>([]);
+  const [rows, setRows] = useState<OrgBulkProvisionRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [results, setResults] = useState<IBulkProvisionResult[] | null>(null);
+  const [results, setResults] = useState<OrgBulkProvisionResult[] | null>(null);
   const bulkMutation = useBulkProvisionOrgs();
 
   const handleFile = (file: File) => {
@@ -96,7 +96,7 @@ export function BulkUploadOrgsModal({ onClose }: Props) {
         const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
           defval: '',
         });
-        const parsed: IBulkProvisionRow[] = json.map((r, i) => {
+        const parsed: OrgBulkProvisionRow[] = json.map((r, i) => {
           for (const col of EXPECTED_COLUMNS) {
             if (!(col in r))
               throw new Error(`Row ${i + 1}: missing column "${col}"`);
@@ -106,10 +106,10 @@ export function BulkUploadOrgsModal({ onClose }: Props) {
             email: String(r.email),
             serviceCategory: String(
               r.serviceCategory
-            ) as IBulkProvisionRow['serviceCategory'],
+            ) as OrgBulkProvisionRow['serviceCategory'],
             generalNumber: Number(r.generalNumber),
             password: String(r.password),
-            sector: String(r.sector) as IBulkProvisionRow['sector'],
+            sector: String(r.sector) as OrgBulkProvisionRow['sector'],
             siloBaseUrl: String(r.siloBaseUrl),
           };
         });

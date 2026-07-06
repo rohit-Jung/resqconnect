@@ -1,7 +1,8 @@
-import type { ApiResponse } from '@repo/types/api/responses';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { AxiosError, AxiosResponse } from 'axios';
+
+import type { ApiResponse } from '@/types/auth.types';
 
 import api from '../axiosInstance';
 
@@ -28,7 +29,10 @@ export const useLoginAdmin = () => {
 export const useSuperAdminLogin = useLoginAdmin;
 
 export const useAdminProfile = (options?: { enabled?: boolean }) => {
-  return useQuery<AxiosResponse<ApiResponse<AdminProfile>>, AxiosError>({
+  return useQuery<
+    AxiosResponse<ApiResponse<{ admin: AdminProfile }>>,
+    AxiosError
+  >({
     queryKey: ['adminProfile'],
     queryFn: () => api.get('/auth/me'),
     enabled: options?.enabled,
@@ -38,7 +42,7 @@ export const useAdminProfile = (options?: { enabled?: boolean }) => {
 
 export const useAdminUpdateProfile = () => {
   return useMutation<
-    AxiosResponse<ApiResponse<AdminProfile>>,
+    AxiosResponse<ApiResponse<{ admin: AdminProfile }>>,
     AxiosError,
     { name?: string; email?: string }
   >({

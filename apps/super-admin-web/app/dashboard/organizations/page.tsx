@@ -36,7 +36,7 @@ export default function OrganizationsPage() {
   const deleteOrganization = useDeleteOrganization();
   const updateOrganization = useUpdateOrganization();
 
-  const organizations = data?.data?.data?.orgs ?? data?.data?.orgs ?? [];
+  const organizations = data?.data?.orgs ?? [];
 
   const filteredOrganizations = organizations.filter((org: CpOrg) =>
     org.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -75,10 +75,8 @@ export default function OrganizationsPage() {
   }) => {
     try {
       await updateOrganization.mutateAsync({
-        id: org.id,
-        data: {
-          status: org.status === 'active' ? 'suspended' : 'active',
-        },
+        orgId: org.id,
+        lifecycleStatus: org.status === 'active' ? 'suspended' : 'active',
       });
       toast.success('Organization status updated');
     } catch (err) {

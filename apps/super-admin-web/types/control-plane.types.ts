@@ -104,6 +104,25 @@ export type CpUsersListResponse = {
   users: CpUser[];
 };
 
+export type CpPaymentsListResponse = {
+  ok: true;
+  payments: Array<{
+    id: string;
+    organizationId: string;
+    organization?: { name: string };
+    amount: number;
+    status: string;
+    createdAt: string;
+    subscription?: { plan?: { name: string } };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
+};
+
 export type CpPlansListResponse = {
   ok: true;
   plans: Array<{

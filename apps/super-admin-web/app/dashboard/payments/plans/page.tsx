@@ -24,12 +24,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import {
-  ISubscriptionPlan,
   useCreateSubscriptionPlan,
   useDeleteSubscriptionPlan,
   useGetSubscriptionPlans,
   useUpdateSubscriptionPlan,
 } from '@/services/super-admin/payments.api';
+import type { PaymentPlan } from '@/services/super-admin/payments.api';
 
 interface PlanFormData {
   name: string;
@@ -147,9 +147,7 @@ function buildPlanFeatures(
 
 export default function PlansManagementPage() {
   const [showForm, setShowForm] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<ISubscriptionPlan | null>(
-    null
-  );
+  const [editingPlan, setEditingPlan] = useState<PaymentPlan | null>(null);
   const [formData, setFormData] = useState<PlanFormData>(emptyFormData);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -170,7 +168,7 @@ export default function PlansManagementPage() {
     setShowForm(true);
   };
 
-  const handleOpenEdit = (plan: ISubscriptionPlan) => {
+  const handleOpenEdit = (plan: PaymentPlan) => {
     const parsed = splitPlanFeatures(plan.features);
     setEditingPlan(plan);
     setFormData({
@@ -588,7 +586,7 @@ export default function PlansManagementPage() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {plans.map((plan: ISubscriptionPlan) => (
+            {plans.map((plan: PaymentPlan) => (
               <Card key={plan.id} className="relative overflow-hidden">
                 {!plan.isActive && (
                   <div className="absolute inset-x-0 top-0 bg-gray-500 px-3 py-1 text-center text-xs font-medium text-white">
