@@ -1,1 +1,0 @@
-ALTER TABLE "organization" ADD COLUMN "logo" varchar(500);
