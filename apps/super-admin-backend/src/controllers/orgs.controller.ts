@@ -339,11 +339,16 @@ export const provisionOrg = async (req: Request, res: Response) => {
         .where(eq(cpOrganization.id, existing.id));
     }
 
-    // Prevent silently reusing an existing org with different parameters.
-    if (existing.sector !== sector || existing.siloBaseUrl !== siloBaseUrl) {
+    // Stale URL from a failed provision? Update and continue.
+    if (existing.siloBaseUrl !== siloBaseUrl && !existing.siloOrgId) {
+      await db
+        .update(cpOrganization)
+        .set({ siloBaseUrl })
+        .where(eq(cpOrganization.id, existing.id));
+    } else if (existing.sector !== sector) {
       return res.status(409).json({
         ok: false,
-        error: 'Organization already exists with different configuration',
+        error: 'Organization already exists with different sector',
         orgId: existing.id,
       });
     }
