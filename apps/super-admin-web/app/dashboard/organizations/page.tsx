@@ -36,7 +36,7 @@ export default function OrganizationsPage() {
   const deleteOrganization = useDeleteOrganization();
   const updateOrganization = useUpdateOrganization();
 
-  const organizations = data?.data?.orgs ?? [];
+  const organizations = data?.data?.data?.orgs ?? [];
 
   const filteredOrganizations = organizations.filter((org: CpOrg) =>
     org.name.toLowerCase().includes(searchQuery.toLowerCase())
