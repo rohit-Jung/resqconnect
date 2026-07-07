@@ -99,10 +99,7 @@ export default function OrganizationDetailPage() {
     isLoading: entLoading,
     isError: entError,
   } = useGetOrganizationEntitlements(id, { enabled: !!id });
-  const entSnapshot =
-    entData?.data && 'ok' in entData.data && entData.data.ok
-      ? entData.data.snapshot
-      : null;
+  const entSnapshot = entData?.data?.data?.snapshot ?? null;
 
   const setEntitlements = useSetOrganizationEntitlements();
   const [pushEntitlementsToSilo, setPushEntitlementsToSilo] = useState(true);

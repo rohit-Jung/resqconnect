@@ -36,8 +36,8 @@ export default function PaymentsPage() {
     limit: 10,
   });
 
-  const plans = plansData?.data?.plans ?? [];
-  const typedPlans: CpPlansListResponse['plans'] = plans;
+  const plans = plansData?.data?.data?.plans ?? [];
+  const typedPlans: CpPlansListResponse['data']['plans'] = plans;
 
   const payments = paymentsData?.data?.payments ?? [];
   const pagination = paymentsData?.data?.pagination;

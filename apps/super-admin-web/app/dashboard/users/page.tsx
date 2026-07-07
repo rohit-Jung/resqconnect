@@ -37,7 +37,7 @@ export default function UsersPage() {
     search: debouncedSearch,
   });
 
-  const payload = data?.data;
+  const payload = data?.data?.data;
   const users = payload?.users ?? [];
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

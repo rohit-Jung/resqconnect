@@ -156,7 +156,7 @@ export default function PlansManagementPage() {
   const updatePlan = useUpdateSubscriptionPlan();
   const deletePlan = useDeleteSubscriptionPlan();
 
-  const plans = plansData?.data?.plans ?? [];
+  const plans = plansData?.data?.data?.plans ?? [];
 
   const formatAmount = (paisa: number) => {
     return `NPR ${(paisa / 100).toFixed(2)}`;
