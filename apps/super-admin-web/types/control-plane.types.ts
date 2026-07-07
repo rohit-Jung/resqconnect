@@ -4,47 +4,54 @@ export type CpAdmin = {
 };
 
 export type CpLoginResponse = {
-  ok: true;
-  token: string;
-  admin: CpAdmin;
+  statusCode: number;
+  message: string;
+  data: {
+    token: string;
+    admin: CpAdmin;
+  };
+  success: boolean;
 };
 
 export type CpMeResponse = {
-  ok: true;
-  admin: CpAdmin;
+  statusCode: number;
+  message: string;
+  data: {
+    admin: CpAdmin;
+  };
+  success: boolean;
+};
+
+type CpOrgShape = {
+  id: string;
+  name: string;
+  sector: 'hospital' | 'police' | 'fire';
+  status: 'pending_approval' | 'active' | 'suspended' | 'trial_expired';
+  siloBaseUrl: string;
+  siloOrgId: string | null;
+  planId: string | null;
+  databaseUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CpOrgsListResponse = {
-  ok: true;
-  orgs: Array<{
-    id: string;
-    name: string;
-    sector: 'hospital' | 'police' | 'fire';
-    status: 'pending_approval' | 'active' | 'suspended' | 'trial_expired';
-    siloBaseUrl: string;
-    siloOrgId: string | null;
-    createdAt: string;
-    updatedAt: string;
-  }>;
+  statusCode: number;
+  message: string;
+  data: {
+    orgs: CpOrgShape[];
+  };
+  success: boolean;
 };
 
 export type CpOrgGetResponse = {
   ok: true;
-  org: {
-    id: string;
-    name: string;
-    sector: 'hospital' | 'police' | 'fire';
-    status: 'pending_approval' | 'active' | 'suspended' | 'trial_expired';
-    siloBaseUrl: string;
-    siloOrgId: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
-  replica?: {
+  org: CpOrgShape;
+  replica: {
     snapshot: unknown;
     capturedAt: string;
   } | null;
-  siloMetricsLatest?: {
+  siloMetricsLatest: {
     sector: string;
     metrics: unknown;
     collectedAt: string;
@@ -62,15 +69,14 @@ export type CpOrgEntitlementsSnapshot = {
   createdAt: string;
 };
 
-export type CpOrgEntitlementsGetResponse =
-  | {
-      ok: true;
-      snapshot: CpOrgEntitlementsSnapshot;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
+export type CpOrgEntitlementsGetResponse = {
+  statusCode: number;
+  message: string;
+  data: {
+    snapshot: CpOrgEntitlementsSnapshot;
+  };
+  success: boolean;
+};
 
 export type CpOrgEntitlementsSetResponse =
   | {
@@ -97,11 +103,15 @@ export type CpUser = {
 };
 
 export type CpUsersListResponse = {
-  ok: true;
-  total: number;
-  page: number;
-  limit: number;
-  users: CpUser[];
+  statusCode: number;
+  message: string;
+  data: {
+    total: number;
+    page: number;
+    limit: number;
+    users: CpUser[];
+  };
+  success: boolean;
 };
 
 export type CpPaymentsListResponse = {
@@ -124,15 +134,19 @@ export type CpPaymentsListResponse = {
 };
 
 export type CpPlansListResponse = {
-  ok: true;
-  plans: Array<{
-    id: string;
-    name: string;
-    price: number;
-    durationMonths: number;
-    features: string[];
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-  }>;
+  statusCode: number;
+  message: string;
+  data: {
+    plans: Array<{
+      id: string;
+      name: string;
+      price: number;
+      durationMonths: number;
+      features: string[];
+      isActive: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  success: boolean;
 };
