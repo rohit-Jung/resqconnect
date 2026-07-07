@@ -25,20 +25,15 @@ api.interceptors.request.use(
   }
 );
 
-// add response interceptor to handle auth errors
 api.interceptors.response.use(
   response => response,
   error => {
-    if (error.response?.status === 401) {
-      // Clear token and redirect to login
+    if (
+      error.response?.status === 401 &&
+      window.location.pathname !== '/login'
+    ) {
       removeTokenFromStorage('adminToken');
-      if (typeof window !== 'undefined') {
-        // Avoid hard-reloading the login page when a login attempt fails (401).
-        // The login screen should show an error instead.
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-      }
+      window.location.href = '/login?expired=1';
     }
     return Promise.reject(error);
   }

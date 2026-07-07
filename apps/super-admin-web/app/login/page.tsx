@@ -7,6 +7,7 @@ import { Label } from '@repo/ui/label';
 
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -37,6 +38,8 @@ function parseApiError(err: unknown): string {
 }
 
 export default function SuperAdminLoginPage() {
+  const searchParams = useSearchParams();
+  const expired = searchParams.get('expired') === '1';
   const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useSuperAdminLogin();
   const router = useRouter();
@@ -132,6 +135,11 @@ export default function SuperAdminLoginPage() {
                 Enter your credentials to access the admin portal
               </p>
             </div>
+            {expired && (
+              <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                Session expired. Please log in again.
+              </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
