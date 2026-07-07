@@ -4,15 +4,6 @@
  * Frontend API clients import these for type-safe HTTP calls.
  */
 
-// Generic API response wrapper
-
-export interface ApiResponse<T = unknown> {
-  statusCode: number;
-  message: string;
-  data: T;
-  success: boolean;
-}
-
 // Auth endpoints
 
 export namespace AuthEndpoints {
