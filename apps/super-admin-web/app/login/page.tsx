@@ -6,9 +6,8 @@ import { Input } from '@repo/ui/input';
 import { Label } from '@repo/ui/label';
 
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -22,22 +21,32 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function parseApiError(err: unknown): string {
-  const axiosErr = err as {
-    response?: {
-      data?: { message?: string; errors?: string[]; error?: string };
-    };
-  };
-  const data = axiosErr?.response?.data;
-  if (!data) return 'Something went wrong. Please try again.';
-  if (data.errors && Array.isArray(data.errors) && data.errors.length > 0)
-    return data.errors.join(', ');
-  if (data.error) return data.error;
-  if (data.message) return data.message;
-  return 'Something went wrong. Please try again.';
+export default function SuperAdminLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
 }
 
-export default function SuperAdminLoginPage() {
+function parseApiError(err: unknown): string {
+  const axiosErr = err as { response?: { data?: Record<string, unknown> } };
+  const data = axiosErr?.response?.data;
+  if (!data) return 'Something went wrong.';
+  if (data.message) return String(data.message);
+  if (data.error) return String(data.error);
+  if (data.errors && Array.isArray(data.errors))
+    return (data.errors as string[]).join(', ');
+  return 'Something went wrong.';
+}
+
+function LoginForm() {
   const searchParams = useSearchParams();
   const expired = searchParams.get('expired') === '1';
   const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +76,6 @@ export default function SuperAdminLoginPage() {
         router.push('/dashboard');
       },
       onError: error => {
-        console.log('ERROR', parseApiError(error));
         toast.error(parseApiError(error));
       },
     });
@@ -76,7 +84,6 @@ export default function SuperAdminLoginPage() {
   return (
     <GuestGuard>
       <div className="flex min-h-screen">
-        {/* Left Side - Swiss Design */}
         <div className="hidden flex-col justify-between bg-foreground p-12 text-background lg:flex lg:w-[45%]">
           <div className="flex flex-1 flex-col items-start justify-center px-8">
             <span className="mb-6 font-mono text-[10px] uppercase tracking-[0.2em] text-background/40">
@@ -92,7 +99,6 @@ export default function SuperAdminLoginPage() {
               Full administrative access to manage organizations, users, and
               monitor system-wide emergency response operations.
             </p>
-
             <div className="w-full max-w-xs border-t border-background/10 pt-6">
               <div className="grid grid-cols-3 gap-6">
                 <div>
@@ -116,7 +122,6 @@ export default function SuperAdminLoginPage() {
               </div>
             </div>
           </div>
-
           <div className="border-t border-background/10 pt-6">
             <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-background/30">
               Authorized Administrators Only
@@ -124,7 +129,6 @@ export default function SuperAdminLoginPage() {
           </div>
         </div>
 
-        {/* Right Side - Login Form */}
         <div className="bg-background flex w-full items-center justify-center p-8 lg:w-[55%]">
           <div className="w-full max-w-md">
             <div className="mb-8">
@@ -140,7 +144,6 @@ export default function SuperAdminLoginPage() {
                 Session expired. Please log in again.
               </div>
             )}
-
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email">Email address</Label>
@@ -158,7 +161,6 @@ export default function SuperAdminLoginPage() {
                   <p className="text-sm text-red-500">{errors.email.message}</p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
@@ -188,7 +190,6 @@ export default function SuperAdminLoginPage() {
                   </p>
                 )}
               </div>
-
               <Button
                 type="submit"
                 className="h-11 w-full"
@@ -204,7 +205,6 @@ export default function SuperAdminLoginPage() {
                 )}
               </Button>
             </form>
-
             <p className="text-muted-foreground mt-6 text-center text-xs">
               This portal is restricted to authorized super administrators only.
             </p>
