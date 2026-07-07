@@ -98,7 +98,7 @@ export default function ServiceProviderDetailPage({
   const deleteMutation = useOrgDeleteProvider();
   const verifyMutation = useOrgVerifyProvider();
 
-  const responder = providerData?.data?.data;
+  const responder = providerData?.data?.data?.serviceProvider;
 
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this responder?')) {

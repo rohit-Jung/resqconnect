@@ -29,8 +29,11 @@ import { useState } from 'react';
 
 import { BulkUploadProvidersModal } from '@/components/bulk-upload-providers-modal';
 import {
-  useOrgDeleteProvider,
+  type IServiceProvider,
   useOrgServiceProviders,
+} from '@/services/organization/providers.api';
+import {
+  useOrgDeleteProvider,
   useOrgVerifyProvider,
 } from '@/services/service-provider/auth.api';
 import { ServiceStatus, ServiceType } from '@/types/auth.types';
@@ -93,7 +96,7 @@ export default function ServiceProvidersPage() {
   const deleteMutation = useOrgDeleteProvider();
   const verifyMutation = useOrgVerifyProvider();
 
-  const responders = providersData?.data?.data || [];
+  const responders: IServiceProvider[] = providersData?.data?.data || [];
 
   // Filter responders
   const filteredProviders = responders.filter(responder => {

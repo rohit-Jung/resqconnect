@@ -31,7 +31,7 @@ export default function EditServiceProviderPage({
   const { data: providerData, isLoading } = useOrgServiceProvider(id);
   const updateMutation = useOrgUpdateProvider();
 
-  const responder = providerData?.data?.data;
+  const responder = providerData?.data?.data?.serviceProvider;
 
   const {
     register,

@@ -90,7 +90,7 @@ export default function LiveTrackingPage() {
   const { data: analyticsResponse, isLoading: analyticsLoading } =
     useOrgDashboardAnalytics();
 
-  const responders = providersResponse?.data?.data ?? [];
+  const responders: IServiceProvider[] = providersResponse?.data?.data ?? [];
   const analytics = analyticsResponse?.data?.data;
   const isLoading = providersLoading || analyticsLoading;
 

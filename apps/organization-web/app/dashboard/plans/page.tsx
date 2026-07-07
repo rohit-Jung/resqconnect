@@ -21,8 +21,8 @@ import { useState } from 'react';
 import {
   useGetActiveSubscription,
   useGetPaymentHistory,
-  useGetSubscriptionPlans,
-  useSubscribeToPlan,
+  useGetPaymentPlans,
+  useSubscribe,
 } from '@/services/organization/payments.api';
 
 function derivePlanFeatures(features: string[]): string[] {
@@ -83,19 +83,19 @@ export default function PlansPage() {
     data: plansData,
     isLoading: plansLoading,
     isError: plansError,
-  } = useGetSubscriptionPlans();
+  } = useGetPaymentPlans();
   const { data: subscriptionData, isLoading: subscriptionLoading } =
     useGetActiveSubscription();
   const { data: historyData, isLoading: historyLoading } = useGetPaymentHistory(
     { page: paymentPage, limit: 5 }
   );
-  const subscribeMutation = useSubscribeToPlan();
+  const subscribeMutation = useSubscribe();
 
-  const plans = plansData?.data?.plans ?? [];
+  const plans = plansData?.data?.data ?? [];
   const activeSubscription = subscriptionData?.data?.subscription ?? null;
-  const history = historyData?.data;
-  const payments = history?.payments ?? [];
-  const pagination = history?.pagination;
+  const historyPayload = historyData?.data;
+  const payments = historyPayload?.payments ?? [];
+  const pagination = historyPayload?.pagination;
 
   const formatAmount = (paisa: number) => {
     return `NPR ${(paisa / 100).toFixed(2)}`;
@@ -108,7 +108,7 @@ export default function PlansPage() {
         planId,
         returnUrl: `${window.location.origin}/payment/success`,
       });
-      const paymentUrl = response.data.data.payment_url;
+      const paymentUrl = response.data.data.paymentUrl;
       window.location.assign(paymentUrl);
     } catch {
       setSubscribingPlanId(null);

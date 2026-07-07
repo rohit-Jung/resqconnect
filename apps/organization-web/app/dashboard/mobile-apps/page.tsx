@@ -7,7 +7,10 @@ import { Download, Info, Loader2, Monitor, Smartphone } from 'lucide-react';
 import { FaAndroid, FaApple } from 'react-icons/fa';
 
 import { useOrgDashboardAnalytics } from '@/services/organization/dashboard.api';
-import { useOrgServiceProviders } from '@/services/organization/providers.api';
+import {
+  type IServiceProvider,
+  useOrgServiceProviders,
+} from '@/services/organization/providers.api';
 
 const APP_CONFIG = {
   ios: { version: '1.0.0', storeUrl: '#' },
@@ -22,7 +25,7 @@ export default function MobileAppsPage() {
     useOrgServiceProviders();
 
   const analytics = analyticsResponse?.data?.data;
-  const responders = providersResponse?.data?.data ?? [];
+  const responders: IServiceProvider[] = providersResponse?.data?.data ?? [];
   const isLoading = analyticsLoading || providersLoading;
 
   const totalProviders = analytics?.providers.total ?? 0;

@@ -231,11 +231,16 @@ export default function VerificationDetailPage() {
                 <Clock className="text-muted-foreground h-4 w-4" />
                 <span className="text-sm">
                   Submitted:{' '}
-                  {new Date(responder.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {responder.createdAt
+                    ? new Date(responder.createdAt).toLocaleDateString(
+                        'en-US',
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        }
+                      )
+                    : 'N/A'}
                 </span>
               </div>
             </div>
@@ -298,7 +303,10 @@ export default function VerificationDetailPage() {
                 {responder.panCardUrl ? (
                   <div
                     className="group relative cursor-pointer overflow-hidden rounded-lg border"
-                    onClick={() => setSelectedImage(responder.panCardUrl)}
+                    onClick={() =>
+                      responder.panCardUrl &&
+                      setSelectedImage(responder.panCardUrl)
+                    }
                   >
                     <Image
                       src={responder.panCardUrl}
@@ -342,7 +350,10 @@ export default function VerificationDetailPage() {
                 {responder.citizenshipUrl ? (
                   <div
                     className="group relative cursor-pointer overflow-hidden rounded-lg border"
-                    onClick={() => setSelectedImage(responder.citizenshipUrl)}
+                    onClick={() =>
+                      responder.citizenshipUrl &&
+                      setSelectedImage(responder.citizenshipUrl)
+                    }
                   >
                     <Image
                       src={responder.citizenshipUrl}

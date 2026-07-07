@@ -77,7 +77,10 @@ export default function EmergencyReportsPage() {
     if (selectedStatus === 'all') {
       return allReports;
     }
-    return allReports.filter(report => report.requestStatus === selectedStatus);
+    return allReports.filter(
+      (report: { requestStatus: string }) =>
+        report.requestStatus === selectedStatus
+    );
   }, [allReports, selectedStatus]);
 
   const statusOptions: {

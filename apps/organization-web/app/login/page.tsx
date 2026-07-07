@@ -15,8 +15,11 @@ import { toast } from 'sonner';
 
 import { GuestGuard } from '@/components/guest-guard';
 import { setTokenToStorage } from '@/lib/hooks/useLocalStorage';
-import { useOrgLogin } from '@/services/organization/auth.api';
-import { IOrgLoginResponse } from '@/types/auth.types';
+import {
+  type OrgLoginOtpResponse,
+  type OrgLoginSuccessResponse,
+  useOrgLogin,
+} from '@/services/organization/auth.api';
 import { TLoginUser, loginUserSchema } from '@/validations/auth.schema';
 
 export const dynamic = 'force-dynamic';
@@ -59,9 +62,7 @@ export default function LoginPage() {
         const responseData = response.data.data;
 
         if ('organizationId' in responseData) {
-          const otpData = responseData as {
-            organizationId: string;
-          };
+          const otpData = responseData as OrgLoginOtpResponse;
           console.log('OTP Response:', otpData);
 
           toast.success('OTP sent to your email');
@@ -69,7 +70,7 @@ export default function LoginPage() {
             `/verify?organizationId=${otpData.organizationId}&email=${encodeURIComponent(data.email)}`
           );
         } else {
-          const loginData = responseData as IOrgLoginResponse;
+          const loginData = responseData as OrgLoginSuccessResponse;
           if (loginData.token) {
             setTokenToStorage('token', loginData.token);
           }

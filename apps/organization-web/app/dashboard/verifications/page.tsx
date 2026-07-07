@@ -289,7 +289,11 @@ export default function VerificationsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-muted-foreground text-sm dark:text-muted-foreground">
-                            {new Date(responder.createdAt).toLocaleDateString()}
+                            {responder.createdAt
+                              ? new Date(
+                                  responder.createdAt
+                                ).toLocaleDateString()
+                              : 'N/A'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">

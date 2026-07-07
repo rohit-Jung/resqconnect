@@ -53,7 +53,7 @@ export default function SettingsPage() {
         name: name !== orgData?.name ? name : undefined,
         generalNumber:
           generalNumber !== orgData?.generalNumber?.toString()
-            ? generalNumber
+            ? Number(generalNumber)
             : undefined,
       });
       setDraftName(null);

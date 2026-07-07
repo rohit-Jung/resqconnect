@@ -85,8 +85,9 @@ export default function NewServiceProviderPage() {
   // Fetch org data to get the allowed service type
   const { data: analyticsResponse, isLoading: isLoadingOrg } =
     useOrgDashboardAnalytics();
-  const orgServiceCategory =
-    analyticsResponse?.data?.data?.organization?.serviceCategory;
+  const org = analyticsResponse?.data?.data?.organization;
+  const orgServiceCategory = org?.serviceCategory;
+  const orgId = org?.id;
 
   // The allowed service type is the same as the org's service category
   const allowedServiceType = orgServiceCategory as ServiceType | undefined;
@@ -115,10 +116,15 @@ export default function NewServiceProviderPage() {
     try {
       const { confirmPassword: _confirmPassword, ...formData } = data;
       void _confirmPassword;
+      if (!orgId) {
+        alert('Organization information not available');
+        return;
+      }
       const apiData = {
         ...formData,
         age: parseInt(data.age, 10),
         phoneNumber: parseInt(data.phoneNumber, 10),
+        organizationId: orgId,
         // Only include document URLs if they are provided
         ...(formData.panCardUrl &&
           formData.panCardUrl.trim() !== '' && {
